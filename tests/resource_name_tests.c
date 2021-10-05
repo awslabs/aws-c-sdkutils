@@ -134,7 +134,8 @@ static int s_test_resource_name_tostring(struct aws_allocator *allocator, void *
         .service = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("s3"),
         .region = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL(""),
         .account_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("123456789"),
-        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("bucket/key")};
+        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("bucket/key"),
+    };
     ASSERT_SUCCESS(aws_byte_buf_append_resource_name(&static_buffer, &arn_03));
     ASSERT_BIN_ARRAYS_EQUALS(
         "arn:aws:s3::123456789:bucket/key",
@@ -202,7 +203,8 @@ static int s_test_resource_name_length(struct aws_allocator *allocator, void *ct
         .service = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("cloudformation"),
         .region = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("us-west-2"),
         .account_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("12345678910"),
-        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("stack/MyStack")};
+        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("stack/MyStack"),
+    };
     ASSERT_SUCCESS(aws_resource_name_length(&arn_02, &arn_length));
     ASSERT_UINT_EQUALS(strlen("arn:aws:cloudformation:us-west-2:12345678910:stack/MyStack"), arn_length);
 
