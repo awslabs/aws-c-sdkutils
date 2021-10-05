@@ -22,19 +22,19 @@ AWS_EXTERN_C_BEGIN
     Given an ARN "Amazon Resource Name" represented as an in memory a
     structure representing the parts
 */
-AWS_COMMON_API
+AWS_SDKUTILS_API
 int aws_resource_name_init_from_cur(struct aws_resource_name *arn, const struct aws_byte_cursor *input);
 
 /**
     Calculates the space needed to write an ARN to a byte buf
 */
-AWS_COMMON_API
+AWS_SDKUTILS_API
 int aws_resource_name_length(const struct aws_resource_name *arn, size_t *size);
 
 /**
     Serializes an ARN structure into the lexical string format
 */
-AWS_COMMON_API
+AWS_SDKUTILS_API
 int aws_byte_buf_append_resource_name(struct aws_byte_buf *buf, const struct aws_resource_name *arn);
 
 AWS_EXTERN_C_END
