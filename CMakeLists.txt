@@ -62,7 +62,7 @@ file(GLOB SDKUTILS_SRC
 add_library(${PROJECT_NAME} ${SDKUTILS_SRC})
 aws_set_common_properties(${PROJECT_NAME} NO_WEXTRA)
 aws_prepare_symbol_visibility_args(${PROJECT_NAME} "AWS_SDKUTILS")
-aws_add_sanitizers(${PROJECT_NAME} BLACKLIST "sanitizer-blacklist.txt")
+aws_add_sanitizers(${PROJECT_NAME})
 
 aws_use_package(aws-c-common)
 target_link_libraries(${PROJECT_NAME} PUBLIC ${DEP_AWS_LIBS} ${PLATFORM_LIBS})
