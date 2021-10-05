@@ -6,6 +6,8 @@
 #define AWS_COMMON_RESOURCE_NAME_H
 #pragma once
 
+#include <aws/sdkutils/exports.h>
+
 #include <aws/common/byte_buf.h>
 
 struct aws_resource_name {
