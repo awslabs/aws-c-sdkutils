@@ -102,7 +102,8 @@ static int s_test_resource_name_tostring(struct aws_allocator *allocator, void *
         .service = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("iam"),
         .region = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL(""),
         .account_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("123456789"),
-        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("group/crt")};
+        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("group/crt"),
+    };
     ASSERT_SUCCESS(aws_byte_buf_append_resource_name(&buffer, &arn_01));
     ASSERT_BIN_ARRAYS_EQUALS(
         "arn:aws-us-gov:iam::123456789:group/crt",
@@ -116,7 +117,8 @@ static int s_test_resource_name_tostring(struct aws_allocator *allocator, void *
         .service = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("cloudformation"),
         .region = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("us-west-2"),
         .account_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("12345678910"),
-        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("stack/MyStack")};
+        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("stack/MyStack"),
+    };
     ASSERT_SUCCESS(aws_byte_buf_append_resource_name(&buffer, &arn_02));
     ASSERT_BIN_ARRAYS_EQUALS(
         "arn:aws:cloudformation:us-west-2:12345678910:stack/MyStack",
@@ -156,7 +158,8 @@ static int s_test_resource_name_tostring_failure(struct aws_allocator *allocator
         .service = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("dynamodb"),
         .region = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("cn-northwest-1"),
         .account_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("123456789"),
-        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("Table/Books")};
+        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("Table/Books"),
+    };
     ASSERT_ERROR(AWS_ERROR_DEST_COPY_TOO_SMALL, aws_byte_buf_append_resource_name(&too_small_buffer, &arn_01));
     aws_byte_buf_clean_up(&too_small_buffer);
 
@@ -167,7 +170,8 @@ static int s_test_resource_name_tostring_failure(struct aws_allocator *allocator
         .service = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("s3"),
         .region = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL(""),
         .account_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("123456789"),
-        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("bucket/key")};
+        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("bucket/key"),
+    };
     ASSERT_ERROR(AWS_ERROR_DEST_COPY_TOO_SMALL, aws_byte_buf_append_resource_name(&static_buffer, &arn_02));
 
     return AWS_OP_SUCCESS;
@@ -187,7 +191,8 @@ static int s_test_resource_name_length(struct aws_allocator *allocator, void *ct
         .service = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("iam"),
         .region = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL(""),
         .account_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("123456789"),
-        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("group:crt")};
+        .resource_id = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("group:crt"),
+    };
     ASSERT_SUCCESS(aws_resource_name_length(&arn_01, &arn_length));
     ASSERT_UINT_EQUALS(strlen("arn:aws-us-gov:iam::123456789:group:crt"), arn_length);
 
