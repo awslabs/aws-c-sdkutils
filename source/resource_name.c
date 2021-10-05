@@ -13,7 +13,6 @@ static const char ARN_DELIMETER_CHAR = ':';
 
 static const size_t DELIMETER_LEN = 8; /* strlen("arn:::::") */
 
-AWS_COMMON_API
 int aws_resource_name_init_from_cur(struct aws_resource_name *arn, const struct aws_byte_cursor *input) {
     struct aws_byte_cursor arn_parts[ARN_PARTS_COUNT];
     struct aws_array_list arn_part_list;
@@ -45,7 +44,6 @@ int aws_resource_name_init_from_cur(struct aws_resource_name *arn, const struct 
     return AWS_OP_SUCCESS;
 }
 
-AWS_COMMON_API
 int aws_resource_name_length(const struct aws_resource_name *arn, size_t *size) {
     AWS_PRECONDITION(aws_byte_cursor_is_valid(&arn->partition));
     AWS_PRECONDITION(aws_byte_cursor_is_valid(&arn->service));
@@ -59,7 +57,6 @@ int aws_resource_name_length(const struct aws_resource_name *arn, size_t *size) 
     return AWS_OP_SUCCESS;
 }
 
-AWS_COMMON_API
 int aws_byte_buf_append_resource_name(struct aws_byte_buf *buf, const struct aws_resource_name *arn) {
     AWS_PRECONDITION(aws_byte_buf_is_valid(buf));
     AWS_PRECONDITION(aws_byte_cursor_is_valid(&arn->partition));
