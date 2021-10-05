@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0.
  */
 
-
 #include <aws/sdkutils/sdkutils.h>
 
 /* clang-format off */
