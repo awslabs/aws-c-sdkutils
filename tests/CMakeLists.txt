@@ -7,5 +7,11 @@ file(GLOB TESTS ${TEST_HDRS} ${TEST_SRC})
 
 add_test_case(sdkutils_library_test)
 
+add_test_case(parse_resource_name_test)
+add_test_case(parse_resource_name_failures_test)
+add_test_case(resource_name_tostring_test)
+add_test_case(resource_name_tostring_failure_test)
+add_test_case(resource_name_length_test)
+
 set(TEST_BINARY_NAME ${PROJECT_NAME}-tests)
 generate_test_driver(${TEST_BINARY_NAME})
