@@ -5,8 +5,8 @@
 
 #include <aws/testing/aws_test_harness.h>
 
-#include <aws/sdkutils/aws_profile.h>
 #include <aws/common/string.h>
+#include <aws/sdkutils/aws_profile.h>
 
 static int s_do_aws_profile_fatal_parse_test(
     struct aws_allocator *allocator,
