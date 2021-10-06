@@ -13,6 +13,27 @@
 #define PROPERTIES_TABLE_DEFAULT_SIZE 4
 #define PROFILE_TABLE_DEFAULT_SIZE 5
 
+struct aws_profile_property {
+    struct aws_allocator *allocator;
+    struct aws_string *name;
+    struct aws_string *value;
+    struct aws_hash_table sub_properties;
+    bool is_empty_valued;
+};
+
+struct aws_profile {
+    struct aws_allocator *allocator;
+    struct aws_string *name;
+    struct aws_hash_table properties;
+    bool has_profile_prefix;
+};
+
+struct aws_profile_collection {
+    struct aws_allocator *allocator;
+    enum aws_profile_source_type profile_source;
+    struct aws_hash_table profiles;
+};
+
 /*
  * Character-based profile parse helper functions
  */
@@ -501,7 +522,7 @@ on_property_new_failure:
     return NULL;
 }
 
-struct aws_profile_property *aws_profile_get_property(
+const struct aws_profile_property *aws_profile_get_property(
     const struct aws_profile *profile,
     const struct aws_string *property_name) {
 
@@ -515,6 +536,11 @@ struct aws_profile_property *aws_profile_get_property(
     return element->value;
 }
 
+const struct aws_string *aws_profile_property_get_value(const struct aws_profile_property *property) {
+    AWS_PRECONDITION(property);
+    return property->value;
+}
+
 static int s_profile_merge(struct aws_profile *dest_profile, const struct aws_profile *source_profile) {
 
     AWS_ASSERT(dest_profile != NULL && source_profile != NULL);
@@ -525,7 +551,7 @@ static int s_profile_merge(struct aws_profile *dest_profile, const struct aws_pr
     while (!aws_hash_iter_done(&source_iter)) {
         struct aws_profile_property *source_property = (struct aws_profile_property *)source_iter.element.value;
         struct aws_profile_property *dest_property =
-            aws_profile_get_property(dest_profile, (struct aws_string *)source_iter.element.key);
+            (struct aws_profile_property*)aws_profile_get_property(dest_profile, (struct aws_string *)source_iter.element.key);
         if (dest_property == NULL) {
 
             struct aws_byte_cursor empty_value;
@@ -574,7 +600,7 @@ void aws_profile_collection_destroy(struct aws_profile_collection *profile_colle
     aws_mem_release(profile_collection->allocator, profile_collection);
 }
 
-struct aws_profile *aws_profile_collection_get_profile(
+const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name) {
     struct aws_hash_element *element = NULL;
@@ -675,7 +701,7 @@ static int s_profile_collection_merge(
     while (!aws_hash_iter_done(&source_iter)) {
         struct aws_profile *source_profile = (struct aws_profile *)source_iter.element.value;
         struct aws_profile *dest_profile =
-            aws_profile_collection_get_profile(dest_collection, (struct aws_string *)source_iter.element.key);
+            (struct aws_profile*)aws_profile_collection_get_profile(dest_collection, (struct aws_string *)source_iter.element.key);
 
         if (dest_profile == NULL) {
 

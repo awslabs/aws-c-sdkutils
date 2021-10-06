@@ -15,7 +15,7 @@
 #define EXPECT_PROFILE(profile_collection, profile_name)                                                               \
     {                                                                                                                  \
         struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);        \
+        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
         aws_string_destroy(profile_name_str);                                                                          \
         ASSERT_TRUE(profile != NULL);                                                                                  \
     }
@@ -23,7 +23,7 @@
 #define EXPECT_PROPERTY_COUNT(profile_collection, profile_name, expected_property_count)                               \
     {                                                                                                                  \
         struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);        \
+        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
         aws_string_destroy(profile_name_str);                                                                          \
         ASSERT_TRUE(aws_profile_get_property_count(profile) == (expected_property_count));                             \
     }
@@ -31,20 +31,22 @@
 #define EXPECT_PROPERTY(profile_collection, profile_name, property_name, expected_property_value)                      \
     {                                                                                                                  \
         struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);        \
+        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
-        struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);                  \
+        const struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);            \
         aws_string_destroy(property_name_str);                                                                         \
         aws_string_destroy(profile_name_str);                                                                          \
-        ASSERT_TRUE(property != NULL && strcmp(expected_property_value, aws_string_c_str(property->value)) == 0);      \
+        ASSERT_TRUE(                                                                                                   \
+            property != NULL &&                                                                                        \
+            strcmp(expected_property_value, aws_string_c_str(aws_profile_property_get_value(property))) == 0);         \
     }
 
 #define EXPECT_SUB_PROPERTY_COUNT(profile_collection, profile_name, property_name, expected_sub_property_count)        \
     {                                                                                                                  \
         struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);        \
+        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
-        struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);                  \
+        const struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);            \
         aws_string_destroy(property_name_str);                                                                         \
         aws_string_destroy(profile_name_str);                                                                          \
         ASSERT_UINT_EQUALS((expected_sub_property_count), aws_profile_property_get_sub_property_count(property));      \
@@ -54,9 +56,9 @@
     profile_collection, profile_name, property_name, sub_property_name, expected_sub_property_value)                   \
     {                                                                                                                  \
         struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);        \
+        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
-        struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);                  \
+        const struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);            \
         struct aws_string *sub_property_name_str = aws_string_new_from_c_str(allocator, sub_property_name);            \
         const struct aws_string *sub_property_value =                                                                  \
             aws_profile_property_get_sub_property(property, sub_property_name_str);                                    \

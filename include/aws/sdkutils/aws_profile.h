@@ -27,32 +27,15 @@ struct aws_byte_cursor;
  * The profile specification is informally defined as "what the aws cli does" and
  * formally defined in internal aws documents.
  */
-struct aws_profile_property {
-    struct aws_allocator *allocator;
-    struct aws_string *name;
-    struct aws_string *value;
-    struct aws_hash_table sub_properties;
-    bool is_empty_valued;
-};
-
-struct aws_profile {
-    struct aws_allocator *allocator;
-    struct aws_string *name;
-    struct aws_hash_table properties;
-    bool has_profile_prefix;
-};
+struct aws_profile_property;
+struct aws_profile;
+struct aws_profile_collection;
 
 /**
  * The profile specification has rule exceptions based on what file
  * the profile collection comes from.
  */
 enum aws_profile_source_type { AWS_PST_NONE, AWS_PST_CONFIG, AWS_PST_CREDENTIALS };
-
-struct aws_profile_collection {
-    struct aws_allocator *allocator;
-    enum aws_profile_source_type profile_source;
-    struct aws_hash_table profiles;
-};
 
 AWS_EXTERN_C_BEGIN
 
@@ -96,10 +79,10 @@ struct aws_profile_collection *aws_profile_collection_new_from_buffer(
     enum aws_profile_source_type source);
 
 /**
- * Retrieves a profile with the specified name, if it exists, from the profile collection
+ * Retrieves a reference to a profile with the specified name, if it exists, from the profile collection
  */
 AWS_SDKUTILS_API
-struct aws_profile *aws_profile_collection_get_profile(
+const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name);
 
@@ -114,10 +97,10 @@ size_t aws_profile_collection_get_profile_count(const struct aws_profile_collect
  **************/
 
 /**
- * Retrieves a property with the specified name, if it exists, from a profile
+ * Retrieves a reference to a property with the specified name, if it exists, from a profile
  */
 AWS_SDKUTILS_API
-struct aws_profile_property *aws_profile_get_property(
+const struct aws_profile_property *aws_profile_get_property(
     const struct aws_profile *profile,
     const struct aws_string *property_name);
 
@@ -127,12 +110,15 @@ struct aws_profile_property *aws_profile_get_property(
 AWS_SDKUTILS_API
 size_t aws_profile_get_property_count(const struct aws_profile *profile);
 
+AWS_SDKUTILS_API
+const struct aws_string *aws_profile_property_get_value(const struct aws_profile_property *property);
+
 /***********************
  * profile property APIs
  ***********************/
 
 /**
- * Returns the value of a sub property with the given name, if it exists, in the property
+ * Returns a reference to the value of a sub property with the given name, if it exists, in the property
  */
 AWS_SDKUTILS_API
 const struct aws_string *aws_profile_property_get_sub_property(
@@ -152,6 +138,8 @@ size_t aws_profile_property_get_sub_property_count(const struct aws_profile_prop
 /**
  * Computes the final platform-specific path for the profile credentials file.  Does limited home directory
  * expansion/resolution.
+ * 
+ * override_path, if not null, will be searched first instead of using the standard home directory config path
  */
 AWS_SDKUTILS_API
 struct aws_string *aws_get_credentials_file_path(
@@ -161,6 +149,8 @@ struct aws_string *aws_get_credentials_file_path(
 /**
  * Computes the final platform-specific path for the profile config file.  Does limited home directory
  * expansion/resolution.
+ * 
+ * override_path, if not null, will be searched first instead of using the standard home directory config path
  */
 AWS_SDKUTILS_API
 struct aws_string *aws_get_config_file_path(
