@@ -92,6 +92,12 @@ const struct aws_profile *aws_profile_collection_get_profile(
 AWS_SDKUTILS_API
 size_t aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection);
 
+/**
+ * Returns a reference to the name of the provided profile
+ */
+AWS_SDKUTILS_API
+const struct aws_string *aws_profile_get_name(const struct aws_profile *profile);
+
 /**************
  * profile APIs
  **************/
@@ -110,6 +116,9 @@ const struct aws_profile_property *aws_profile_get_property(
 AWS_SDKUTILS_API
 size_t aws_profile_get_property_count(const struct aws_profile *profile);
 
+/**
+ * Returns a reference to the property's string value
+ */
 AWS_SDKUTILS_API
 const struct aws_string *aws_profile_property_get_value(const struct aws_profile_property *property);
 
@@ -138,7 +147,7 @@ size_t aws_profile_property_get_sub_property_count(const struct aws_profile_prop
 /**
  * Computes the final platform-specific path for the profile credentials file.  Does limited home directory
  * expansion/resolution.
- * 
+ *
  * override_path, if not null, will be searched first instead of using the standard home directory config path
  */
 AWS_SDKUTILS_API
@@ -149,7 +158,7 @@ struct aws_string *aws_get_credentials_file_path(
 /**
  * Computes the final platform-specific path for the profile config file.  Does limited home directory
  * expansion/resolution.
- * 
+ *
  * override_path, if not null, will be searched first instead of using the standard home directory config path
  */
 AWS_SDKUTILS_API

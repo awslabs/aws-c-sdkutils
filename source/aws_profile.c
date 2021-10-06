@@ -550,8 +550,8 @@ static int s_profile_merge(struct aws_profile *dest_profile, const struct aws_pr
     struct aws_hash_iter source_iter = aws_hash_iter_begin(&source_profile->properties);
     while (!aws_hash_iter_done(&source_iter)) {
         struct aws_profile_property *source_property = (struct aws_profile_property *)source_iter.element.value;
-        struct aws_profile_property *dest_property =
-            (struct aws_profile_property*)aws_profile_get_property(dest_profile, (struct aws_string *)source_iter.element.key);
+        struct aws_profile_property *dest_property = (struct aws_profile_property *)aws_profile_get_property(
+            dest_profile, (struct aws_string *)source_iter.element.key);
         if (dest_property == NULL) {
 
             struct aws_byte_cursor empty_value;
@@ -700,8 +700,8 @@ static int s_profile_collection_merge(
     struct aws_hash_iter source_iter = aws_hash_iter_begin(&source_collection->profiles);
     while (!aws_hash_iter_done(&source_iter)) {
         struct aws_profile *source_profile = (struct aws_profile *)source_iter.element.value;
-        struct aws_profile *dest_profile =
-            (struct aws_profile*)aws_profile_collection_get_profile(dest_collection, (struct aws_string *)source_iter.element.key);
+        struct aws_profile *dest_profile = (struct aws_profile *)aws_profile_collection_get_profile(
+            dest_collection, (struct aws_string *)source_iter.element.key);
 
         if (dest_profile == NULL) {
 
@@ -1515,4 +1515,9 @@ const struct aws_string *aws_profile_property_get_sub_property(
     }
 
     return (const struct aws_string *)element->value;
+}
+
+const struct aws_string *aws_profile_get_name(const struct aws_profile *profile) {
+    AWS_PRECONDITION(profile);
+    return profile->name;
 }
