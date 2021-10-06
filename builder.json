@@ -1,7 +1,7 @@
 {
     "name": "aws-c-sdkutils",
     "upstream": [
-        { "name": "aws-c-common" }
+        { "name": "aws-c-common", "revision": "profile" }
     ],
     "test_steps": [
         "test"
