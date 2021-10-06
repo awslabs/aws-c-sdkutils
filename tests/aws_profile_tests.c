@@ -5,7 +5,7 @@
 
 #include <aws/testing/aws_test_harness.h>
 
-#include <aws/common/aws_profile.h>
+#include <aws/sdkutils/aws_profile.h>
 #include <aws/common/environment.h>
 #include <aws/common/string.h>
 
