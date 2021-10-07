@@ -6,6 +6,7 @@
 #include <aws/common/byte_buf.h>
 #include <aws/common/environment.h>
 #include <aws/common/file.h>
+#include <aws/common/hash_table.h>
 #include <aws/common/logging.h>
 #include <aws/common/string.h>
 #include <aws/sdkutils/aws_profile.h>
