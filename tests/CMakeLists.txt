@@ -60,5 +60,12 @@ add_test_case(aws_profile_override_duplicate_merge_test)
 add_test_case(aws_profile_no_prefix_nondefault_test)
 add_test_case(aws_profile_prefix_credentials_test)
 
+add_test_case(parse_resource_name_test)
+add_test_case(parse_resource_name_failures_test)
+add_test_case(resource_name_tostring_test)
+add_test_case(resource_name_tostring_failure_test)
+add_test_case(resource_name_length_test)
+
+
 set(TEST_BINARY_NAME ${PROJECT_NAME}-tests)
 generate_test_driver(${TEST_BINARY_NAME})
