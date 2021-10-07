@@ -8,6 +8,8 @@
 /* clang-format off */
 static struct aws_error_info s_errors[] = {
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_GENERAL, "General error in SDK Utility library", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARSE_FATAL, "Parser encountered a fatal error", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE, "Parser encountered an error, but recovered", "aws-c-sdkutils"),
 };
 /* clang-format on */
 
@@ -21,6 +23,7 @@ static struct aws_log_subject_info s_log_subject_infos[] = {
         AWS_LS_SDKUTILS_GENERAL,
         "SDKUtils",
         "Subject for SDK utility logging that defies categorization."),
+    DEFINE_LOG_SUBJECT_INFO(AWS_LS_SDKUTILS_PROFILE, "AWSProfile", "Subject for AWS Profile parser and utilities"),
 };
 
 static struct aws_log_subject_info_list s_sdkutils_log_subjects = {
