@@ -2,11 +2,11 @@
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0.
  */
-#ifndef AWS_COMMON_RESOURCE_NAME_H
-#define AWS_COMMON_RESOURCE_NAME_H
+#ifndef AWS_SDKUTILS_RESOURCE_NAME_H
+#define AWS_SDKUTILS_RESOURCE_NAME_H
 #pragma once
 
-#include <aws/sdkutils/exports.h>
+#include <aws/sdkutils/sdkutils.h>
 
 #include <aws/common/byte_buf.h>
 
@@ -41,4 +41,4 @@ int aws_byte_buf_append_resource_name(struct aws_byte_buf *buf, const struct aws
 
 AWS_EXTERN_C_END
 
-#endif /* AWS_COMMON_RESOURCE_NAME_H */
+#endif /* AWS_SDKUTILS_RESOURCE_NAME_H */
