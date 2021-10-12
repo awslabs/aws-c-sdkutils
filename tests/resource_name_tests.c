@@ -4,7 +4,7 @@
  */
 
 #include <aws/common/byte_buf.h>
-#include <aws/common/resource_name.h>
+#include <aws/sdkutils/resource_name.h>
 #include <aws/testing/aws_test_harness.h>
 
 AWS_TEST_CASE(parse_resource_name_test, s_test_parse_resource_name)
