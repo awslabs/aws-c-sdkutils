@@ -31,7 +31,13 @@ static struct aws_log_subject_info_list s_sdkutils_log_subjects = {
     .count = AWS_ARRAY_SIZE(s_log_subject_infos),
 };
 
+static bool s_library_init_count = 0;
+
 void aws_sdkutils_library_init(struct aws_allocator *allocator) {
+    if (s_library_init_count++ != 0) {
+        return;
+    }
+
     aws_common_library_init(allocator);
 
     aws_register_error_info(&s_sdkutils_error_info);
@@ -39,6 +45,10 @@ void aws_sdkutils_library_init(struct aws_allocator *allocator) {
 }
 
 void aws_sdkutils_library_clean_up(void) {
+    if (--s_library_init_count != 0) {
+        return;
+    }
+
     aws_unregister_log_subject_info_list(&s_sdkutils_log_subjects);
     aws_unregister_error_info(&s_sdkutils_error_info);
 
