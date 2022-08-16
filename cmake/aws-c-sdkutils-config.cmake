@@ -1,5 +1,4 @@
 include(CMakeFindDependencyMacro)
-include(AwsCrtLoadTarget)
 
 find_dependency(aws-c-common)
 
