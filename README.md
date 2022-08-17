@@ -16,7 +16,7 @@ CMake 3.0+ is required to build.
 `<install-path>` must be an absolute path in the following instructions.
 
 
-#### Building aws-c-s3 and Remaining Dependencies
+#### Building aws-c-sdkutils
 
 ```
 git clone git@github.com:awslabs/aws-c-common.git
