@@ -10,6 +10,8 @@ static struct aws_error_info s_errors[] = {
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_GENERAL, "General error in SDK Utility library", "aws-c-sdkutils"),
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARSE_FATAL, "Parser encountered a fatal error", "aws-c-sdkutils"),
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE, "Parser encountered an error, but recovered", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET, "Ruleset version not supported", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED, "Ruleset parsing failed", "aws-c-sdkutils"),
 };
 /* clang-format on */
 

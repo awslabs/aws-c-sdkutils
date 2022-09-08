@@ -1,0 +1,68 @@
+{
+  "version": "1.0",
+  "serviceId": "example",
+  "parameters": {
+    "region": {
+      "type": "string",
+      "builtIn": "AWS::Region",
+      "documentation": "The region to dispatch the request to",
+      "required": true
+    }
+  },
+  "rules": [
+    {
+      "documentation": "rules for when region isSet",
+      "type": "tree",
+      "conditions": [
+        {"fn": "isSet", "argv": [{"ref": "region"}]}
+      ],
+      "rules": [
+        {
+          "conditions": [
+            {"fn": "partition", "argv": [{"ref": "region"}], "assign": "partitionResult"}
+          ],
+          "type": "tree",
+          "rules": [
+            {
+              "type": "endpoint",
+              "conditions": [
+                {"fn": "isSet", "argv": [{"ref": "resourceId"}]},
+                {"fn": "isValidHostLabel", "argv": [{"ref": "resourceId"}]}
+              ],
+              "endpoint": {
+                "url": "{resourceId}.example.{region}.{partitionResult#dnsSuffix}"
+              }
+            },
+            {
+              "conditions": [
+                {"fn": "isSet", "argv": [{"ref": "resourceId"}]},
+                {"fn": "isNotValidHostLabel", "argv": [{"ref": "resourceId"}]}
+              ],
+              "type": "error",
+              "error": "invalid resourceId provided: {resourceId}"
+            },
+            {
+              "conditions": [],
+              "type": "endpoint",
+              "endpoint": {
+                "url": "https://example.{region}.{partitionResult#dnsSuffix}"
+              }
+            }
+          ]
+        },
+        {
+          "documentation": "invalid region value",
+          "type": "error",
+          "conditions": [],
+          "error": "unable to determine endpoint for region: {region}"
+        }
+      ]
+    },
+    {
+      "documentation": "the single service global endpoint",
+      "type": "endpoint",
+      "conditions": [],
+      "endpoint": {"url": "https://example.amazonaws.com"}
+    }
+  ]
+}
