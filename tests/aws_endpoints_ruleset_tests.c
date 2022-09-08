@@ -10,7 +10,10 @@
 #include <aws/testing/aws_test_harness.h>
 #include <time.h>
 
-static int read_file_contents(struct aws_byte_buf *out_buf, struct aws_allocator *alloc, const struct aws_string *filename) {
+static int read_file_contents(
+    struct aws_byte_buf *out_buf,
+    struct aws_allocator *alloc,
+    const struct aws_string *filename) {
     AWS_ZERO_STRUCT(*out_buf);
     struct aws_string *mode = aws_string_new_from_c_str(alloc, "r");
     FILE *fp = aws_fopen_safe(filename, mode);
@@ -25,7 +28,7 @@ static int read_file_contents(struct aws_byte_buf *out_buf, struct aws_allocator
     fclose(fp);
 
     /* TODO: On win size read seems to be smaller than what get length returns,
-    but its still a valid json*/ 
+    but its still a valid json*/
     /* ASSERT_INT_EQUALS(file_size, read); */
 
     out_buf->len = read;
@@ -41,7 +44,7 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     aws_sdkutils_library_init(allocator);
 
     struct aws_string *filename = aws_string_new_from_c_str(allocator, "sample_ruleset.json");
-    
+
     ASSERT_INT_EQUALS(read_file_contents(&buf, allocator, filename), AWS_OP_SUCCESS);
     struct aws_byte_cursor ruleset_json = aws_byte_cursor_from_buf(&buf);
 
