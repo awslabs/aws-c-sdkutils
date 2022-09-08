@@ -27,7 +27,8 @@ void aws_array_list_deep_cleanup(struct aws_array_list *array, aws_array_callbac
     for (size_t idx = 0; idx < aws_array_list_length(array); ++idx) {
         void *element = NULL;
 
-        AWS_ASSERT(aws_array_list_get_at(array, &element, idx) == AWS_OP_SUCCESS);
+        int error_code = aws_array_list_get_at(array, &element, idx);
+        AWS_ASSERT(error_code == AWS_OP_SUCCESS);
         AWS_ASSERT(element);
         on_destroy_element(element);
     }
