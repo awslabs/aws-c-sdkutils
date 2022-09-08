@@ -229,6 +229,7 @@ static struct aws_endpoints_reference *s_try_parse_reference(
 static struct aws_endpoints_expr *s_parse_expr(struct aws_allocator *allocator, const struct aws_json_value *node);
 
 static bool s_on_expr_element(size_t idx, const struct aws_json_value *value_node, void *user_data) {
+    (void)idx;
     struct array_parser_wrapper *wrapper = user_data;
     struct aws_endpoints_expr *expr = s_parse_expr(wrapper->allocator, value_node);
 
@@ -318,7 +319,7 @@ static struct aws_endpoints_function *s_try_parse_function(
         aws_endpoints_function_new(allocator, aws_string_new_from_cursor(allocator, &fn_cur));
     struct aws_json_value *argv_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("argv"));
     size_t num_args = aws_json_get_array_size(argv_node);
-    aws_array_list_init_dynamic(&function->argv, allocator, num_args, sizeof(struct aws_endpoints_value *));
+    aws_array_list_init_dynamic(&function->argv, allocator, num_args, sizeof(struct aws_endpoints_expr *));
 
     if (s_init_array_from_json(allocator, argv_node, &function->argv, s_on_expr_element)) {
         aws_endpoints_function_destroy(function);
@@ -445,6 +446,7 @@ static bool s_on_parameter_key(const struct aws_byte_cursor *key, const struct a
 }
 
 static bool s_on_condition_element(size_t idx, const struct aws_json_value *condition_node, void *user_data) {
+    (void)idx;
     struct array_parser_wrapper *wrapper = user_data;
 
     struct aws_endpoints_function *function = s_try_parse_function(wrapper->allocator, condition_node);
@@ -470,6 +472,7 @@ static bool s_on_condition_element(size_t idx, const struct aws_json_value *cond
 }
 
 static bool s_on_header_element(size_t idx, const struct aws_json_value *value, void *user_data) {
+    (void)idx;
     struct array_parser_wrapper *wrapper = user_data;
     struct aws_byte_cursor cur;
     aws_json_value_get_string(value, &cur);
@@ -558,8 +561,6 @@ static struct aws_endpoints_rule_data_endpoint *s_parse_endpoints_rule_data_endp
             aws_hash_callback_string_destroy,
             aws_hash_callback_headers_destroy);
 
-        struct aws_json_value *headers_node =
-            aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("headers"));
         if (s_init_members_from_json(allocator, headers_node, data_rule->headers, s_on_headers_key)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameters.");
             aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
@@ -635,6 +636,7 @@ static struct aws_endpoints_rule_data_tree *s_parse_endpoints_rule_data_tree(
 }
 
 static bool s_on_rule_element(size_t idx, const struct aws_json_value *value, void *user_data) {
+    (void)idx;
     struct array_parser_wrapper *wrapper = user_data;
 
     /* Required fields */
