@@ -7,7 +7,7 @@
 #define AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H
 
 #include <aws/common/ref_count.h>
-#include <aws/sdkutils/endpoints/ruleset.h>
+#include <aws/sdkutils/endpoints_rule_engine.h>
 
 enum aws_endpoints_rule_type { AWS_ENDPOINTS_RULE_ENDPOINT, AWS_ENDPOINTS_RULE_ERROR, AWS_ENDPOINTS_RULE_TREE };
 
@@ -31,6 +31,9 @@ enum aws_endpoints_expr_type {
 struct aws_endpoints_parameter {
     struct aws_allocator *allocator;
 
+    struct aws_byte_cursor name_cur;
+    struct aws_string *name;
+
     enum aws_endpoints_parameter_value_type type;
     struct aws_string *built_in;
 
@@ -50,37 +53,31 @@ struct aws_endpoints_ruleset {
     struct aws_allocator *allocator;
     struct aws_ref_count ref_count;
 
+    /* list of (aws_endpoints_rule *) */
     struct aws_array_list rules;
 
     struct aws_string *version;
     struct aws_string *service_id;
+    /* map of (aws_byte_cursor *) -> (aws_endpoints_parameter *) */
     struct aws_hash_table *parameters;
 };
 
-struct aws_endpoints_reference {
-    struct aws_allocator *allocator;
-    struct aws_string *ref;
+struct aws_endpoints_function {
+    struct aws_string *fn; /* TODO: precompute hash or enum value to avoid lookup on every eval */
+    /* List of (aws_endpoints_expr *) */
+    struct aws_array_list argv;
 };
 
-struct aws_endpoints_fn;
-
 struct aws_endpoints_expr {
-    struct aws_allocator *allocator;
     enum aws_endpoints_expr_type type;
     union {
         struct aws_string *string;
-        int32_t number;
+        double number;
         bool boolean;
-        struct aws_array_list array;
-        struct aws_endpoints_reference *reference;
-        struct aws_endpoints_function *function;
+        struct aws_array_list array; /* List of (aws_endpoints_expr *) */
+        struct aws_string *reference;
+        struct aws_endpoints_function function;
     } e;
-};
-
-struct aws_endpoints_function {
-    struct aws_allocator *allocator;
-    struct aws_string *fn; /* TODO: precompute hash or enum value to avoid lookup on every eval */
-    struct aws_array_list argv;
 };
 
 struct aws_endpoints_rule_data_endpoint {
@@ -88,11 +85,17 @@ struct aws_endpoints_rule_data_endpoint {
     enum aws_endpoints_url_type url_type;
     union {
         struct aws_string *template;
-        struct aws_endpoints_reference *reference;
-        struct aws_endpoints_function *function;
+        struct aws_string *reference;
+        struct aws_endpoints_function function;
     } url;
 
+    /* 
+    * Note: this is a custom properties json associated with the result.
+    * Properties are unstable and format can change frequently.
+    * Its up to caller to parse json to retrieve properties.
+    */
     struct aws_string *properties;
+    /* Map of (aws_string *) -> (aws_array_list * of aws_string *) */
     struct aws_hash_table *headers;
 };
 
@@ -101,25 +104,26 @@ struct aws_endpoints_rule_data_error {
     enum aws_endpoints_error_type error_type;
     union {
         struct aws_string *template;
-        struct aws_endpoints_reference *reference;
-        struct aws_endpoints_function *function;
+        struct aws_string *reference;
+        struct aws_endpoints_function function;
     } error;
 };
 
 struct aws_endpoints_rule_data_tree {
     struct aws_allocator *allocator;
+    /* List of (aws_endpoints_rule *) */
     struct aws_array_list rules;
 };
 
 struct aws_endpoints_condition {
-    struct aws_allocator *allocator;
-    struct aws_endpoints_function *function;
+    struct aws_endpoints_function function;
     struct aws_string *assign;
 };
 
 struct aws_endpoints_rule {
     struct aws_allocator *allocator;
 
+    /* List of (aws_endpoints_condition *) */
     struct aws_array_list conditions;
     struct aws_string *documentation;
 
@@ -134,7 +138,7 @@ struct aws_endpoints_rule {
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     struct aws_allocator *allocator,
     enum aws_endpoints_parameter_value_type type,
-    struct aws_string *documentation);
+    const struct aws_byte_cursor *name_cur);
 void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter);
 
 struct aws_endpoints_rule *aws_endpoints_rule_new(struct aws_allocator *allocator, enum aws_endpoints_rule_type type);
@@ -149,19 +153,9 @@ void aws_endpoints_rule_data_error_destroy(struct aws_endpoints_rule_data_error 
 struct aws_endpoints_rule_data_tree *aws_endpoints_rule_data_tree_new(struct aws_allocator *allocator);
 void aws_endpoints_rule_data_tree_destroy(struct aws_endpoints_rule_data_tree *rule_data);
 
-struct aws_endpoints_condition *aws_endpoints_condition_new(
-    struct aws_allocator *allocator,
-    struct aws_endpoints_function *function);
-void aws_endpoints_condition_destroy(struct aws_endpoints_condition *condition);
-
-struct aws_endpoints_function *aws_endpoints_function_new(struct aws_allocator *allocator, struct aws_string *fn);
-void aws_endpoints_function_destroy(struct aws_endpoints_function *function);
-
-struct aws_endpoints_expr *aws_endpoints_expr_new(struct aws_allocator *allocator, enum aws_endpoints_expr_type type);
-void aws_endpoints_expr_destroy(struct aws_endpoints_expr *expr);
-
-struct aws_endpoints_reference *aws_endpoints_reference_new(struct aws_allocator *allocator, struct aws_string *ref);
-void aws_endpoints_reference_destroy(struct aws_endpoints_reference *reference);
+void aws_endpoints_condition_cleanup(struct aws_endpoints_condition *condition);
+void aws_endpoints_function_cleanup(struct aws_endpoints_function *function);
+void aws_endpoints_expr_cleanup(struct aws_endpoints_expr *expr);
 
 /*
  * Helpers to do deep clean up of array list.

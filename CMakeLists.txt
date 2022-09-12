@@ -39,17 +39,12 @@ file(GLOB AWS_SDKUTILS_HEADERS
         "include/aws/sdkutils/*.h"
 )
 
-file(GLOB AWS_SDKUTILS_ENDPOINTS_HEADERS
-        "include/aws/sdkutils/endpoints/*.h"
-)
-
-file(GLOB AWS_SDKUTILS_ENDPOINT_PRIVATE_HEADERS
-        "include/aws/sdkutils/endpoints/*.h"
+file(GLOB AWS_SDKUTILS_PRIVATE_HEADERS
+        "include/aws/sdkutils/private/*.h"
 )
 
 file(GLOB AWS_SDKUTILS_SRC
         "source/*.c"
-        "source/endpoints/*.c"
 )
 
 if (WIN32)
@@ -61,7 +56,6 @@ endif()
 
 file(GLOB SDKUTILS_HEADERS
         ${AWS_SDKUTILS_HEADERS}
-        ${AWS_SDKUTILS_ENDPOINTS_HEADERS}
 )
 
 file(GLOB SDKUTILS_SRC
