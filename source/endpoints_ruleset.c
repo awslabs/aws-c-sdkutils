@@ -57,7 +57,9 @@ int aws_endpoints_parameter_get_default_string(
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_INVALID_ARGUMENT);
 }
 
-int aws_endpoints_parameter_get_default_boolean(const struct aws_endpoints_parameter *parameter, const bool **out_bool) {
+int aws_endpoints_parameter_get_default_boolean(
+    const struct aws_endpoints_parameter *parameter,
+    const bool **out_bool) {
     AWS_PRECONDITION(parameter);
     AWS_PRECONDITION(out_bool);
 
@@ -212,12 +214,12 @@ static int s_init_members_from_json(
 
 static int s_parse_function(
     struct aws_allocator *allocator,
-    const struct aws_json_value *node, 
+    const struct aws_json_value *node,
     struct aws_endpoints_function *function);
 
 static int s_try_parse_reference(
     struct aws_allocator *allocator,
-    const struct aws_json_value *node, 
+    const struct aws_json_value *node,
     struct aws_string **out_reference) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(node);
@@ -238,11 +240,16 @@ static int s_try_parse_reference(
     return AWS_OP_SUCCESS;
 }
 
-static int s_parse_expr(struct aws_allocator *allocator,
+static int s_parse_expr(
+    struct aws_allocator *allocator,
     const struct aws_json_value *node,
     struct aws_endpoints_expr *expr);
 
-static int s_on_expr_element(size_t idx, const struct aws_json_value *value_node, bool *out_should_continue, void *user_data) {
+static int s_on_expr_element(
+    size_t idx,
+    const struct aws_json_value *value_node,
+    bool *out_should_continue,
+    void *user_data) {
     (void)idx;
     (void)out_should_continue;
     struct array_parser_wrapper *wrapper = user_data;
@@ -259,7 +266,10 @@ static int s_on_expr_element(size_t idx, const struct aws_json_value *value_node
     return AWS_OP_SUCCESS;
 }
 
-static int s_parse_expr(struct aws_allocator *allocator, const struct aws_json_value *node, struct aws_endpoints_expr *expr) {
+static int s_parse_expr(
+    struct aws_allocator *allocator,
+    const struct aws_json_value *node,
+    struct aws_endpoints_expr *expr) {
     /* TODO: this recurses. in practical circumstances depth will never be high,
     but we should still consider doing iterative approach */
     if (aws_json_value_is_string(node)) {
@@ -317,11 +327,11 @@ on_error:
 
 static int s_parse_function(
     struct aws_allocator *allocator,
-    const struct aws_json_value *node, 
+    const struct aws_json_value *node,
     struct aws_endpoints_function *function) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(node);
-    
+
     struct aws_json_value *fn_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("fn"));
     if (fn_node == NULL) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Node is not a function.");
@@ -460,7 +470,11 @@ static int s_on_parameter_key(
     return AWS_OP_SUCCESS;
 }
 
-static int s_on_condition_element(size_t idx, const struct aws_json_value *condition_node, bool *out_should_continue, void *user_data) {
+static int s_on_condition_element(
+    size_t idx,
+    const struct aws_json_value *condition_node,
+    bool *out_should_continue,
+    void *user_data) {
     (void)idx;
     (void)out_should_continue;
     struct array_parser_wrapper *wrapper = user_data;
@@ -477,7 +491,7 @@ static int s_on_condition_element(size_t idx, const struct aws_json_value *condi
         aws_json_value_get_from_object(condition_node, aws_byte_cursor_from_c_str("assign"));
     if (assign_node != NULL) {
         struct aws_byte_cursor cur;
-        if(aws_json_value_get_string(assign_node, &cur)) {
+        if (aws_json_value_get_string(assign_node, &cur)) {
             aws_endpoints_condition_cleanup(&condition);
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for assign.");
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
@@ -489,7 +503,11 @@ static int s_on_condition_element(size_t idx, const struct aws_json_value *condi
     return AWS_OP_SUCCESS;
 }
 
-static int s_on_header_element(size_t idx, const struct aws_json_value *value, bool *out_should_continue, void *user_data) {
+static int s_on_header_element(
+    size_t idx,
+    const struct aws_json_value *value,
+    bool *out_should_continue,
+    void *user_data) {
     (void)idx;
     (void)out_should_continue;
     struct array_parser_wrapper *wrapper = user_data;
@@ -526,7 +544,7 @@ static int s_on_headers_key(
 
 static int s_parse_endpoints_rule_data_endpoint(
     struct aws_allocator *allocator,
-    const struct aws_json_value *rule_node, 
+    const struct aws_json_value *rule_node,
     struct aws_endpoints_rule_data_endpoint *data_rule) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(rule_node);
@@ -568,7 +586,7 @@ static int s_parse_endpoints_rule_data_endpoint(
 
         struct aws_byte_buf properties_buf;
         aws_byte_buf_init(&properties_buf, allocator, 0);
-        
+
         if (aws_byte_buf_append_json_string(properties_node, &properties_buf)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract properties.");
             goto on_error;
@@ -583,10 +601,10 @@ static int s_parse_endpoints_rule_data_endpoint(
     if (headers_node != NULL) {
         data_rule->headers = aws_mem_acquire(allocator, sizeof(struct aws_hash_table));
         /* TODO: this is currently aws_string* to aws_array_list*
-        * We cannot use same trick as for params to use aws_byte_cursor as key,
-        * since value is a generic type. We can wrap list into a struct, but
-        * seems ugly. Anything cleaner? 
-        */
+         * We cannot use same trick as for params to use aws_byte_cursor as key,
+         * since value is a generic type. We can wrap list into a struct, but
+         * seems ugly. Anything cleaner?
+         */
         aws_hash_table_init(
             data_rule->headers,
             allocator,
@@ -611,7 +629,7 @@ on_error:
 
 static int s_parse_endpoints_rule_data_error(
     struct aws_allocator *allocator,
-    const struct aws_json_value *error_node, 
+    const struct aws_json_value *error_node,
     struct aws_endpoints_rule_data_error *data_rule) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(error_node);
@@ -647,16 +665,20 @@ static int s_parse_endpoints_rule_data_error(
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_endpoints_rule_data_error_cleanup(data_rule);   
+    aws_endpoints_rule_data_error_cleanup(data_rule);
     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse error rule.");
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
 }
 
-static int s_on_rule_element(size_t idx, const struct aws_json_value *value, bool *out_should_continue, void *user_data);
+static int s_on_rule_element(
+    size_t idx,
+    const struct aws_json_value *value,
+    bool *out_should_continue,
+    void *user_data);
 
 static int s_parse_endpoints_rule_data_tree(
     struct aws_allocator *allocator,
-    const struct aws_json_value *rule_node, 
+    const struct aws_json_value *rule_node,
     struct aws_endpoints_rule_data_tree *rule_data) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(rule_node);
@@ -674,7 +696,11 @@ static int s_parse_endpoints_rule_data_tree(
     return AWS_OP_SUCCESS;
 }
 
-static int s_on_rule_element(size_t idx, const struct aws_json_value *value, bool *out_should_continue, void *user_data) {
+static int s_on_rule_element(
+    size_t idx,
+    const struct aws_json_value *value,
+    bool *out_should_continue,
+    void *user_data) {
     (void)idx;
     (void)out_should_continue;
     struct array_parser_wrapper *wrapper = user_data;

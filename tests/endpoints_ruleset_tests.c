@@ -5,8 +5,8 @@
 
 #include <aws/common/byte_buf.h>
 #include <aws/common/file.h>
-#include <aws/common/string.h>
 #include <aws/common/hash_table.h>
+#include <aws/common/string.h>
 #include <aws/sdkutils/endpoints_rule_engine.h>
 #include <aws/testing/aws_test_harness.h>
 #include <time.h>
@@ -63,8 +63,8 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     aws_hash_table_find(parameters, &param_name_cur, &element);
     ASSERT_NOT_NULL(element);
 
-    const struct aws_string *built_in 
-        = aws_endpoints_parameter_get_built_in((struct aws_endpoints_parameter *)element->value);
+    const struct aws_string *built_in =
+        aws_endpoints_parameter_get_built_in((struct aws_endpoints_parameter *)element->value);
     ASSERT_TRUE(aws_string_eq_c_str(built_in, "AWS::Region"));
 
     aws_string_destroy(filename);

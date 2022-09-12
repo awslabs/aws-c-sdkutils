@@ -89,11 +89,11 @@ struct aws_endpoints_rule_data_endpoint {
         struct aws_endpoints_function function;
     } url;
 
-    /* 
-    * Note: this is a custom properties json associated with the result.
-    * Properties are unstable and format can change frequently.
-    * Its up to caller to parse json to retrieve properties.
-    */
+    /*
+     * Note: this is a custom properties json associated with the result.
+     * Properties are unstable and format can change frequently.
+     * Its up to caller to parse json to retrieve properties.
+     */
     struct aws_string *properties;
     /* Map of (aws_string *) -> (aws_array_list * of aws_string *) */
     struct aws_hash_table *headers;

@@ -124,21 +124,24 @@ AWS_SDKUTILS_API struct aws_endpoints_ruleset *aws_endpoints_ruleset_release(str
  * pointer is valid during ruleset lifetime. Will never return a NULL. In case
  * there are no parameters in the ruleset, hash table will contain 0 elements.
  */
-AWS_SDKUTILS_API const struct aws_hash_table *aws_endpoints_ruleset_get_parameters(struct aws_endpoints_ruleset *ruleset);
+AWS_SDKUTILS_API const struct aws_hash_table *aws_endpoints_ruleset_get_parameters(
+    struct aws_endpoints_ruleset *ruleset);
 
 /*
  * Ruleset version.
  * Returned pointer is owned by ruleset.
  * Will not return NULL as version is a required field for ruleset.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_version(const struct aws_endpoints_ruleset *ruleset);
+AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_version(
+    const struct aws_endpoints_ruleset *ruleset);
 
 /*
  * Ruleset service id.
  * Returned pointer is owned by ruleset.
  * Can be NULL if not specified in ruleset.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_service_id(const struct aws_endpoints_ruleset *ruleset);
+AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_service_id(
+    const struct aws_endpoints_ruleset *ruleset);
 
 AWS_EXTERN_C_END
 
