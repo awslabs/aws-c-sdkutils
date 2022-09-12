@@ -53,7 +53,7 @@ struct aws_endpoints_ruleset {
     struct aws_allocator *allocator;
     struct aws_ref_count ref_count;
 
-    /* list of (aws_endpoints_rule *) */
+    /* list of (aws_endpoints_rule) */
     struct aws_array_list rules;
 
     struct aws_string *version;
@@ -64,7 +64,7 @@ struct aws_endpoints_ruleset {
 
 struct aws_endpoints_function {
     struct aws_string *fn; /* TODO: precompute hash or enum value to avoid lookup on every eval */
-    /* List of (aws_endpoints_expr *) */
+    /* List of (aws_endpoints_expr) */
     struct aws_array_list argv;
 };
 
@@ -74,7 +74,7 @@ struct aws_endpoints_expr {
         struct aws_string *string;
         double number;
         bool boolean;
-        struct aws_array_list array; /* List of (aws_endpoints_expr *) */
+        struct aws_array_list array; /* List of (aws_endpoints_expr) */
         struct aws_string *reference;
         struct aws_endpoints_function function;
     } e;
@@ -100,7 +100,6 @@ struct aws_endpoints_rule_data_endpoint {
 };
 
 struct aws_endpoints_rule_data_error {
-    struct aws_allocator *allocator;
     enum aws_endpoints_error_type error_type;
     union {
         struct aws_string *template;
@@ -110,8 +109,7 @@ struct aws_endpoints_rule_data_error {
 };
 
 struct aws_endpoints_rule_data_tree {
-    struct aws_allocator *allocator;
-    /* List of (aws_endpoints_rule *) */
+    /* List of (aws_endpoints_rule) */
     struct aws_array_list rules;
 };
 
@@ -123,15 +121,15 @@ struct aws_endpoints_condition {
 struct aws_endpoints_rule {
     struct aws_allocator *allocator;
 
-    /* List of (aws_endpoints_condition *) */
+    /* List of (aws_endpoints_condition) */
     struct aws_array_list conditions;
     struct aws_string *documentation;
 
     enum aws_endpoints_rule_type type;
     union {
-        struct aws_endpoints_rule_data_endpoint *endpoint;
-        struct aws_endpoints_rule_data_error *error;
-        struct aws_endpoints_rule_data_tree *tree;
+        struct aws_endpoints_rule_data_endpoint endpoint;
+        struct aws_endpoints_rule_data_error error;
+        struct aws_endpoints_rule_data_tree tree;
     } rule_data;
 };
 
@@ -141,17 +139,11 @@ struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     const struct aws_byte_cursor *name_cur);
 void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter);
 
-struct aws_endpoints_rule *aws_endpoints_rule_new(struct aws_allocator *allocator, enum aws_endpoints_rule_type type);
-void aws_endpoints_rule_destroy(struct aws_endpoints_rule *rule);
+void aws_endpoints_rule_cleanup(struct aws_endpoints_rule *rule);
 
-struct aws_endpoints_rule_data_endpoint *aws_endpoints_rule_data_endpoint_new(struct aws_allocator *allocator);
-void aws_endpoints_rule_data_endpoint_destroy(struct aws_endpoints_rule_data_endpoint *rule_data);
-
-struct aws_endpoints_rule_data_error *aws_endpoints_rule_data_error_new(struct aws_allocator *allocator);
-void aws_endpoints_rule_data_error_destroy(struct aws_endpoints_rule_data_error *rule_data);
-
-struct aws_endpoints_rule_data_tree *aws_endpoints_rule_data_tree_new(struct aws_allocator *allocator);
-void aws_endpoints_rule_data_tree_destroy(struct aws_endpoints_rule_data_tree *rule_data);
+void aws_endpoints_rule_data_endpoint_cleanup(struct aws_endpoints_rule_data_endpoint *rule_data);
+void aws_endpoints_rule_data_error_cleanup(struct aws_endpoints_rule_data_error *rule_data);
+void aws_endpoints_rule_data_tree_cleanup(struct aws_endpoints_rule_data_tree *rule_data);
 
 void aws_endpoints_condition_cleanup(struct aws_endpoints_condition *condition);
 void aws_endpoints_function_cleanup(struct aws_endpoints_function *function);
@@ -161,7 +153,7 @@ void aws_endpoints_expr_cleanup(struct aws_endpoints_expr *expr);
  * Helpers to do deep clean up of array list.
  * TODO: move to aws-c-common?
  */
-typedef void(aws_array_callback_destroy_fn)(void *value);
-void aws_array_list_deep_cleanup(struct aws_array_list *array, aws_array_callback_destroy_fn on_destroy_element);
+typedef void(aws_array_callback_cleanup_fn)(void *value);
+void aws_array_list_deep_cleanup(struct aws_array_list *array, aws_array_callback_cleanup_fn on_cleanup_element);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H */

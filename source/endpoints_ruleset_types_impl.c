@@ -8,14 +8,14 @@
 #include <aws/common/string.h>
 #include <aws/sdkutils/private/endpoints_ruleset_types_impl.h>
 
-static void s_on_condition_array_element_destroy(void *element) {
+static void s_on_condition_array_element_cleanup(void *element) {
     struct aws_endpoints_condition *condition = element;
     aws_endpoints_condition_cleanup(condition);
 }
 
-static void s_on_rule_array_element_destroy(void *element) {
+static void s_on_rule_array_element_cleanup(void *element) {
     struct aws_endpoints_rule *rule = element;
-    aws_endpoints_rule_destroy(rule);
+    aws_endpoints_rule_cleanup(rule);
 }
 
 static void s_on_expr_array_element_cleanup(void *element) {
@@ -23,24 +23,13 @@ static void s_on_expr_array_element_cleanup(void *element) {
     aws_endpoints_expr_cleanup(expr);
 }
 
-void aws_array_list_deep_cleanup(struct aws_array_list *array, aws_array_callback_destroy_fn on_destroy_element) {
-    for (size_t idx = 0; idx < aws_array_list_length(array); ++idx) {
-        void *element = NULL;
-
-        aws_array_list_get_at(array, &element, idx);
-        AWS_ASSERT(element);
-        on_destroy_element(element);
-    }
-    aws_array_list_clean_up(array);
-}
-
-void aws_array_list_deep_value_cleanup(struct aws_array_list *array, aws_array_callback_destroy_fn on_destroy_element) {
+void aws_array_list_deep_cleanup(struct aws_array_list *array, aws_array_callback_cleanup_fn on_cleanup_element) {
     for (size_t idx = 0; idx < aws_array_list_length(array); ++idx) {
         void *element = NULL;
 
         aws_array_list_get_at_ptr(array, &element, idx);
         AWS_ASSERT(element);
-        on_destroy_element(element);
+        on_cleanup_element(element);
     }
     aws_array_list_clean_up(array);
 }
@@ -74,47 +63,27 @@ void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter) 
     aws_mem_release(parameter->allocator, parameter);
 }
 
-struct aws_endpoints_rule *aws_endpoints_rule_new(struct aws_allocator *allocator, enum aws_endpoints_rule_type type) {
-
-    struct aws_endpoints_rule *rule = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_rule));
-
-    rule->allocator = allocator;
-    rule->type = type;
-
-    return rule;
-}
-
-void aws_endpoints_rule_destroy(struct aws_endpoints_rule *rule) {
-    aws_array_list_deep_value_cleanup(&rule->conditions, s_on_condition_array_element_destroy);
+void aws_endpoints_rule_cleanup(struct aws_endpoints_rule *rule) {
+    aws_array_list_deep_cleanup(&rule->conditions, s_on_condition_array_element_cleanup);
 
     switch (rule->type) {
         case AWS_ENDPOINTS_RULE_ENDPOINT:
-            aws_endpoints_rule_data_endpoint_destroy(rule->rule_data.endpoint);
+            aws_endpoints_rule_data_endpoint_cleanup(&rule->rule_data.endpoint);
             break;
         case AWS_ENDPOINTS_RULE_ERROR:
-            aws_endpoints_rule_data_error_destroy(rule->rule_data.error);
+            aws_endpoints_rule_data_error_cleanup(&rule->rule_data.error);
             break;
         case AWS_ENDPOINTS_RULE_TREE:
-            aws_endpoints_rule_data_tree_destroy(rule->rule_data.tree);
+            aws_endpoints_rule_data_tree_cleanup(&rule->rule_data.tree);
             break;
         default:
             AWS_FATAL_ASSERT(false);
     }
 
     aws_string_destroy(rule->documentation);
-
-    aws_mem_release(rule->allocator, rule);
 }
 
-struct aws_endpoints_rule_data_endpoint *aws_endpoints_rule_data_endpoint_new(struct aws_allocator *allocator) {
-    struct aws_endpoints_rule_data_endpoint *rule_data =
-        aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_rule_data_endpoint));
-    rule_data->allocator = allocator;
-
-    return rule_data;
-}
-
-void aws_endpoints_rule_data_endpoint_destroy(struct aws_endpoints_rule_data_endpoint *rule_data) {
+void aws_endpoints_rule_data_endpoint_cleanup(struct aws_endpoints_rule_data_endpoint *rule_data) {
 
     switch (rule_data->url_type) {
         case AWS_ENDPOINTS_URL_TEMPLATE:
@@ -135,17 +104,9 @@ void aws_endpoints_rule_data_endpoint_destroy(struct aws_endpoints_rule_data_end
         aws_hash_table_clean_up(rule_data->headers);
         aws_mem_release(rule_data->allocator, rule_data->headers);
     }
-    aws_mem_release(rule_data->allocator, rule_data);
 }
 
-struct aws_endpoints_rule_data_error *aws_endpoints_rule_data_error_new(struct aws_allocator *allocator) {
-    struct aws_endpoints_rule_data_error *rule_data =
-        aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_rule_data_error));
-    rule_data->allocator = allocator;
-    return rule_data;
-}
-
-void aws_endpoints_rule_data_error_destroy(struct aws_endpoints_rule_data_error *rule_data) {
+void aws_endpoints_rule_data_error_cleanup(struct aws_endpoints_rule_data_error *rule_data) {
     switch (rule_data->error_type) {
         case AWS_ENDPOINTS_ERROR_TEMPLATE:
             aws_string_destroy(rule_data->error.template);
@@ -159,21 +120,10 @@ void aws_endpoints_rule_data_error_destroy(struct aws_endpoints_rule_data_error 
         default:
             AWS_FATAL_ASSERT(false);
     }
-    aws_mem_release(rule_data->allocator, rule_data);
 }
 
-struct aws_endpoints_rule_data_tree *aws_endpoints_rule_data_tree_new(struct aws_allocator *allocator) {
-    AWS_PRECONDITION(allocator);
-    struct aws_endpoints_rule_data_tree *rule_data =
-        aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_rule_data_tree));
-    rule_data->allocator = allocator;
-    return rule_data;
-}
-
-void aws_endpoints_rule_data_tree_destroy(struct aws_endpoints_rule_data_tree *rule_data) {
-    aws_array_list_deep_cleanup(&rule_data->rules, s_on_rule_array_element_destroy);
-
-    aws_mem_release(rule_data->allocator, rule_data);
+void aws_endpoints_rule_data_tree_cleanup(struct aws_endpoints_rule_data_tree *rule_data) {
+    aws_array_list_deep_cleanup(&rule_data->rules, s_on_rule_array_element_cleanup);
 }
 
 void aws_endpoints_condition_cleanup(struct aws_endpoints_condition *condition) {
@@ -186,7 +136,7 @@ void aws_endpoints_function_cleanup(struct aws_endpoints_function *function) {
     aws_string_destroy(function->fn);
     function->fn = NULL;
 
-    aws_array_list_deep_value_cleanup(&function->argv, s_on_expr_array_element_cleanup);
+    aws_array_list_deep_cleanup(&function->argv, s_on_expr_array_element_cleanup);
 }
 
 void aws_endpoints_expr_cleanup(struct aws_endpoints_expr *expr) {
@@ -204,7 +154,7 @@ void aws_endpoints_expr_cleanup(struct aws_endpoints_expr *expr) {
             aws_string_destroy(expr->e.reference);
             break;
         case AWS_ENDPOINTS_EXPR_ARRAY:
-            aws_array_list_deep_value_cleanup(&expr->e.array, s_on_expr_array_element_cleanup);
+            aws_array_list_deep_cleanup(&expr->e.array, s_on_expr_array_element_cleanup);
             break;
         default:
             AWS_FATAL_ASSERT(false);

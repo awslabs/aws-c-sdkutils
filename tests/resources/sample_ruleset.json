@@ -2,7 +2,7 @@
   "version": "1.0",
   "serviceId": "example",
   "parameters": {
-    "region": {
+    "Region": {
       "type": "string",
       "builtIn": "AWS::Region",
       "documentation": "The region to dispatch the request to",

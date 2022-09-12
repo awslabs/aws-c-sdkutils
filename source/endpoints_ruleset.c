@@ -128,9 +128,9 @@ static bool s_byte_cursor_eq(const void *a, const void *b) {
     return aws_byte_cursor_eq(a_cur, b_cur);
 }
 
-static void s_on_rule_array_element_destroy(void *element) {
+static void s_on_rule_array_element_cleanup(void *element) {
     struct aws_endpoints_rule *rule = element;
-    aws_endpoints_rule_destroy(rule);
+    aws_endpoints_rule_cleanup(rule);
 }
 
 static void s_on_string_array_element_destroy(void *data) {
@@ -524,54 +524,58 @@ static int s_on_headers_key(
     return AWS_OP_SUCCESS;
 }
 
-static struct aws_endpoints_rule_data_endpoint *s_parse_endpoints_rule_data_endpoint(
+static int s_parse_endpoints_rule_data_endpoint(
     struct aws_allocator *allocator,
-    const struct aws_json_value *rule_node) {
+    const struct aws_json_value *rule_node, 
+    struct aws_endpoints_rule_data_endpoint *data_rule) {
+    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(rule_node);
+    AWS_PRECONDITION(data_rule);
 
-    struct aws_endpoints_rule_data_endpoint *data_rule = aws_endpoints_rule_data_endpoint_new(allocator);
-
+    data_rule->allocator = allocator;
     struct aws_json_value *url_node = aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("url"));
     if (aws_json_value_is_string(url_node)) {
         struct aws_byte_cursor url_cur;
         if (aws_json_value_get_string(url_node, &url_cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract url.");
-            aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
             goto on_error;
         }
 
         data_rule->url_type = AWS_ENDPOINTS_URL_TEMPLATE;
         data_rule->url.template = aws_string_new_from_cursor(allocator, &url_cur);
-        return data_rule;
     } else {
         struct aws_string *reference = NULL;
         if (s_try_parse_reference(allocator, url_node, &reference)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse reference.");
-            aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
             goto on_error;
         }
 
         if (reference != NULL) {
             data_rule->url_type = AWS_ENDPOINTS_URL_REFERENCE;
             data_rule->url.reference = reference;
+        } else {
+            data_rule->url_type = AWS_ENDPOINTS_URL_FUNCTION;
+            if (s_parse_function(allocator, url_node, &data_rule->url.function)) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to function.");
+                goto on_error;
+            }
         }
-
-        if (s_parse_function(allocator, url_node, &data_rule->url.function)) {
-            goto on_error;
-        }
-        data_rule->url_type = AWS_ENDPOINTS_URL_FUNCTION;
     }
 
     struct aws_json_value *properties_node =
         aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("properties"));
     if (properties_node != NULL) {
-        struct aws_byte_cursor properties_cur;
-        if (aws_json_value_get_string(properties_node, &properties_cur)) {
+
+        struct aws_byte_buf properties_buf;
+        aws_byte_buf_init(&properties_buf, allocator, 0);
+        
+        if (aws_byte_buf_append_json_string(properties_node, &properties_buf)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract properties.");
-            aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
             goto on_error;
         }
 
-        data_rule->properties = aws_string_new_from_cursor(allocator, &properties_cur);
+        data_rule->properties = aws_string_new_from_buf(allocator, &properties_buf);
+        aws_byte_buf_clean_up(&properties_buf);
     }
 
     struct aws_json_value *headers_node =
@@ -594,36 +598,34 @@ static struct aws_endpoints_rule_data_endpoint *s_parse_endpoints_rule_data_endp
 
         if (s_init_members_from_json(allocator, headers_node, data_rule->headers, s_on_headers_key)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameters.");
-            aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
             goto on_error;
         }
     }
 
+    return AWS_OP_SUCCESS;
+
 on_error:
-    aws_endpoints_rule_data_endpoint_destroy(data_rule);
-    return NULL;
+    aws_endpoints_rule_data_endpoint_cleanup(data_rule);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
 }
 
-static struct aws_endpoints_rule_data_error *s_parse_endpoints_rule_data_error(
+static int s_parse_endpoints_rule_data_error(
     struct aws_allocator *allocator,
-    const struct aws_json_value *error_node) {
+    const struct aws_json_value *error_node, 
+    struct aws_endpoints_rule_data_error *data_rule) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(error_node);
-
-    struct aws_endpoints_rule_data_error *data_rule = aws_endpoints_rule_data_error_new(allocator);
+    AWS_PRECONDITION(data_rule);
 
     if (aws_json_value_is_string(error_node)) {
         struct aws_byte_cursor error_cur;
         if (aws_json_value_get_string(error_node, &error_cur)) {
-            aws_endpoints_rule_data_error_destroy(data_rule);
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract rule type.");
-            aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
-            return NULL;
+            goto on_error;
         }
 
         data_rule->error_type = AWS_ENDPOINTS_ERROR_TEMPLATE;
         data_rule->error.template = aws_string_new_from_cursor(allocator, &error_cur);
-        return data_rule;
+        return AWS_OP_SUCCESS;
     }
 
     struct aws_string *reference = NULL;
@@ -632,46 +634,44 @@ static struct aws_endpoints_rule_data_error *s_parse_endpoints_rule_data_error(
     }
 
     if (reference != NULL) {
-        struct aws_endpoints_rule_data_error *data_rule = aws_endpoints_rule_data_error_new(allocator);
         data_rule->error_type = AWS_ENDPOINTS_ERROR_REFERENCE;
         data_rule->error.reference = reference;
-        return data_rule;
+        return AWS_OP_SUCCESS;
     }
 
+    data_rule->error_type = AWS_ENDPOINTS_ERROR_FUNCTION;
     if (s_parse_function(allocator, error_node, &data_rule->error.function)) {
         goto on_error;
     }
 
-    data_rule->error_type = AWS_ENDPOINTS_ERROR_FUNCTION;
-    return data_rule;
+    return AWS_OP_SUCCESS;
 
 on_error:
-    aws_endpoints_rule_data_error_destroy(data_rule);   
+    aws_endpoints_rule_data_error_cleanup(data_rule);   
     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse error rule.");
-    aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
-    return NULL;
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
 }
 
 static int s_on_rule_element(size_t idx, const struct aws_json_value *value, bool *out_should_continue, void *user_data);
 
-static struct aws_endpoints_rule_data_tree *s_parse_endpoints_rule_data_tree(
+static int s_parse_endpoints_rule_data_tree(
     struct aws_allocator *allocator,
-    const struct aws_json_value *rule_node) {
+    const struct aws_json_value *rule_node, 
+    struct aws_endpoints_rule_data_tree *rule_data) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(rule_node);
+    AWS_PRECONDITION(rule_data);
 
-    struct aws_endpoints_rule_data_tree *rule_data = aws_endpoints_rule_data_tree_new(allocator);
     struct aws_json_value *rules_node = aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("rules"));
     size_t num_rules = aws_json_get_array_size(rules_node);
-    aws_array_list_init_dynamic(&rule_data->rules, allocator, num_rules, sizeof(struct aws_endpoints_rule *));
+    aws_array_list_init_dynamic(&rule_data->rules, allocator, num_rules, sizeof(struct aws_endpoints_rule));
     if (s_init_array_from_json(allocator, rules_node, &rule_data->rules, s_on_rule_element)) {
-        aws_endpoints_rule_data_tree_destroy(rule_data);
+        aws_endpoints_rule_data_tree_cleanup(rule_data);
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse rules.");
-        aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
-        return NULL;
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
     }
 
-    return rule_data;
+    return AWS_OP_SUCCESS;
 }
 
 static int s_on_rule_element(size_t idx, const struct aws_json_value *value, bool *out_should_continue, void *user_data) {
@@ -698,7 +698,9 @@ static int s_on_rule_element(size_t idx, const struct aws_json_value *value, boo
         AWS_FATAL_ASSERT(false);
     }
 
-    struct aws_endpoints_rule *rule = aws_endpoints_rule_new(wrapper->allocator, type);
+    struct aws_endpoints_rule rule;
+    AWS_ZERO_STRUCT(rule);
+    rule.type = type;
 
     struct aws_json_value *conditions_node =
         aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("conditions"));
@@ -709,9 +711,9 @@ static int s_on_rule_element(size_t idx, const struct aws_json_value *value, boo
 
     size_t num_conditions = aws_json_get_array_size(conditions_node);
     aws_array_list_init_dynamic(
-        &rule->conditions, wrapper->allocator, num_conditions, sizeof(struct aws_endpoints_condition));
+        &rule.conditions, wrapper->allocator, num_conditions, sizeof(struct aws_endpoints_condition));
 
-    if (s_init_array_from_json(wrapper->allocator, conditions_node, &rule->conditions, s_on_condition_element)) {
+    if (s_init_array_from_json(wrapper->allocator, conditions_node, &rule.conditions, s_on_condition_element)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract conditions.");
         goto error_cleanup;
     }
@@ -720,35 +722,26 @@ static int s_on_rule_element(size_t idx, const struct aws_json_value *value, boo
         case AWS_ENDPOINTS_RULE_ENDPOINT: {
             struct aws_json_value *endpoint_node =
                 aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("endpoint"));
-            struct aws_endpoints_rule_data_endpoint *rule_data =
-                s_parse_endpoints_rule_data_endpoint(wrapper->allocator, endpoint_node);
-            if (rule_data == NULL) {
+            if (s_parse_endpoints_rule_data_endpoint(wrapper->allocator, endpoint_node, &rule.rule_data.endpoint)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract endpoint rule data.");
                 goto error_cleanup;
             }
-            rule->rule_data.endpoint = rule_data;
             break;
         }
         case AWS_ENDPOINTS_RULE_ERROR: {
             struct aws_json_value *error_node =
                 aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("error"));
-            struct aws_endpoints_rule_data_error *rule_data =
-                s_parse_endpoints_rule_data_error(wrapper->allocator, error_node);
-            if (rule_data == NULL) {
+            if (s_parse_endpoints_rule_data_error(wrapper->allocator, error_node, &rule.rule_data.error)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract error rule data.");
                 goto error_cleanup;
             }
-            rule->rule_data.error = rule_data;
             break;
         }
         case AWS_ENDPOINTS_RULE_TREE: {
-            struct aws_endpoints_rule_data_tree *rule_data =
-                s_parse_endpoints_rule_data_tree(wrapper->allocator, value);
-            if (rule_data == NULL) {
+            if (s_parse_endpoints_rule_data_tree(wrapper->allocator, value, &rule.rule_data.tree)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract tree rule data.");
                 goto error_cleanup;
             }
-            rule->rule_data.tree = rule_data;
             break;
         }
         default:
@@ -764,7 +757,7 @@ static int s_on_rule_element(size_t idx, const struct aws_json_value *value, boo
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameter documentation.");
             goto error_cleanup;
         }
-        rule->documentation = aws_string_new_from_cursor(wrapper->allocator, &documentation_cur);
+        rule.documentation = aws_string_new_from_cursor(wrapper->allocator, &documentation_cur);
     }
 
     aws_array_list_push_back(wrapper->array, &rule);
@@ -772,7 +765,7 @@ static int s_on_rule_element(size_t idx, const struct aws_json_value *value, boo
     return AWS_OP_SUCCESS;
 
 error_cleanup:
-    aws_endpoints_rule_destroy(rule);
+    aws_endpoints_rule_cleanup(&rule);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
 }
 
@@ -853,7 +846,7 @@ static int s_init_ruleset_from_json(
         goto error_cleanup;
     }
     size_t num_rules = aws_json_get_array_size(rules_node);
-    aws_array_list_init_dynamic(&ruleset->rules, allocator, num_rules, sizeof(struct aws_endpoints_rule *));
+    aws_array_list_init_dynamic(&ruleset->rules, allocator, num_rules, sizeof(struct aws_endpoints_rule));
     if (s_init_array_from_json(allocator, rules_node, &ruleset->rules, s_on_rule_element)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract rules.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
@@ -879,7 +872,7 @@ static void s_endpoints_ruleset_destroy(void *data) {
         aws_mem_release(ruleset->allocator, ruleset->parameters);
     }
 
-    aws_array_list_deep_cleanup(&ruleset->rules, s_on_rule_array_element_destroy);
+    aws_array_list_deep_cleanup(&ruleset->rules, s_on_rule_array_element_cleanup);
 
     aws_mem_release(ruleset->allocator, ruleset);
 }
