@@ -34,7 +34,7 @@ struct aws_endpoints_parameter {
     struct aws_byte_cursor name_cur;
     struct aws_string *name;
 
-    enum aws_endpoints_parameter_value_type type;
+    enum aws_endpoints_value_type type;
     struct aws_string *built_in;
 
     union {
@@ -135,7 +135,7 @@ struct aws_endpoints_rule {
 
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     struct aws_allocator *allocator,
-    enum aws_endpoints_parameter_value_type type,
+    enum aws_endpoints_value_type type,
     const struct aws_byte_cursor *name_cur);
 void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter);
 

@@ -32,8 +32,7 @@ struct aws_byte_cursor aws_endpoints_get_supported_ruleset_version(void) {
 * Parameter Getters.
 ******************************
 */
-enum aws_endpoints_parameter_value_type aws_endpoints_parameter_get_value_type(
-    const struct aws_endpoints_parameter *parameter) {
+enum aws_endpoints_value_type aws_endpoints_parameter_get_value_type(const struct aws_endpoints_parameter *parameter) {
     AWS_PRECONDITION(parameter);
     return parameter->type;
 }
@@ -381,7 +380,7 @@ static int s_on_parameter_key(
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
     }
 
-    enum aws_endpoints_parameter_value_type type;
+    enum aws_endpoints_value_type type;
     if (aws_byte_cursor_eq_ignore_case(&type_cur, &s_string_type_cur)) {
         type = AWS_ENDPOINTS_PARAMETER_STRING;
     } else if (aws_byte_cursor_eq_ignore_case(&type_cur, &s_boolean_type_cur)) {

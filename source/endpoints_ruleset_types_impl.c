@@ -36,7 +36,7 @@ void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callba
 
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     struct aws_allocator *allocator,
-    enum aws_endpoints_parameter_value_type type,
+    enum aws_endpoints_value_type type,
     const struct aws_byte_cursor *name_cur) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(name_cur);
