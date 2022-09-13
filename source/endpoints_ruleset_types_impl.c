@@ -8,28 +8,28 @@
 #include <aws/common/string.h>
 #include <aws/sdkutils/private/endpoints_ruleset_types_impl.h>
 
-static void s_on_condition_array_element_cleanup(void *element) {
+static void s_on_condition_array_element_clean_up(void *element) {
     struct aws_endpoints_condition *condition = element;
-    aws_endpoints_condition_cleanup(condition);
+    aws_endpoints_condition_clean_up(condition);
 }
 
-static void s_on_rule_array_element_cleanup(void *element) {
+static void s_on_rule_array_element_clean_up(void *element) {
     struct aws_endpoints_rule *rule = element;
-    aws_endpoints_rule_cleanup(rule);
+    aws_endpoints_rule_clean_up(rule);
 }
 
-static void s_on_expr_array_element_cleanup(void *element) {
+static void s_on_expr_array_element_clean_up(void *element) {
     struct aws_endpoints_expr *expr = element;
-    aws_endpoints_expr_cleanup(expr);
+    aws_endpoints_expr_clean_up(expr);
 }
 
-void aws_array_list_deep_cleanup(struct aws_array_list *array, aws_array_callback_cleanup_fn on_cleanup_element) {
+void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callback_clean_up_fn on_clean_up_element) {
     for (size_t idx = 0; idx < aws_array_list_length(array); ++idx) {
         void *element = NULL;
 
         aws_array_list_get_at_ptr(array, &element, idx);
         AWS_ASSERT(element);
-        on_cleanup_element(element);
+        on_clean_up_element(element);
     }
     aws_array_list_clean_up(array);
 }
@@ -63,18 +63,18 @@ void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter) 
     aws_mem_release(parameter->allocator, parameter);
 }
 
-void aws_endpoints_rule_cleanup(struct aws_endpoints_rule *rule) {
-    aws_array_list_deep_cleanup(&rule->conditions, s_on_condition_array_element_cleanup);
+void aws_endpoints_rule_clean_up(struct aws_endpoints_rule *rule) {
+    aws_array_list_deep_clean_up(&rule->conditions, s_on_condition_array_element_clean_up);
 
     switch (rule->type) {
         case AWS_ENDPOINTS_RULE_ENDPOINT:
-            aws_endpoints_rule_data_endpoint_cleanup(&rule->rule_data.endpoint);
+            aws_endpoints_rule_data_endpoint_clean_up(&rule->rule_data.endpoint);
             break;
         case AWS_ENDPOINTS_RULE_ERROR:
-            aws_endpoints_rule_data_error_cleanup(&rule->rule_data.error);
+            aws_endpoints_rule_data_error_clean_up(&rule->rule_data.error);
             break;
         case AWS_ENDPOINTS_RULE_TREE:
-            aws_endpoints_rule_data_tree_cleanup(&rule->rule_data.tree);
+            aws_endpoints_rule_data_tree_clean_up(&rule->rule_data.tree);
             break;
         default:
             AWS_FATAL_ASSERT(false);
@@ -83,7 +83,7 @@ void aws_endpoints_rule_cleanup(struct aws_endpoints_rule *rule) {
     aws_string_destroy(rule->documentation);
 }
 
-void aws_endpoints_rule_data_endpoint_cleanup(struct aws_endpoints_rule_data_endpoint *rule_data) {
+void aws_endpoints_rule_data_endpoint_clean_up(struct aws_endpoints_rule_data_endpoint *rule_data) {
 
     switch (rule_data->url_type) {
         case AWS_ENDPOINTS_URL_TEMPLATE:
@@ -93,7 +93,7 @@ void aws_endpoints_rule_data_endpoint_cleanup(struct aws_endpoints_rule_data_end
             aws_string_destroy(rule_data->url.reference);
             break;
         case AWS_ENDPOINTS_URL_FUNCTION:
-            aws_endpoints_function_cleanup(&rule_data->url.function);
+            aws_endpoints_function_clean_up(&rule_data->url.function);
             break;
         default:
             AWS_FATAL_ASSERT(false);
@@ -106,7 +106,7 @@ void aws_endpoints_rule_data_endpoint_cleanup(struct aws_endpoints_rule_data_end
     }
 }
 
-void aws_endpoints_rule_data_error_cleanup(struct aws_endpoints_rule_data_error *rule_data) {
+void aws_endpoints_rule_data_error_clean_up(struct aws_endpoints_rule_data_error *rule_data) {
     switch (rule_data->error_type) {
         case AWS_ENDPOINTS_ERROR_TEMPLATE:
             aws_string_destroy(rule_data->error.template);
@@ -115,31 +115,31 @@ void aws_endpoints_rule_data_error_cleanup(struct aws_endpoints_rule_data_error 
             aws_string_destroy(rule_data->error.reference);
             break;
         case AWS_ENDPOINTS_ERROR_FUNCTION:
-            aws_endpoints_function_cleanup(&rule_data->error.function);
+            aws_endpoints_function_clean_up(&rule_data->error.function);
             break;
         default:
             AWS_FATAL_ASSERT(false);
     }
 }
 
-void aws_endpoints_rule_data_tree_cleanup(struct aws_endpoints_rule_data_tree *rule_data) {
-    aws_array_list_deep_cleanup(&rule_data->rules, s_on_rule_array_element_cleanup);
+void aws_endpoints_rule_data_tree_clean_up(struct aws_endpoints_rule_data_tree *rule_data) {
+    aws_array_list_deep_clean_up(&rule_data->rules, s_on_rule_array_element_clean_up);
 }
 
-void aws_endpoints_condition_cleanup(struct aws_endpoints_condition *condition) {
+void aws_endpoints_condition_clean_up(struct aws_endpoints_condition *condition) {
 
     aws_string_destroy(condition->assign);
-    aws_endpoints_function_cleanup(&condition->function);
+    aws_endpoints_function_clean_up(&condition->function);
 }
 
-void aws_endpoints_function_cleanup(struct aws_endpoints_function *function) {
+void aws_endpoints_function_clean_up(struct aws_endpoints_function *function) {
     aws_string_destroy(function->fn);
     function->fn = NULL;
 
-    aws_array_list_deep_cleanup(&function->argv, s_on_expr_array_element_cleanup);
+    aws_array_list_deep_clean_up(&function->argv, s_on_expr_array_element_clean_up);
 }
 
-void aws_endpoints_expr_cleanup(struct aws_endpoints_expr *expr) {
+void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr) {
     switch (expr->type) {
         case AWS_ENDPOINTS_EXPR_STRING:
             aws_string_destroy(expr->e.string);
@@ -148,13 +148,13 @@ void aws_endpoints_expr_cleanup(struct aws_endpoints_expr *expr) {
         case AWS_ENDPOINTS_EXPR_NUMBER:
             break;
         case AWS_ENDPOINTS_EXPR_FUNCTION:
-            aws_endpoints_function_cleanup(&expr->e.function);
+            aws_endpoints_function_clean_up(&expr->e.function);
             break;
         case AWS_ENDPOINTS_EXPR_REFERENCE:
             aws_string_destroy(expr->e.reference);
             break;
         case AWS_ENDPOINTS_EXPR_ARRAY:
-            aws_array_list_deep_cleanup(&expr->e.array, s_on_expr_array_element_cleanup);
+            aws_array_list_deep_clean_up(&expr->e.array, s_on_expr_array_element_clean_up);
             break;
         default:
             AWS_FATAL_ASSERT(false);
