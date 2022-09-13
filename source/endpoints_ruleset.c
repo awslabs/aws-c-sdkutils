@@ -54,7 +54,7 @@ int aws_endpoints_parameter_get_default_string(
         return AWS_OP_SUCCESS;
     };
 
-    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_INVALID_ARGUMENT);
+    return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
 int aws_endpoints_parameter_get_default_boolean(
@@ -68,7 +68,7 @@ int aws_endpoints_parameter_get_default_boolean(
         return AWS_OP_SUCCESS;
     };
 
-    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_INVALID_ARGUMENT);
+    return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
 bool aws_endpoints_parameters_get_is_required(const struct aws_endpoints_parameter *parameter) {
@@ -295,9 +295,8 @@ static int s_parse_expr(
         size_t num_elements = aws_json_get_array_size(node);
         aws_array_list_init_dynamic(&expr->e.array, allocator, num_elements, sizeof(struct aws_endpoints_expr));
         if (s_init_array_from_json(allocator, node, &expr->e.array, s_on_expr_element)) {
-            aws_endpoints_expr_cleanup(expr);
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse array value type.");
-            return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
+            goto on_error;
         }
         return AWS_OP_SUCCESS;
     }
@@ -321,6 +320,7 @@ static int s_parse_expr(
     return AWS_OP_SUCCESS;
 
 on_error:
+    aws_endpoints_expr_cleanup(expr);
     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse expr type");
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
 }
@@ -350,7 +350,7 @@ static int s_parse_function(
     if (argv_node == NULL || !aws_json_value_is_array(argv_node)) {
         aws_endpoints_function_cleanup(function);
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "No argv or unexpected type.");
-        return AWS_OP_SUCCESS;
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
     }
 
     size_t num_args = aws_json_get_array_size(argv_node);
@@ -685,6 +685,11 @@ static int s_parse_endpoints_rule_data_tree(
     AWS_PRECONDITION(rule_data);
 
     struct aws_json_value *rules_node = aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("rules"));
+    if (rules_node == NULL) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Rules node is missing.");
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
+    }
+
     size_t num_rules = aws_json_get_array_size(rules_node);
     aws_array_list_init_dynamic(&rule_data->rules, allocator, num_rules, sizeof(struct aws_endpoints_rule));
     if (s_init_array_from_json(allocator, rules_node, &rule_data->rules, s_on_rule_element)) {

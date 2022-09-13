@@ -123,6 +123,12 @@ AWS_SDKUTILS_API struct aws_endpoints_ruleset *aws_endpoints_ruleset_release(str
  * (aws_endpoints_parameter *) as a value. Ruleset owns the owns the hashtable and
  * pointer is valid during ruleset lifetime. Will never return a NULL. In case
  * there are no parameters in the ruleset, hash table will contain 0 elements.
+ * 
+ * Note on usage in bindings:
+ * - this is basically a map from a parameter name to a structure describing parameter
+ * - deep copy all the fields and let language take ownership of data
+ *   Consider transforming this into language specific map (dict for python, Map
+ *   in Java, std::map in C++, etc...) instead of wrapping it into a custom class.
  */
 AWS_SDKUTILS_API const struct aws_hash_table *aws_endpoints_ruleset_get_parameters(
     struct aws_endpoints_ruleset *ruleset);

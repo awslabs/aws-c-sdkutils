@@ -41,16 +41,18 @@ AWS_TEST_CASE(parse_ruleset_from_string, s_test_parse_ruleset_from_string)
 static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
+    struct aws_allocator *alloc = aws_default_allocator();
+
     struct aws_byte_buf buf;
-    aws_sdkutils_library_init(allocator);
+    aws_sdkutils_library_init(alloc);
 
-    struct aws_string *filename = aws_string_new_from_c_str(allocator, "sample_ruleset.json");
+    struct aws_string *filename = aws_string_new_from_c_str(alloc, "s3_ruleset.json");
 
-    ASSERT_INT_EQUALS(read_file_contents(&buf, allocator, filename), AWS_OP_SUCCESS);
+    ASSERT_INT_EQUALS(read_file_contents(&buf, alloc, filename), AWS_OP_SUCCESS);
     struct aws_byte_cursor ruleset_json = aws_byte_cursor_from_buf(&buf);
 
     clock_t begin = clock();
-    struct aws_endpoints_ruleset *ruleset = aws_endpoints_ruleset_new_from_string(allocator, ruleset_json);
+    struct aws_endpoints_ruleset *ruleset = aws_endpoints_ruleset_new_from_string(alloc, ruleset_json);
     clock_t end = clock();
     double time_taken = (((double)(end - begin)) / CLOCKS_PER_SEC);
     AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Parsed in(s): %f", time_taken);
