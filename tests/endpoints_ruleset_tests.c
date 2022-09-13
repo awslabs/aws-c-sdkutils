@@ -46,7 +46,7 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     struct aws_byte_buf buf;
     aws_sdkutils_library_init(alloc);
 
-    struct aws_string *filename = aws_string_new_from_c_str(alloc, "s3_ruleset.json");
+    struct aws_string *filename = aws_string_new_from_c_str(alloc, "sample_ruleset.json");
 
     ASSERT_INT_EQUALS(read_file_contents(&buf, alloc, filename), AWS_OP_SUCCESS);
     struct aws_byte_cursor ruleset_json = aws_byte_cursor_from_buf(&buf);
