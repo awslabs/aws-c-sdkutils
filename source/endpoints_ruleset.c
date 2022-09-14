@@ -42,7 +42,9 @@ const struct aws_string *aws_endpoints_parameter_get_built_in(const struct aws_e
     return parameter->built_in;
 }
 
-int aws_endpoints_parameter_get_default_string(const struct aws_endpoints_parameter *parameter, const struct aws_string **out_string) {
+int aws_endpoints_parameter_get_default_string(
+    const struct aws_endpoints_parameter *parameter,
+    const struct aws_string **out_string) {
     AWS_PRECONDITION(parameter);
     AWS_PRECONDITION(out_string);
 
@@ -54,7 +56,9 @@ int aws_endpoints_parameter_get_default_string(const struct aws_endpoints_parame
     return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
-int aws_endpoints_parameter_get_default_boolean(const struct aws_endpoints_parameter *parameter, const bool **out_bool) {
+int aws_endpoints_parameter_get_default_boolean(
+    const struct aws_endpoints_parameter *parameter,
+    const bool **out_bool) {
     AWS_PRECONDITION(parameter);
     AWS_PRECONDITION(out_bool);
 
@@ -213,9 +217,9 @@ static int s_parse_function(
     struct aws_endpoints_function *function);
 
 /*
-* Note: this function only fails in cases where node is a ref (ie object with a
-* ref field), but cannot be parsed completely.
-*/
+ * Note: this function only fails in cases where node is a ref (ie object with a
+ * ref field), but cannot be parsed completely.
+ */
 static int s_try_parse_reference(
     struct aws_allocator *allocator,
     const struct aws_json_value *node,
@@ -226,7 +230,7 @@ static int s_try_parse_reference(
     *out_reference = NULL;
     struct aws_json_value *ref_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("ref"));
     if (ref_node != NULL) {
-        struct aws_byte_cursor ref_cur;     
+        struct aws_byte_cursor ref_cur;
         if (aws_json_value_get_string(ref_node, &ref_cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse ref.");
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
@@ -340,7 +344,7 @@ static int s_parse_function(
     AWS_PRECONDITION(node);
 
     AWS_ZERO_STRUCT(*function);
-    
+
     struct aws_json_value *fn_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("fn"));
     if (fn_node == NULL) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Node is not a function.");
@@ -520,7 +524,7 @@ static int s_on_condition_element(
         aws_json_value_get_from_object(condition_node, aws_byte_cursor_from_c_str("assign"));
     if (assign_node != NULL) {
         struct aws_byte_cursor cur;
-        if (aws_json_value_get_string(assign_node, &cur)) {            
+        if (aws_json_value_get_string(assign_node, &cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for assign.");
             goto on_error;
         }
@@ -602,8 +606,7 @@ static int s_parse_endpoints_rule_data_endpoint(
 
     data_rule->allocator = allocator;
     struct aws_json_value *url_node = aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("url"));
-    if (url_node == NULL || 
-        aws_json_value_is_string(url_node)) {
+    if (url_node == NULL || aws_json_value_is_string(url_node)) {
         struct aws_byte_cursor url_cur;
         if (aws_json_value_get_string(url_node, &url_cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract url.");
