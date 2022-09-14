@@ -119,8 +119,6 @@ struct aws_endpoints_condition {
 };
 
 struct aws_endpoints_rule {
-    struct aws_allocator *allocator;
-
     /* List of (aws_endpoints_condition) */
     struct aws_array_list conditions;
     struct aws_string *documentation;

@@ -42,9 +42,7 @@ const struct aws_string *aws_endpoints_parameter_get_built_in(const struct aws_e
     return parameter->built_in;
 }
 
-int aws_endpoints_parameter_get_default_string(
-    const struct aws_endpoints_parameter *parameter,
-    const struct aws_string **out_string) {
+int aws_endpoints_parameter_get_default_string(const struct aws_endpoints_parameter *parameter, const struct aws_string **out_string) {
     AWS_PRECONDITION(parameter);
     AWS_PRECONDITION(out_string);
 
@@ -56,9 +54,7 @@ int aws_endpoints_parameter_get_default_string(
     return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
-int aws_endpoints_parameter_get_default_boolean(
-    const struct aws_endpoints_parameter *parameter,
-    const bool **out_bool) {
+int aws_endpoints_parameter_get_default_boolean(const struct aws_endpoints_parameter *parameter, const bool **out_bool) {
     AWS_PRECONDITION(parameter);
     AWS_PRECONDITION(out_bool);
 
@@ -216,6 +212,10 @@ static int s_parse_function(
     const struct aws_json_value *node,
     struct aws_endpoints_function *function);
 
+/*
+* Note: this function only fails in cases where node is a ref (ie object with a
+* ref field), but cannot be parsed completely.
+*/
 static int s_try_parse_reference(
     struct aws_allocator *allocator,
     const struct aws_json_value *node,
@@ -226,13 +226,12 @@ static int s_try_parse_reference(
     *out_reference = NULL;
     struct aws_json_value *ref_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("ref"));
     if (ref_node != NULL) {
-        if (!aws_json_value_is_string(ref_node)) {
+        struct aws_byte_cursor ref_cur;     
+        if (aws_json_value_get_string(ref_node, &ref_cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse ref.");
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
         }
 
-        struct aws_byte_cursor ref_cur;
-        aws_json_value_get_string(ref_node, &ref_cur);
         *out_reference = aws_string_new_from_cursor(allocator, &ref_cur);
         return AWS_OP_SUCCESS;
     }
@@ -252,6 +251,9 @@ static int s_on_expr_element(
     void *user_data) {
     (void)idx;
     (void)out_should_continue;
+    AWS_PRECONDITION(value_node);
+    AWS_PRECONDITION(user_data);
+
     struct array_parser_wrapper *wrapper = user_data;
 
     struct aws_endpoints_expr expr;
@@ -269,7 +271,12 @@ static int s_parse_expr(
     struct aws_allocator *allocator,
     const struct aws_json_value *node,
     struct aws_endpoints_expr *expr) {
+    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(node);
+    AWS_PRECONDITION(expr);
+
     AWS_ZERO_STRUCT(*expr);
+
     /* TODO: this recurses. in practical circumstances depth will never be high,
     but we should still consider doing iterative approach */
     if (aws_json_value_is_string(node)) {
@@ -332,6 +339,8 @@ static int s_parse_function(
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(node);
 
+    AWS_ZERO_STRUCT(*function);
+    
     struct aws_json_value *fn_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("fn"));
     if (fn_node == NULL) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Node is not a function.");
@@ -373,6 +382,10 @@ static int s_on_parameter_key(
     bool *out_should_continue,
     void *user_data) {
     (void)out_should_continue;
+    AWS_PRECONDITION(key);
+    AWS_PRECONDITION(value);
+    AWS_PRECONDITION(user_data);
+
     struct member_parser_wrapper *wrapper = user_data;
 
     struct aws_endpoints_parameter *parameter = aws_endpoints_parameter_new(wrapper->allocator, key);
@@ -408,7 +421,6 @@ static int s_on_parameter_key(
     parameter->documentation = aws_string_new_from_cursor(wrapper->allocator, &documentation_cur);
 
     /* optional fields */
-    parameter->built_in = NULL;
     struct aws_byte_cursor built_in_cur;
     struct aws_json_value *built_in_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("builtIn"));
     if (built_in_node != NULL) {
@@ -419,7 +431,6 @@ static int s_on_parameter_key(
         parameter->built_in = aws_string_new_from_cursor(wrapper->allocator, &built_in_cur);
     }
 
-    parameter->is_required = false;
     struct aws_json_value *required_node =
         aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("required"));
     if (required_node != NULL) {
@@ -492,6 +503,9 @@ static int s_on_condition_element(
     void *user_data) {
     (void)idx;
     (void)out_should_continue;
+    AWS_PRECONDITION(condition_node);
+    AWS_PRECONDITION(user_data);
+
     struct array_parser_wrapper *wrapper = user_data;
 
     struct aws_endpoints_condition condition;
@@ -499,23 +513,26 @@ static int s_on_condition_element(
 
     if (s_parse_function(wrapper->allocator, condition_node, &condition.function)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse function.");
-        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
+        goto on_error;
     }
 
     struct aws_json_value *assign_node =
         aws_json_value_get_from_object(condition_node, aws_byte_cursor_from_c_str("assign"));
     if (assign_node != NULL) {
         struct aws_byte_cursor cur;
-        if (aws_json_value_get_string(assign_node, &cur)) {
-            aws_endpoints_condition_clean_up(&condition);
+        if (aws_json_value_get_string(assign_node, &cur)) {            
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for assign.");
-            return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
+            goto on_error;
         }
         condition.assign = aws_string_new_from_cursor(wrapper->allocator, &cur);
     }
 
     aws_array_list_push_back(wrapper->array, &condition);
     return AWS_OP_SUCCESS;
+
+on_error:
+    aws_endpoints_condition_clean_up(&condition);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
 }
 
 static int s_on_header_element(
@@ -525,6 +542,8 @@ static int s_on_header_element(
     void *user_data) {
     (void)idx;
     (void)out_should_continue;
+    AWS_PRECONDITION(value);
+    AWS_PRECONDITION(user_data);
     struct array_parser_wrapper *wrapper = user_data;
     struct aws_byte_cursor cur;
 
@@ -544,6 +563,9 @@ static int s_on_headers_key(
     bool *out_should_continue,
     void *user_data) {
     (void)out_should_continue;
+    AWS_PRECONDITION(key);
+    AWS_PRECONDITION(value);
+    AWS_PRECONDITION(user_data);
     struct member_parser_wrapper *wrapper = user_data;
 
     if (!aws_json_value_is_array(value)) {
@@ -580,7 +602,8 @@ static int s_parse_endpoints_rule_data_endpoint(
 
     data_rule->allocator = allocator;
     struct aws_json_value *url_node = aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("url"));
-    if (aws_json_value_is_string(url_node)) {
+    if (url_node == NULL || 
+        aws_json_value_is_string(url_node)) {
         struct aws_byte_cursor url_cur;
         if (aws_json_value_get_string(url_node, &url_cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract url.");
@@ -628,6 +651,7 @@ static int s_parse_endpoints_rule_data_endpoint(
     struct aws_json_value *headers_node =
         aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("headers"));
     if (headers_node != NULL) {
+
         /* TODO: this is currently aws_string* to aws_array_list*
          * We cannot use same trick as for params to use aws_byte_cursor as key,
          * since value is a generic type. We can wrap list into a struct, but
@@ -736,6 +760,9 @@ static int s_on_rule_element(
     void *user_data) {
     (void)idx;
     (void)out_should_continue;
+    AWS_PRECONDITION(value);
+    AWS_PRECONDITION(user_data);
+
     struct array_parser_wrapper *wrapper = user_data;
 
     /* Required fields */
