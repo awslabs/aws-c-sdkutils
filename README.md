@@ -1,6 +1,6 @@
 ## AWS C SDKUTILS
 
-C99 library implementing AWS SDK specific utilitiies. Includes utilities for ARN
+C99 library implementing AWS SDK specific utilities. Includes utilities for ARN
 parsing, reading AWS profiles, etc...
 
 ## License

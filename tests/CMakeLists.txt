@@ -66,6 +66,11 @@ add_test_case(resource_name_tostring_test)
 add_test_case(resource_name_tostring_failure_test)
 add_test_case(resource_name_length_test)
 
+add_test_case(parse_ruleset_from_string)
 
 set(TEST_BINARY_NAME ${PROJECT_NAME}-tests)
 generate_test_driver(${TEST_BINARY_NAME})
+
+add_custom_command(TARGET ${PROJECT_NAME}-tests PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/resources $<TARGET_FILE_DIR:${PROJECT_NAME}-tests>)

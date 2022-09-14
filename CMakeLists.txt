@@ -39,6 +39,10 @@ file(GLOB AWS_SDKUTILS_HEADERS
         "include/aws/sdkutils/*.h"
 )
 
+file(GLOB AWS_SDKUTILS_PRIVATE_HEADERS
+        "include/aws/sdkutils/private/*.h"
+)
+
 file(GLOB AWS_SDKUTILS_SRC
         "source/*.c"
 )
@@ -56,7 +60,6 @@ file(GLOB SDKUTILS_HEADERS
 
 file(GLOB SDKUTILS_SRC
         ${AWS_SDKUTILS_SRC}
-        ${AWS_SDKUTILS_OS_SRC}
 )
 
 add_library(${PROJECT_NAME} ${SDKUTILS_SRC})
