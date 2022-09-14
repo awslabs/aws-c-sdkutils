@@ -59,7 +59,7 @@ struct aws_endpoints_ruleset {
     struct aws_string *version;
     struct aws_string *service_id;
     /* map of (aws_byte_cursor *) -> (aws_endpoints_parameter *) */
-    struct aws_hash_table *parameters;
+    struct aws_hash_table parameters;
 };
 
 struct aws_endpoints_function {
@@ -96,7 +96,7 @@ struct aws_endpoints_rule_data_endpoint {
      */
     struct aws_string *properties;
     /* Map of (aws_string *) -> (aws_array_list * of aws_string *) */
-    struct aws_hash_table *headers;
+    struct aws_hash_table headers;
 };
 
 struct aws_endpoints_rule_data_error {
@@ -135,7 +135,6 @@ struct aws_endpoints_rule {
 
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     struct aws_allocator *allocator,
-    enum aws_endpoints_value_type type,
     const struct aws_byte_cursor *name_cur);
 void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter);
 
