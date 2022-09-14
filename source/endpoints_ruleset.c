@@ -269,7 +269,7 @@ static int s_parse_expr(
     struct aws_allocator *allocator,
     const struct aws_json_value *node,
     struct aws_endpoints_expr *expr) {
-    AWS_ZERO_STRUCT(expr);
+    AWS_ZERO_STRUCT(*expr);
     /* TODO: this recurses. in practical circumstances depth will never be high,
     but we should still consider doing iterative approach */
     if (aws_json_value_is_string(node)) {
@@ -341,7 +341,7 @@ static int s_parse_function(
     struct aws_byte_cursor fn_cur;
     if (aws_json_value_get_string(fn_node, &fn_cur)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract fn name.");
-         goto on_error;
+        goto on_error;
     }
 
     function->fn = aws_string_new_from_cursor(allocator, &fn_cur);
@@ -357,7 +357,7 @@ static int s_parse_function(
 
     if (s_init_array_from_json(allocator, argv_node, &function->argv, s_on_expr_element)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse argv.");
-         goto on_error;
+        goto on_error;
     }
 
     return AWS_OP_SUCCESS;
@@ -412,7 +412,7 @@ static int s_on_parameter_key(
     struct aws_byte_cursor built_in_cur;
     struct aws_json_value *built_in_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("builtIn"));
     if (built_in_node != NULL) {
-        if(aws_json_value_get_string(built_in_node, &built_in_cur)) {
+        if (aws_json_value_get_string(built_in_node, &built_in_cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for built-in parameter field.");
             goto on_error;
         }
@@ -449,12 +449,12 @@ static int s_on_parameter_key(
 
     struct aws_json_value *deprecated_node =
         aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("deprecated"));
-    if (deprecated_node != NULL) {     
+    if (deprecated_node != NULL) {
         struct aws_json_value *deprecated_message_node =
             aws_json_value_get_from_object(deprecated_node, aws_byte_cursor_from_c_str("message"));
         if (deprecated_message_node != NULL) {
             struct aws_byte_cursor deprecated_message_cur;
-            if(aws_json_value_get_string(deprecated_message_node, &deprecated_message_cur)) {
+            if (aws_json_value_get_string(deprecated_message_node, &deprecated_message_cur)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for deprecated message.");
                 goto on_error;
             }
@@ -564,7 +564,7 @@ static int s_on_headers_key(
     return AWS_OP_SUCCESS;
 
 on_error:
-    if(headers) {
+    if (headers) {
         s_callback_headers_destroy(headers);
     }
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
@@ -782,7 +782,7 @@ static int s_on_rule_element(
         case AWS_ENDPOINTS_RULE_ENDPOINT: {
             struct aws_json_value *endpoint_node =
                 aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("endpoint"));
-            if (endpoint_node == NULL || 
+            if (endpoint_node == NULL ||
                 s_parse_endpoints_rule_data_endpoint(wrapper->allocator, endpoint_node, &rule.rule_data.endpoint)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract endpoint rule data.");
                 goto error_clean_up;
@@ -902,8 +902,7 @@ static int s_init_ruleset_from_json(
     }
 
     struct aws_json_value *rules_node = aws_json_value_get_from_object(root, aws_byte_cursor_from_c_str("rules"));
-    if (rules_node == NULL ||
-        !aws_json_value_is_array(rules_node)) {
+    if (rules_node == NULL || !aws_json_value_is_array(rules_node)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for rules node.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
         goto error_clean_up;
