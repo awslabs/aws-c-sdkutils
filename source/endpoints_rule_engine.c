@@ -471,7 +471,7 @@ static int s_eval_conditions(
     *out_is_truthy = false;
     for (size_t idx = 0; idx < aws_array_list_length(conditions); ++idx) {
         struct aws_endpoints_condition *condition = NULL;
-        if (aws_array_list_get_at_ptr(conditions, (void **) &condition, idx)) {
+        if (aws_array_list_get_at_ptr(conditions, (void **)&condition, idx)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to retrieve condition.");
             goto on_error;
         }
@@ -564,8 +564,7 @@ static int s_resolve_templated_value_with_pathing(
         goto on_error;
     }
 
-    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Template string: " PRInSTR, 
-        AWS_BYTE_CURSOR_PRI(template_cur));
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Template string: " PRInSTR, AWS_BYTE_CURSOR_PRI(template_cur));
 
     struct aws_hash_element *elem = NULL;
     if (aws_hash_table_find(&scope->values, &template_cur, &elem) || elem == NULL) {
@@ -1054,10 +1053,10 @@ int aws_endpoints_rule_engine_resolve(
                 }
 
                 if (rule->rule_data.endpoint.properties && s_resolve_templated_string(
-                        engine->allocator,
-                        rule->rule_data.endpoint.properties,
-                        &scope,
-                        &endpoint->r.endpoint.properties)) {
+                                                               engine->allocator,
+                                                               rule->rule_data.endpoint.properties,
+                                                               &scope,
+                                                               &endpoint->r.endpoint.properties)) {
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated error.");
                     goto on_error;
                 }
@@ -1104,7 +1103,7 @@ on_success:
     return AWS_OP_SUCCESS;
 
 on_error:
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unsuccessfully resolved endpoint.");  
+    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unsuccessfully resolved endpoint.");
     s_scope_clean_up(engine->allocator, &scope);
     return AWS_OP_ERR;
 }

@@ -41,6 +41,8 @@ AWS_TEST_CASE(parse_ruleset_from_string, s_test_parse_ruleset_from_string)
 static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
+    allocator = aws_default_allocator();
+
     struct aws_byte_buf buf;
     aws_sdkutils_library_init(allocator);
 
@@ -70,10 +72,10 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset);
 
     struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
-    ASSERT_INT_EQUALS(AWS_OP_SUCCESS, aws_endpoints_request_context_add_string(allocator, 
-        context,
-        aws_byte_cursor_from_c_str("Region"), 
-        aws_byte_cursor_from_c_str("us-west-2")));
+    ASSERT_INT_EQUALS(
+        AWS_OP_SUCCESS,
+        aws_endpoints_request_context_add_string(
+            allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-west-2")));
 
     struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
     clock_t begin_resolve = clock();

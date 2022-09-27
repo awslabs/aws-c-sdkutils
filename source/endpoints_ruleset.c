@@ -386,7 +386,9 @@ static int s_parse_function(
     }
 
     if (function->fn == AWS_ENDPOINTS_FN_LAST) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Could not map function name to function type: " PRInSTR,
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_PARSING,
+            "Could not map function name to function type: " PRInSTR,
             AWS_BYTE_CURSOR_PRI(fn_cur));
         goto on_error;
     }
