@@ -36,13 +36,12 @@ void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callba
 
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     struct aws_allocator *allocator,
-    const struct aws_byte_cursor *name_cur) {
+    struct aws_byte_cursor name_cur) {
     AWS_PRECONDITION(allocator);
-    AWS_PRECONDITION(name_cur);
     struct aws_endpoints_parameter *parameter = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_parameter));
 
     parameter->allocator = allocator;
-    parameter->name = aws_string_new_from_cursor(allocator, name_cur);
+    parameter->name = aws_string_new_from_cursor(allocator, &name_cur);
     parameter->name_cur = aws_byte_cursor_from_string(parameter->name);
 
     return parameter;
@@ -147,9 +146,6 @@ void aws_endpoints_condition_clean_up(struct aws_endpoints_condition *condition)
 
 void aws_endpoints_function_clean_up(struct aws_endpoints_function *function) {
     AWS_PRECONDITION(function);
-
-    aws_string_destroy(function->fn);
-    function->fn = NULL;
 
     aws_array_list_deep_clean_up(&function->argv, s_on_expr_array_element_clean_up);
     AWS_ZERO_STRUCT(*function);

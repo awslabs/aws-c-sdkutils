@@ -28,15 +28,33 @@ enum aws_endpoints_expr_type {
     AWS_ENDPOINTS_EXPR_FUNCTION
 };
 
+enum aws_endpoints_fn_type {
+    AWS_ENDPOINTS_FN_FIRST = 0,
+    AWS_ENDPOINTS_FN_IS_SET = 0,
+    AWS_ENDPOINTS_FN_NOT,
+    AWS_ENDPOINTS_FN_GET_ATTR,
+    AWS_ENDPOINTS_FN_SUBSTRING,
+    AWS_ENDPOINTS_FN_STRING_EQUALS,
+    AWS_ENDPOINTS_FN_BOOLEAN_EQUALS,
+    AWS_ENDPOINTS_FN_URI_ENCODE,
+    AWS_ENDPOINTS_FN_PARSE_URL,
+    AWS_ENDPOINTS_FN_IS_VALID_HOST_LABEL,
+    AWS_ENDPOINTS_FN_AWS_PARTITION,
+    AWS_ENDPOINTS_FN_AWS_PARSE_ARN,
+    AWS_ENDPOINTS_FN_AWS_IS_VIRTUAL_HOSTABLE_S3_BUCKET,
+    AWS_ENDPOINTS_FN_LAST,
+};
+
 struct aws_endpoints_parameter {
     struct aws_allocator *allocator;
 
     struct aws_byte_cursor name_cur;
     struct aws_string *name;
 
-    enum aws_endpoints_value_type type;
+    enum aws_endpoints_parameter_value_type type;
     struct aws_string *built_in;
 
+    bool has_default_value;
     union {
         struct aws_string *string;
         bool boolean;
@@ -63,7 +81,7 @@ struct aws_endpoints_ruleset {
 };
 
 struct aws_endpoints_function {
-    struct aws_string *fn; /* TODO: precompute hash or enum value to avoid lookup on every eval */
+    enum aws_endpoints_fn_type fn;
     /* List of (aws_endpoints_expr) */
     struct aws_array_list argv;
 };
@@ -95,7 +113,7 @@ struct aws_endpoints_rule_data_endpoint {
      * Its up to caller to parse json to retrieve properties.
      */
     struct aws_string *properties;
-    /* Map of (aws_string *) -> (aws_array_list * of aws_string *) */
+    /* Map of (aws_string *) -> (aws_array_list * of aws_endpoints_expr) */
     struct aws_hash_table headers;
 };
 
@@ -131,9 +149,11 @@ struct aws_endpoints_rule {
     } rule_data;
 };
 
+bool aws_endpoints_byte_cursor_eq(const void *a, const void *b);
+
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     struct aws_allocator *allocator,
-    const struct aws_byte_cursor *name_cur);
+    struct aws_byte_cursor name_cur);
 void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter);
 
 void aws_endpoints_rule_clean_up(struct aws_endpoints_rule *rule);
@@ -152,5 +172,11 @@ void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr);
  */
 typedef void(aws_array_callback_clean_up_fn)(void *value);
 void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callback_clean_up_fn on_clean_up_element);
+
+/*
+ * Helper to init rule engine.
+ * TODO: move to a better place
+ */
+void aws_endpoints_rule_engine_init(void);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H */

@@ -19,7 +19,7 @@
       "rules": [
         {
           "conditions": [
-            {"fn": "partition", "argv": [{"ref": "region"}], "assign": "partitionResult"}
+            {"fn": "aws.partition", "argv": [{"ref": "region"}], "assign": "partitionResult"}
           ],
           "type": "tree",
           "rules": [

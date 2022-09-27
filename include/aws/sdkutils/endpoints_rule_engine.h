@@ -7,6 +7,7 @@
 #define AWS_SDKUTILS_ENDPOINTS_RULESET_H
 
 #include <aws/common/byte_buf.h>
+#include <aws/common/hash_table.h>
 #include <aws/sdkutils/sdkutils.h>
 
 struct aws_endpoints_ruleset;
@@ -16,7 +17,7 @@ struct aws_endpoints_resolved_endpoint;
 struct aws_endpoints_request_context;
 struct aws_hash_table;
 
-enum aws_endpoints_value_type { AWS_ENDPOINTS_PARAMETER_STRING, AWS_ENDPOINTS_PARAMETER_BOOLEAN };
+enum aws_endpoints_parameter_value_type { AWS_ENDPOINTS_PARAMETER_STRING, AWS_ENDPOINTS_PARAMETER_BOOLEAN };
 enum aws_endpoints_resolved_endpoint_type { AWS_ENDPOINTS_RESOLVED_ENDPOINT, AWS_ENDPOINTS_RESOLVED_ERROR };
 
 AWS_EXTERN_C_BEGIN
@@ -32,7 +33,7 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_get_supported_ruleset_vers
 /*
  * Value type of parameter.
  */
-AWS_SDKUTILS_API enum aws_endpoints_value_type aws_endpoints_parameter_get_value_type(
+AWS_SDKUTILS_API enum aws_endpoints_parameter_value_type aws_endpoints_parameter_get_value_type(
     const struct aws_endpoints_parameter *parameter);
 
 /*
@@ -282,14 +283,13 @@ AWS_SDKUTILS_API int aws_endpoints_resolved_endpoint_get_properties(
  */
 AWS_SDKUTILS_API int aws_endpoints_resolved_endpoint_get_headers(
     const struct aws_endpoints_resolved_endpoint *resolved_endpoint,
-    struct aws_hash_table **out_headers);
+    const struct aws_hash_table **out_headers);
 
 /*
  * Get error for the resolved endpoint.
  * Valid only if resolved endpoint has error type and will error otherwise.
  */
-AWS_SDKUTILS_API
-int aws_endpoints_resolved_endpoint_get_error(
+AWS_SDKUTILS_API int aws_endpoints_resolved_endpoint_get_error(
     const struct aws_endpoints_resolved_endpoint *resolved_endpoint,
     struct aws_byte_cursor *out_error);
 

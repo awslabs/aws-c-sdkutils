@@ -27,12 +27,31 @@ struct aws_byte_cursor aws_endpoints_get_supported_ruleset_version(void) {
     return s_supported_version;
 }
 
+static uint64_t s_fn_name_hash[AWS_ENDPOINTS_FN_LAST];
+
+void aws_endpoints_rule_engine_init() {
+    s_fn_name_hash[AWS_ENDPOINTS_FN_IS_SET] = aws_hash_c_string("isSet");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_NOT] = aws_hash_c_string("not");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_GET_ATTR] = aws_hash_c_string("getAttr");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_SUBSTRING] = aws_hash_c_string("substring");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_STRING_EQUALS] = aws_hash_c_string("stringEquals");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_BOOLEAN_EQUALS] = aws_hash_c_string("booleanEquals");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_URI_ENCODE] = aws_hash_c_string("uriEncode");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_PARSE_URL] = aws_hash_c_string("parseURL");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_IS_VALID_HOST_LABEL] = aws_hash_c_string("isValidHostLabel");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_AWS_PARTITION] = aws_hash_c_string("aws.partition");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_AWS_PARSE_ARN] = aws_hash_c_string("aws.parseArn");
+    s_fn_name_hash[AWS_ENDPOINTS_FN_AWS_IS_VIRTUAL_HOSTABLE_S3_BUCKET] =
+        aws_hash_c_string("aws.isVirtualHostableS3Bucket");
+}
+
 /*
 ******************************
 * Parameter Getters.
 ******************************
 */
-enum aws_endpoints_value_type aws_endpoints_parameter_get_value_type(const struct aws_endpoints_parameter *parameter) {
+enum aws_endpoints_parameter_value_type aws_endpoints_parameter_get_value_type(
+    const struct aws_endpoints_parameter *parameter) {
     AWS_PRECONDITION(parameter);
     return parameter->type;
 }
@@ -123,7 +142,7 @@ const struct aws_string *aws_endpoints_ruleset_get_service_id(const struct aws_e
 ******************************
 */
 
-static bool s_byte_cursor_eq(const void *a, const void *b) {
+bool aws_endpoints_byte_cursor_eq(const void *a, const void *b) {
     const struct aws_byte_cursor *a_cur = a;
     const struct aws_byte_cursor *b_cur = b;
     return aws_byte_cursor_eq(a_cur, b_cur);
@@ -134,9 +153,9 @@ static void s_on_rule_array_element_clean_up(void *element) {
     aws_endpoints_rule_clean_up(rule);
 }
 
-static void s_on_string_array_element_destroy(void *data) {
-    struct aws_string *string = data;
-    aws_string_destroy(string);
+static void s_on_expr_element_clean_up(void *data) {
+    struct aws_endpoints_expr *expr = data;
+    aws_endpoints_expr_clean_up(expr);
 }
 
 static void s_callback_endpoints_parameter_destroy(void *data) {
@@ -146,7 +165,7 @@ static void s_callback_endpoints_parameter_destroy(void *data) {
 
 static void s_callback_headers_destroy(void *data) {
     struct aws_array_list *array = data;
-    aws_array_list_deep_clean_up(array, s_on_string_array_element_destroy);
+    aws_array_list_deep_clean_up(array, s_on_expr_element_clean_up);
     aws_array_list_clean_up(array);
 }
 
@@ -357,7 +376,19 @@ static int s_parse_function(
         goto on_error;
     }
 
-    function->fn = aws_string_new_from_cursor(allocator, &fn_cur);
+    function->fn = AWS_ENDPOINTS_FN_LAST;
+    uint64_t hash = aws_hash_byte_cursor_ptr(&fn_cur);
+    for (size_t idx = AWS_ENDPOINTS_FN_FIRST; idx < AWS_ENDPOINTS_FN_LAST; ++idx) {
+        if (s_fn_name_hash[idx] == hash) {
+            function->fn = idx;
+            break;
+        }
+    }
+
+    if (function->fn == AWS_ENDPOINTS_FN_LAST) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Could not map function name to function type.");
+        goto on_error;
+    }
 
     struct aws_json_value *argv_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("argv"));
     if (argv_node == NULL || !aws_json_value_is_array(argv_node)) {
@@ -392,7 +423,7 @@ static int s_on_parameter_key(
 
     struct member_parser_wrapper *wrapper = user_data;
 
-    struct aws_endpoints_parameter *parameter = aws_endpoints_parameter_new(wrapper->allocator, key);
+    struct aws_endpoints_parameter *parameter = aws_endpoints_parameter_new(wrapper->allocator, *key);
 
     /* required fields */
     struct aws_byte_cursor type_cur;
@@ -402,7 +433,7 @@ static int s_on_parameter_key(
         goto on_error;
     }
 
-    enum aws_endpoints_value_type type;
+    enum aws_endpoints_parameter_value_type type;
     if (aws_byte_cursor_eq_ignore_case(&type_cur, &s_string_type_cur)) {
         type = AWS_ENDPOINTS_PARAMETER_STRING;
     } else if (aws_byte_cursor_eq_ignore_case(&type_cur, &s_boolean_type_cur)) {
@@ -446,6 +477,7 @@ static int s_on_parameter_key(
     }
 
     struct aws_json_value *default_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("default"));
+    parameter->has_default_value = default_node != NULL;
     if (default_node != NULL) {
         if (type == AWS_ENDPOINTS_PARAMETER_STRING) {
             struct aws_byte_cursor default_cur;
@@ -549,15 +581,14 @@ static int s_on_header_element(
     AWS_PRECONDITION(value);
     AWS_PRECONDITION(user_data);
     struct array_parser_wrapper *wrapper = user_data;
-    struct aws_byte_cursor cur;
 
-    if (!aws_json_value_get_string(value, &cur)) {
+    struct aws_endpoints_expr expr;
+    if (s_parse_expr(wrapper->allocator, value, &expr)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected format for header element.");
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
     }
 
-    struct aws_string *string = aws_string_new_from_cursor(wrapper->allocator, &cur);
-    aws_array_list_push_back(wrapper->array, &string);
+    aws_array_list_push_back(wrapper->array, &expr);
     return AWS_OP_SUCCESS;
 }
 
@@ -579,9 +610,8 @@ static int s_on_headers_key(
 
     size_t num_elements = aws_json_get_array_size(value);
     struct aws_array_list *headers = aws_mem_calloc(wrapper->allocator, 1, sizeof(struct aws_array_list));
-    aws_array_list_init_dynamic(headers, wrapper->allocator, num_elements, sizeof(struct aws_string *));
+    aws_array_list_init_dynamic(headers, wrapper->allocator, num_elements, sizeof(struct aws_endpoints_expr));
     if (s_init_array_from_json(wrapper->allocator, value, headers, s_on_header_element)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract url.");
         goto on_error;
     }
 
@@ -918,7 +948,7 @@ static int s_init_ruleset_from_json(
         allocator,
         20,
         aws_hash_byte_cursor_ptr,
-        s_byte_cursor_eq,
+        aws_endpoints_byte_cursor_eq,
         NULL,
         s_callback_endpoints_parameter_destroy);
 
@@ -990,8 +1020,10 @@ struct aws_endpoints_ruleset *aws_endpoints_ruleset_new_from_string(
 }
 
 struct aws_endpoints_ruleset *aws_endpoints_ruleset_acquire(struct aws_endpoints_ruleset *ruleset) {
-    AWS_FATAL_PRECONDITION(ruleset);
-    aws_ref_count_acquire(&ruleset->ref_count);
+    AWS_PRECONDITION(ruleset);
+    if (ruleset) {
+        aws_ref_count_acquire(&ruleset->ref_count);
+    }
     return ruleset;
 }
 

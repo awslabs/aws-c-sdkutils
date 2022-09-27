@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0.
  */
 
+#include <aws/sdkutils/private/endpoints_ruleset_types_impl.h>
 #include <aws/sdkutils/sdkutils.h>
 
 /* clang-format off */
@@ -12,6 +13,11 @@ static struct aws_error_info s_errors[] = {
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE, "Parser encountered an error, but recovered", "aws-c-sdkutils"),
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET, "Ruleset version not supported", "aws-c-sdkutils"),
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED, "Ruleset parsing failed", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_INIT_FAILED, "Endpoints eval failed to initialize", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED, "Unexpected eval error", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_EMPTY_RULESET, "Ruleset has no rules", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_RULESET_EXHAUSTED, "Ruleset was exhausted before finding a matching rule", "aws-c-sdkutils"),
+    
 };
 /* clang-format on */
 
@@ -44,6 +50,8 @@ void aws_sdkutils_library_init(struct aws_allocator *allocator) {
 
     aws_register_error_info(&s_sdkutils_error_info);
     aws_register_log_subject_info_list(&s_sdkutils_log_subjects);
+
+    aws_endpoints_rule_engine_init();
 }
 
 void aws_sdkutils_library_clean_up(void) {
