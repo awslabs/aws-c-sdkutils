@@ -5,8 +5,7 @@
     "Region": {
       "type": "string",
       "builtIn": "AWS::Region",
-      "documentation": "The region to dispatch the request to",
-      "required": true
+      "documentation": "The region to dispatch the request to"
     }
   },
   "rules": [
@@ -14,53 +13,27 @@
       "documentation": "rules for when region isSet",
       "type": "tree",
       "conditions": [
-        {"fn": "isSet", "argv": [{"ref": "region"}]}
+        {"fn": "isSet", "argv": [{"ref": "Region"}]}
       ],
       "rules": [
         {
+          "type": "endpoint",
           "conditions": [
-            {"fn": "aws.partition", "argv": [{"ref": "region"}], "assign": "partitionResult"}
+            {"fn": "aws.partition", "argv": [{"ref": "Region"}], "assign": "partitionResult"}
           ],
-          "type": "tree",
-          "rules": [
-            {
-              "type": "endpoint",
-              "conditions": [
-                {"fn": "isSet", "argv": [{"ref": "resourceId"}]},
-                {"fn": "isValidHostLabel", "argv": [{"ref": "resourceId"}]}
-              ],
-              "endpoint": {
-                "url": "{resourceId}.example.{region}.{partitionResult#dnsSuffix}"
-              }
-            },
-            {
-              "conditions": [
-                {"fn": "isSet", "argv": [{"ref": "resourceId"}]},
-                {"fn": "isNotValidHostLabel", "argv": [{"ref": "resourceId"}]}
-              ],
-              "type": "error",
-              "error": "invalid resourceId provided: {resourceId}"
-            },
-            {
-              "conditions": [],
-              "type": "endpoint",
-              "endpoint": {
-                "url": "https://example.{region}.{partitionResult#dnsSuffix}"
-              }
-            }
-          ]
+          "endpoint": {"url": "https://example.{Region}.{partitionResult#dnsSuffix}"}
         },
         {
-          "documentation": "invalid region value",
           "type": "error",
+          "documentation": "invalid region value",
           "conditions": [],
-          "error": "unable to determine endpoint for region: {region}"
+          "error": "unable to determine endpoint for region: {Region}"
         }
       ]
     },
     {
-      "documentation": "the single service global endpoint",
       "type": "endpoint",
+      "documentation": "the single service global endpoint",
       "conditions": [],
       "endpoint": {"url": "https://example.amazonaws.com"}
     }

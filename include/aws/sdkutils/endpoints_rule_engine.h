@@ -211,6 +211,7 @@ AWS_SDKUTILS_API struct aws_endpoints_request_context *aws_endpoints_request_con
  */
 AWS_SDKUTILS_API int aws_endpoints_request_context_add_string(
     struct aws_allocator *allocator,
+    struct aws_endpoints_request_context *context,
     struct aws_byte_cursor name,
     struct aws_byte_cursor value);
 
@@ -221,6 +222,7 @@ AWS_SDKUTILS_API int aws_endpoints_request_context_add_string(
  */
 AWS_SDKUTILS_API int aws_endpoints_request_context_add_boolean(
     struct aws_allocator *allocator,
+    struct aws_endpoints_request_context *context,
     struct aws_byte_cursor name,
     bool value);
 

@@ -138,7 +138,11 @@ static int is_value_truthy(const struct eval_value *value, bool *is_truthy) {
             *is_truthy = value->v.boolean;
             return AWS_OP_SUCCESS;
         case AWS_ENDPOINTS_EVAL_VALUE_OBJECT:
+            *is_truthy = true;
+            return AWS_OP_SUCCESS;
         case AWS_ENDPOINTS_EVAL_VALUE_NUMBER:
+            *is_truthy = value->v.number != 0;
+            return AWS_OP_SUCCESS;
         default:
             *is_truthy = false;
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
@@ -174,9 +178,14 @@ static int s_deep_copy_context_to_scope(
 
         new_value = s_scope_value_new(allocator, context_value->name_cur);
         if (s_deep_copy_value(allocator, context_value, new_value)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to deep copy value.");
             goto on_error;
         }
+
+        aws_hash_table_put(&scope->values, &new_value->name_cur, new_value, NULL);
     }
+
+    return AWS_OP_SUCCESS;
 
 on_error:
     if (new_value != NULL) {
@@ -447,6 +456,8 @@ static int s_eval_expr(
         }
     }
 
+    return AWS_OP_SUCCESS;
+
 on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
@@ -459,8 +470,8 @@ static int s_eval_conditions(
 
     *out_is_truthy = false;
     for (size_t idx = 0; idx < aws_array_list_length(conditions); ++idx) {
-        struct aws_endpoints_condition condition;
-        if (aws_array_list_get_at(conditions, &condition, idx)) {
+        struct aws_endpoints_condition *condition = NULL;
+        if (aws_array_list_get_at_ptr(conditions, (void **) &condition, idx)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to retrieve condition.");
             goto on_error;
         }
@@ -468,7 +479,7 @@ static int s_eval_conditions(
         /* TODO: can safe construction here by parsing it as expr to begin with */
         struct aws_endpoints_expr expr = {
             .type = AWS_ENDPOINTS_EXPR_FUNCTION,
-            .e.function = condition.function,
+            .e.function = condition->function,
         };
 
         struct eval_value val;
@@ -478,7 +489,7 @@ static int s_eval_conditions(
         }
 
         bool truthy = false;
-        if (!is_value_truthy(&val, &truthy)) {
+        if (is_value_truthy(&val, &truthy)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unexpected resolved value.");
             goto on_error;
         }
@@ -487,9 +498,9 @@ static int s_eval_conditions(
             goto on_short_circuit;
         }
 
-        if (condition.assign != NULL) {
+        if (condition->assign != NULL) {
             struct scope_value *scope_value =
-                s_scope_value_new(allocator, aws_byte_cursor_from_string(condition.assign));
+                s_scope_value_new(allocator, aws_byte_cursor_from_string(condition->assign));
             scope_value->value = val;
 
             if (aws_array_list_push_back(&scope->added_keys, &scope_value->name_cur)) {
@@ -537,7 +548,7 @@ static int s_resolve_templated_value_with_pathing(
     int error = aws_byte_cursor_find_exact(&template_cur, &path_delim, &path_cur);
 
     bool has_path = error == AWS_OP_SUCCESS;
-    if (error && error != AWS_ERROR_STRING_MATCH_NOT_FOUND) {
+    if (error && aws_last_error() != AWS_ERROR_STRING_MATCH_NOT_FOUND) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Could not parse path in template string.");
         goto on_error;
     }
@@ -552,6 +563,9 @@ static int s_resolve_templated_value_with_pathing(
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid value or path in template string.");
         goto on_error;
     }
+
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Template string: " PRInSTR, 
+        AWS_BYTE_CURSOR_PRI(template_cur));
 
     struct aws_hash_element *elem = NULL;
     if (aws_hash_table_find(&scope->values, &template_cur, &elem) || elem == NULL) {
@@ -682,11 +696,11 @@ int s_resolve_templated_string(
                 goto on_error;
             }
 
-            struct aws_byte_cursor cur = s_byte_cursor_from_substring(string, copy_start, opening_idx);
+            struct aws_byte_cursor cur = s_byte_cursor_from_substring(string, copy_start, opening_idx + 1);
 
             aws_byte_buf_append_dynamic(out_result_buf, &cur);
 
-            struct aws_byte_cursor template_cur = s_byte_cursor_from_substring(string, opening_idx, idx);
+            struct aws_byte_cursor template_cur = s_byte_cursor_from_substring(string, opening_idx + 1, idx);
 
             struct aws_string *resolved_template = NULL;
             if (s_resolve_templated_value_with_pathing(allocator, scope, template_cur, &resolved_template)) {
@@ -772,6 +786,7 @@ struct aws_endpoints_request_context *aws_endpoints_request_context_release(
 
 int aws_endpoints_request_context_add_string(
     struct aws_allocator *allocator,
+    struct aws_endpoints_request_context *context,
     struct aws_byte_cursor name,
     struct aws_byte_cursor value) {
     AWS_PRECONDITION(allocator);
@@ -781,11 +796,17 @@ int aws_endpoints_request_context_add_string(
     val->value.v.string = aws_string_new_from_cursor(allocator, &value);
     val->value.should_clean_up = false;
 
+    if (aws_hash_table_put(&context->values, &val->name_cur, val, NULL)) {
+        s_scope_value_destroy(val);
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_INIT_FAILED);
+    };
+
     return AWS_OP_SUCCESS;
 }
 
 int aws_endpoints_request_context_add_boolean(
     struct aws_allocator *allocator,
+    struct aws_endpoints_request_context *context,
     struct aws_byte_cursor name,
     bool value) {
     AWS_PRECONDITION(allocator);
@@ -794,6 +815,11 @@ int aws_endpoints_request_context_add_boolean(
     val->value.type = AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN;
     val->value.v.boolean = value;
     val->value.should_clean_up = false;
+
+    if (aws_hash_table_put(&context->values, &val->name_cur, val, NULL)) {
+        s_scope_value_destroy(val);
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_INIT_FAILED);
+    };
 
     return AWS_OP_SUCCESS;
 }
@@ -969,13 +995,13 @@ struct aws_endpoints_rule_engine *aws_endpoints_rule_engine_release(struct aws_e
 int s_revert_scope(struct eval_scope *scope) {
 
     for (size_t idx = 0; idx < aws_array_list_length(&scope->added_keys); ++idx) {
-        struct aws_byte_cursor cur;
-        if (aws_array_list_get_at(&scope->added_keys, &cur, idx)) {
+        struct aws_byte_cursor *cur = NULL;
+        if (aws_array_list_get_at(&scope->added_keys, (void **)&cur, idx)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to retrieve value.");
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
         }
 
-        aws_hash_table_remove(&scope->values, &cur, NULL, NULL);
+        aws_hash_table_remove(&scope->values, cur, NULL, NULL);
     }
 
     aws_array_list_clean_up(&scope->added_keys);
@@ -999,7 +1025,7 @@ int aws_endpoints_rule_engine_resolve(
 
     while (scope.rule_idx < aws_array_list_length(scope.rules)) {
         struct aws_endpoints_rule *rule = NULL;
-        if (aws_array_list_get_at(scope.rules, &rule, scope.rule_idx)) {
+        if (aws_array_list_get_at_ptr(scope.rules, (void **)&rule, scope.rule_idx)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to get rule.");
             goto on_error;
         }
@@ -1027,7 +1053,7 @@ int aws_endpoints_rule_engine_resolve(
                     goto on_error;
                 }
 
-                if (s_resolve_templated_string(
+                if (rule->rule_data.endpoint.properties && s_resolve_templated_string(
                         engine->allocator,
                         rule->rule_data.endpoint.properties,
                         &scope,
@@ -1073,10 +1099,12 @@ int aws_endpoints_rule_engine_resolve(
     goto on_error;
 
 on_success:
+    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Successfully resolved endpoint.");
     s_scope_clean_up(engine->allocator, &scope);
     return AWS_OP_SUCCESS;
 
 on_error:
+    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unsuccessfully resolved endpoint.");  
     s_scope_clean_up(engine->allocator, &scope);
     return AWS_OP_ERR;
 }

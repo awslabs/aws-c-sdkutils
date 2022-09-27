@@ -67,8 +67,34 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
         aws_endpoints_parameter_get_built_in((struct aws_endpoints_parameter *)element->value);
     ASSERT_TRUE(aws_string_eq_c_str(built_in, "AWS::Region"));
 
+    struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset);
+
+    struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
+    ASSERT_INT_EQUALS(AWS_OP_SUCCESS, aws_endpoints_request_context_add_string(allocator, 
+        context,
+        aws_byte_cursor_from_c_str("Region"), 
+        aws_byte_cursor_from_c_str("us-west-2")));
+
+    struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
+    clock_t begin_resolve = clock();
+    ASSERT_INT_EQUALS(AWS_OP_SUCCESS, aws_endpoints_rule_engine_resolve(engine, context, &resolved_endpoint));
+    clock_t end_resolve = clock();
+    double time_taken_resolve = (((double)(end_resolve - begin_resolve)) / CLOCKS_PER_SEC);
+    AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Resolved in(s): %f", time_taken_resolve);
+
+    ASSERT_INT_EQUALS(AWS_ENDPOINTS_RESOLVED_ENDPOINT, aws_endpoints_resolved_endpoint_get_type(resolved_endpoint));
+
+    struct aws_byte_cursor url_cur;
+    ASSERT_INT_EQUALS(AWS_OP_SUCCESS, aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
+
+    struct aws_byte_cursor url_const = aws_byte_cursor_from_c_str("https://example.us-west-2.amazonaws.com");
+    ASSERT_INT_EQUALS(0, aws_byte_cursor_eq(&url_cur, &url_const));
+
     aws_string_destroy(filename);
     aws_endpoints_ruleset_release(ruleset);
+    aws_endpoints_rule_engine_release(engine);
+    aws_endpoints_resolved_endpoint_release(resolved_endpoint);
+    aws_endpoints_request_context_release(context);
     aws_byte_buf_clean_up(&buf);
     aws_sdkutils_library_clean_up();
     return AWS_OP_SUCCESS;
