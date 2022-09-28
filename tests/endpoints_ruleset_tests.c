@@ -90,7 +90,7 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     ASSERT_INT_EQUALS(AWS_OP_SUCCESS, aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
 
     struct aws_byte_cursor url_const = aws_byte_cursor_from_c_str("https://example.us-west-2.amazonaws.com");
-    ASSERT_INT_EQUALS(0, aws_byte_cursor_eq(&url_cur, &url_const));
+    ASSERT_TRUE(aws_byte_cursor_eq(&url_cur, &url_const));
 
     aws_string_destroy(filename);
     aws_endpoints_ruleset_release(ruleset);

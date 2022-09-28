@@ -90,7 +90,7 @@ static void s_eval_value_clean_up(struct eval_value *eval_value, bool force_clea
         aws_string_destroy(eval_value->v.object);
     }
 
-    if (eval_value->type == AWS_ENDPOINTS_EVAL_VALUE_OBJECT) {
+    if (eval_value->type == AWS_ENDPOINTS_EVAL_VALUE_ARRAY) {
         aws_array_list_deep_clean_up(&eval_value->v.array, s_eval_value_clean_up_cb);
     }
 }
@@ -337,7 +337,7 @@ static int s_eval_expr(
 
                     out_value->should_clean_up = true;
                     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN;
-                    out_value->v.boolean = argv_value.type == AWS_ENDPOINTS_EVAL_VALUE_NONE;
+                    out_value->v.boolean = argv_value.type != AWS_ENDPOINTS_EVAL_VALUE_NONE;
                     s_eval_value_clean_up(&argv_value, false);
 
                     break;
@@ -508,7 +508,7 @@ static int s_eval_conditions(
                 goto on_error;
             }
 
-            if (aws_hash_table_put(&scope->values, &scope_value->name_cur, &scope_value, NULL)) {
+            if (aws_hash_table_put(&scope->values, &scope_value->name_cur, scope_value, NULL)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to update key at given scope.");
                 goto on_error;
             }
@@ -526,7 +526,7 @@ on_error:
 
 static struct aws_byte_cursor s_byte_cursor_from_substring(const struct aws_string *src, size_t start, size_t end) {
     AWS_PRECONDITION(aws_string_is_valid(src));
-    AWS_PRECONDITION(start < end && end < src->len);
+    AWS_PRECONDITION(start < end && end <= src->len);
 
     return aws_byte_cursor_from_array(aws_string_bytes(src) + start, end - start);
 }
@@ -539,7 +539,7 @@ static int s_resolve_templated_value_with_pathing(
     struct aws_allocator *allocator,
     struct eval_scope *scope,
     struct aws_byte_cursor template_cur,
-    struct aws_string **out_value) {
+    struct aws_byte_cursor *out_value) {
 
     struct aws_json_value *root_node = NULL;
 
@@ -564,8 +564,6 @@ static int s_resolve_templated_value_with_pathing(
         goto on_error;
     }
 
-    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Template string: " PRInSTR, AWS_BYTE_CURSOR_PRI(template_cur));
-
     struct aws_hash_element *elem = NULL;
     if (aws_hash_table_find(&scope->values, &template_cur, &elem) || elem == NULL) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid value in templated string.");
@@ -573,9 +571,15 @@ static int s_resolve_templated_value_with_pathing(
     }
 
     struct scope_value *eval_val = elem->value;
-    if (eval_val->value.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid value type.");
+    if (!(eval_val->value.type == AWS_ENDPOINTS_EVAL_VALUE_STRING ||
+        eval_val->value.type == AWS_ENDPOINTS_EVAL_VALUE_OBJECT)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid value type. %d", eval_val->value.type);
         goto on_error;
+    }
+
+    if (!has_path) {
+        *out_value = aws_byte_cursor_from_string(eval_val->value.v.string);
+        return AWS_OP_SUCCESS;
     }
 
     struct aws_array_list path_segments;
@@ -587,7 +591,8 @@ static int s_resolve_templated_value_with_pathing(
         goto on_error;
     }
 
-    struct aws_byte_cursor val_cur = aws_byte_cursor_from_string(eval_val->value.v.string);
+    struct aws_byte_cursor val_cur = aws_byte_cursor_from_string(eval_val->value.type != AWS_ENDPOINTS_EVAL_VALUE_STRING ? 
+        eval_val->value.v.string : eval_val->value.v.object);
     root_node = aws_json_value_new_from_string(allocator, val_cur);
     struct aws_json_value *node = root_node;
     struct aws_byte_cursor path_el_cur;
@@ -600,7 +605,7 @@ static int s_resolve_templated_value_with_pathing(
         struct aws_byte_cursor index_cur;
         int error = aws_byte_cursor_find_exact(&path_el_cur, &index_opening_char, &index_cur);
         bool has_index = error == AWS_OP_SUCCESS;
-        if (error && error != AWS_ERROR_STRING_MATCH_NOT_FOUND) {
+        if (error && aws_last_error() != AWS_ERROR_STRING_MATCH_NOT_FOUND) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Could not parse path in template string.");
             goto on_error;
         }
@@ -633,6 +638,8 @@ static int s_resolve_templated_value_with_pathing(
             }
         }
     }
+
+    aws_json_value_get_string(node, out_value);
 
     return AWS_OP_SUCCESS;
 
@@ -677,7 +684,7 @@ int s_resolve_templated_string(
         }
 
         if (string->bytes[idx] == '}') {
-            if ((idx + 1) >= string->len && string->bytes[idx + 1] != '}') {
+            if ((idx + 1) < string->len && string->bytes[idx + 1] == '}') {
                 if (opening_idx != SIZE_MAX) {
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid template string syntax.");
                     goto on_error;
@@ -695,23 +702,30 @@ int s_resolve_templated_string(
                 goto on_error;
             }
 
-            struct aws_byte_cursor cur = s_byte_cursor_from_substring(string, copy_start, opening_idx + 1);
+            struct aws_byte_cursor cur = s_byte_cursor_from_substring(string, copy_start, opening_idx);
 
             aws_byte_buf_append_dynamic(out_result_buf, &cur);
 
             struct aws_byte_cursor template_cur = s_byte_cursor_from_substring(string, opening_idx + 1, idx);
 
-            struct aws_string *resolved_template = NULL;
-            if (s_resolve_templated_value_with_pathing(allocator, scope, template_cur, &resolved_template)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid template string syntax.");
+            struct aws_byte_cursor resolved_template_cur;
+            if (s_resolve_templated_value_with_pathing(allocator, scope, template_cur, &resolved_template_cur)) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolved templated value.");
                 goto on_error;
             }
 
-            struct aws_byte_cursor resolved_template_cur = aws_byte_cursor_from_string(resolved_template);
             aws_byte_buf_append_dynamic(out_result_buf, &resolved_template_cur);
             copy_start = idx + 1;
+            opening_idx = SIZE_MAX;
         }
     }
+
+    if (copy_start < string->len) {
+        struct aws_byte_cursor remainder = s_byte_cursor_from_substring(string, copy_start, string->len);
+        aws_byte_buf_append_dynamic(out_result_buf, &remainder);
+    }
+
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Resolved templated string: " PRInSTR, AWS_BYTE_BUF_PRI(*out_result_buf));
 
     return AWS_OP_SUCCESS;
 
