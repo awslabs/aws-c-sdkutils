@@ -41,8 +41,6 @@ AWS_TEST_CASE(parse_ruleset_from_string, s_test_parse_ruleset_from_string)
 static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
-    allocator = aws_default_allocator();
-
     struct aws_byte_buf buf;
     aws_sdkutils_library_init(allocator);
 
