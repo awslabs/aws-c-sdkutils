@@ -67,6 +67,8 @@ add_test_case(resource_name_tostring_failure_test)
 add_test_case(resource_name_length_test)
 
 add_test_case(parse_ruleset_from_string)
+add_test_case(endpoints_eval_util_is_ipv4)
+add_test_case(endpoints_eval_util_is_ipv6)
 
 set(TEST_BINARY_NAME ${PROJECT_NAME}-tests)
 generate_test_driver(${TEST_BINARY_NAME})

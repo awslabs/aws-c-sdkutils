@@ -22,9 +22,9 @@ static int read_file_contents(
     ASSERT_NOT_NULL(fp);
 
     int64_t file_size = 0;
-    ASSERT_INT_EQUALS(aws_file_get_length(fp, &file_size), AWS_OP_SUCCESS);
+    ASSERT_SUCCESS(aws_file_get_length(fp, &file_size));
 
-    ASSERT_INT_EQUALS(aws_byte_buf_init(out_buf, alloc, (size_t)file_size), AWS_OP_SUCCESS);
+    ASSERT_SUCCESS(aws_byte_buf_init(out_buf, alloc, (size_t)file_size));
     size_t read = fread(out_buf->buffer, 1, (size_t)file_size, fp);
     fclose(fp);
 
@@ -46,7 +46,7 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
 
     struct aws_string *filename = aws_string_new_from_c_str(allocator, "sample_ruleset.json");
 
-    ASSERT_INT_EQUALS(read_file_contents(&buf, allocator, filename), AWS_OP_SUCCESS);
+    ASSERT_SUCCESS(read_file_contents(&buf, allocator, filename));
     struct aws_byte_cursor ruleset_json = aws_byte_cursor_from_buf(&buf);
 
     clock_t begin = clock();
@@ -70,14 +70,13 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset);
 
     struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
-    ASSERT_INT_EQUALS(
-        AWS_OP_SUCCESS,
+    ASSERT_SUCCESS(
         aws_endpoints_request_context_add_string(
             allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-west-2")));
 
     struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
     clock_t begin_resolve = clock();
-    ASSERT_INT_EQUALS(AWS_OP_SUCCESS, aws_endpoints_rule_engine_resolve(engine, context, &resolved_endpoint));
+    ASSERT_SUCCESS(aws_endpoints_rule_engine_resolve(engine, context, &resolved_endpoint));
     clock_t end_resolve = clock();
     double time_taken_resolve = (((double)(end_resolve - begin_resolve)) / CLOCKS_PER_SEC);
     AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Resolved in(s): %f", time_taken_resolve);
@@ -85,7 +84,7 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     ASSERT_INT_EQUALS(AWS_ENDPOINTS_RESOLVED_ENDPOINT, aws_endpoints_resolved_endpoint_get_type(resolved_endpoint));
 
     struct aws_byte_cursor url_cur;
-    ASSERT_INT_EQUALS(AWS_OP_SUCCESS, aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
+    ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
 
     struct aws_byte_cursor url_const = aws_byte_cursor_from_c_str("https://example.us-west-2.amazonaws.com");
     ASSERT_TRUE(aws_byte_cursor_eq(&url_cur, &url_const));
