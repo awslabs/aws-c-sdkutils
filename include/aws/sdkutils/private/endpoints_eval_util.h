@@ -15,12 +15,12 @@ struct aws_byte_cursor aws_byte_cursor_from_substring(const struct aws_string *s
 /*
 * Determine whether host cursor is IPv4 string.
 */
-bool aws_is_ipv4(struct aws_allocator *allocator, struct aws_byte_cursor host);
+AWS_SDKUTILS_API bool aws_is_ipv4(struct aws_allocator *allocator, struct aws_byte_cursor host);
 
 /*
 * Determine whether host cursor is IPv6 string.
 * Supports checking for uri encoded strings and scoped literals.
 */
-bool aws_is_ipv6(struct aws_allocator *allocator, struct aws_byte_cursor host, bool is_uri_encoded);
+AWS_SDKUTILS_API bool aws_is_ipv6(struct aws_allocator *allocator, struct aws_byte_cursor host, bool is_uri_encoded);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_EVAL_UTIL_H */
