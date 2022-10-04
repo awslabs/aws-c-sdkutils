@@ -67,6 +67,24 @@ add_test_case(resource_name_tostring_failure_test)
 add_test_case(resource_name_length_test)
 
 add_test_case(parse_ruleset_from_string)
+add_test_case(test_endpoints_aws_region)
+add_test_case(test_endpoints_default_values)
+add_test_case(test_endpoints_eventbridge)
+add_test_case(test_endpoints_fns)
+# no associated test cases
+#add_test_case(test_endpoints_get_attr_type_inference) 
+add_test_case(test_endpoints_headers)
+add_test_case(test_endpoints_is_virtual_hostable_s3_bucket)
+#no associated test cases
+#add_test_case(test_endpoints_region_override)
+#add_test_case(test_endpoints_minimal_ruleset)
+#add_test_case(test_endpoints_parse_arn)
+#add_test_case(test_endpoints_parse_url)
+#add_test_case(test_endpoints_partition_fn)
+add_test_case(test_endpoints_substring)
+#add_test_case(test_endpoints_uri_encode)
+add_test_case(test_endpoints_valid_hostlabel)
+
 add_test_case(endpoints_eval_util_is_ipv4)
 add_test_case(endpoints_eval_util_is_ipv6)
 

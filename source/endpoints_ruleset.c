@@ -165,8 +165,10 @@ static void s_callback_endpoints_parameter_destroy(void *data) {
 
 static void s_callback_headers_destroy(void *data) {
     struct aws_array_list *array = data;
+    struct aws_allocator *alloc = array->alloc;
     aws_array_list_deep_clean_up(array, s_on_expr_element_clean_up);
     aws_array_list_clean_up(array);
+    aws_mem_release(alloc, array);
 }
 
 struct array_parser_wrapper {
@@ -451,12 +453,17 @@ static int s_on_parameter_key(
     struct aws_byte_cursor documentation_cur;
     struct aws_json_value *documentation_node =
         aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("documentation"));
-    if (documentation_node == NULL || aws_json_value_get_string(documentation_node, &documentation_cur)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameter documentation.");
-        goto on_error;
-    }
 
-    parameter->documentation = aws_string_new_from_cursor(wrapper->allocator, &documentation_cur);
+    /* TODO: spec calls for documentation to be required, but several test-cases
+        are missing docs on parameters */
+    if (documentation_node != NULL) {
+        if (aws_json_value_get_string(documentation_node, &documentation_cur)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameter documentation.");
+            goto on_error;
+        }
+
+        parameter->documentation = aws_string_new_from_cursor(wrapper->allocator, &documentation_cur);
+    }
 
     /* optional fields */
     struct aws_byte_cursor built_in_cur;
