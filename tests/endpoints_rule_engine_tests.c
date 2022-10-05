@@ -134,6 +134,54 @@ on_error:
     return AWS_OP_ERR;
 }
 
+struct headers_wrapper {
+    struct aws_allocator *allocator;
+    const struct aws_hash_table *headers;
+};
+
+static int s_on_header_key(
+    const struct aws_byte_cursor *key,
+    const struct aws_json_value *value,
+    bool *out_should_continue,
+    void *user_data) {
+
+    struct headers_wrapper *wrapper = user_data;
+
+    struct aws_string *key_string = aws_string_new_from_cursor(wrapper->allocator, key);
+    struct aws_hash_element *element = NULL;
+
+    ASSERT_SUCCESS(aws_hash_table_find(wrapper->headers, key_string, &element));
+
+    ASSERT_NOT_NULL(element);
+
+    struct aws_array_list *header_values = element->value;
+    ASSERT_NOT_NULL(header_values);
+
+    ASSERT_INT_EQUALS(aws_json_get_array_size(value), aws_array_list_length(header_values));
+
+    for (size_t i = 0; i < aws_json_get_array_size(value); ++i) {
+        struct aws_json_value *val = aws_json_get_array_element(value, i);
+        struct aws_byte_cursor cur;
+        ASSERT_SUCCESS(aws_json_value_get_string(val, &cur));
+
+        bool found_match = false;
+        for (size_t j = 0; j < aws_array_list_length(header_values); ++j) {
+            struct aws_string *header_val = NULL;
+            ASSERT_SUCCESS(aws_array_list_get_at(header_values, &header_val, j));
+            if (aws_string_eq_byte_cursor(header_val, &cur)) {
+                found_match = true;
+                break;
+            }
+        }
+
+        ASSERT_TRUE(found_match);
+    }
+
+    aws_string_destroy(key_string);
+
+    return AWS_OP_SUCCESS;
+}
+
 static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor file_name) {
     aws_sdkutils_library_init(allocator);
 
@@ -191,6 +239,7 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
 
         struct aws_json_value *expect = aws_json_value_get_from_object(test, aws_byte_cursor_from_c_str("expect"));
         struct aws_json_value *endpoint = aws_json_value_get_from_object(expect, aws_byte_cursor_from_c_str("endpoint"));
+
         if (endpoint != NULL) {
             ASSERT_INT_EQUALS(AWS_ENDPOINTS_RESOLVED_ENDPOINT, aws_endpoints_resolved_endpoint_get_type(resolved_endpoint));
             struct aws_byte_cursor url;
@@ -216,7 +265,17 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
             
             aws_json_value_destroy(properties_json);
 
-            /* TODO: verify headers */
+            const struct aws_hash_table *headers;
+            ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_headers(resolved_endpoint, &headers));
+            struct aws_json_value *expected_headers_node = aws_json_value_get_from_object(endpoint,
+                                                aws_byte_cursor_from_c_str("headers")); 
+            if (expected_headers_node) {
+                struct headers_wrapper wrapper = {
+                    .allocator = allocator,
+                    .headers = headers
+                };
+                ASSERT_SUCCESS(aws_json_const_iterate_object(expected_headers_node, s_on_header_key, &wrapper));
+            }
         }
 
         struct aws_json_value *error_node = aws_json_value_get_from_object(expect, aws_byte_cursor_from_c_str("error"));

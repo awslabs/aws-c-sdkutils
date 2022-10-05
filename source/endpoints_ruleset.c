@@ -625,7 +625,9 @@ static int s_on_headers_key(
         goto on_error;
     }
 
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "adding " PRInSTR, AWS_BYTE_CURSOR_PRI(*key));
     aws_hash_table_put(wrapper->table, aws_string_new_from_cursor(wrapper->allocator, key), headers, NULL);
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "size %d ", aws_hash_table_get_entry_count(wrapper->table));
 
     return AWS_OP_SUCCESS;
 
@@ -691,23 +693,23 @@ static int s_parse_endpoints_rule_data_endpoint(
         aws_byte_buf_clean_up(&properties_buf);
     }
 
+    /* TODO: this is currently aws_string* to aws_array_list*
+    * We cannot use same trick as for params to use aws_byte_cursor as key,
+    * since value is a generic type. We can wrap list into a struct, but
+    * seems ugly. Anything cleaner?
+    */
+    aws_hash_table_init(
+        &data_rule->headers,
+        allocator,
+        20,
+        aws_hash_string,
+        aws_hash_callback_string_eq,
+        aws_hash_callback_string_destroy,
+        s_callback_headers_destroy);
+
     struct aws_json_value *headers_node =
         aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("headers"));
     if (headers_node != NULL) {
-
-        /* TODO: this is currently aws_string* to aws_array_list*
-         * We cannot use same trick as for params to use aws_byte_cursor as key,
-         * since value is a generic type. We can wrap list into a struct, but
-         * seems ugly. Anything cleaner?
-         */
-        aws_hash_table_init(
-            &data_rule->headers,
-            allocator,
-            20,
-            aws_hash_c_string,
-            aws_hash_callback_c_str_eq,
-            aws_hash_callback_string_destroy,
-            s_callback_headers_destroy);
 
         if (s_init_members_from_json(allocator, headers_node, &data_rule->headers, s_on_headers_key)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameters.");

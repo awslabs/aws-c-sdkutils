@@ -17,6 +17,9 @@
 /* TODO: checking for unknown enum values is annoying and is brittle. compile
 time assert on enum size or members would make it a lot simpler. */
 
+static struct aws_byte_cursor s_scheme_http = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("http");
+static struct aws_byte_cursor s_scheme_https = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("https");
+
 enum eval_value_type {
     AWS_ENDPOINTS_EVAL_VALUE_ANY,
     AWS_ENDPOINTS_EVAL_VALUE_NONE,
@@ -137,7 +140,7 @@ static int is_value_truthy(const struct eval_value *value, bool *is_truthy) {
             *is_truthy = false;
             return AWS_OP_SUCCESS;
         case AWS_ENDPOINTS_EVAL_VALUE_STRING:
-            *is_truthy = value->v.string->len > 0;
+            *is_truthy = true;
             return AWS_OP_SUCCESS;
         case AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN:
             *is_truthy = value->v.boolean;
@@ -594,12 +597,12 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
     struct aws_byte_cursor uri_cur = aws_byte_cursor_from_string(argv_url.v.string);
     if(aws_uri_init_parse(&uri, allocator, &uri_cur)) {
         out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
-        return AWS_OP_SUCCESS;
+        goto on_success;
     }
 
-    if (aws_uri_query_string(&uri)->len > 0){
+    if (aws_uri_query_string(&uri)->len > 0) {
         out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
-        return AWS_OP_SUCCESS;
+        goto on_success;
     }
 
     const struct aws_byte_cursor *scheme = aws_uri_scheme(&uri);
@@ -608,57 +611,33 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
     root = aws_json_value_new_object(allocator);
 
     if (scheme->len == 0) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Missing url scheme.");
-        goto on_error;
+        out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
+        goto on_success;
+    }
+
+    if (!(aws_byte_cursor_eq(scheme, &s_scheme_http) || aws_byte_cursor_eq(scheme, &s_scheme_https))) {
+        out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
+        goto on_success;
     }
     
     if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("scheme"), 
         aws_json_value_new_string(allocator, *scheme))) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add scheme to object.");
-            goto on_error;
-    }
-
-    const struct aws_byte_cursor *host_name = aws_uri_host_name(&uri);
-    AWS_ASSERT(host_name != NULL);
-
-    /* Note: spec calls next section authority, but it must not include userinfo
-     * and default http/https ports. So instead of using parsed authority, take
-     * host and add port if needed. */ 
-    if (host_name->len == 0) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Missing url host.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add scheme to object.");
         goto on_error;
     }
 
-    uint16_t port = aws_uri_port(&uri);
-    /* no port specified or default http/https port */
-    if (port == 0 || port == 80 || port == 443) {
-        if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("authority"), 
-            aws_json_value_new_string(allocator, *host_name))) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add authority to object.");
-            goto on_error;
-        }
-    } else {
-        struct aws_byte_buf buf;
-        if (aws_byte_buf_init_copy_from_cursor(&buf, allocator, *host_name)) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed init buffer for authority.");
-            goto on_error;
-        }
+    const struct aws_byte_cursor *authority = aws_uri_authority(&uri);
+    AWS_ASSERT(authority != NULL);
 
-        struct aws_byte_cursor port_app = aws_byte_cursor_from_c_str(":");
-        aws_byte_buf_append_dynamic(&buf, &port_app);
-        char port_arr[6] = {0};
-        sprintf(port_arr, "%" PRIu16, uri.port);
-        struct aws_byte_cursor port_csr = aws_byte_cursor_from_c_str(port_arr);
-        aws_byte_buf_append_dynamic(&buf, &port_csr);
+    if (authority->len == 0) {
+        out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
+        goto on_success;
+    }
 
-        if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("authority"), 
-            aws_json_value_new_string(allocator, aws_byte_cursor_from_buf(&buf)))) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add authority to object.");
-            aws_byte_buf_clean_up(&buf);
-            goto on_error;
-        }
-
-        aws_byte_buf_clean_up(&buf);
+    if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("authority"), 
+        aws_json_value_new_string(allocator, *authority))) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add authority to object.");
+        goto on_error;
     }
 
     const struct aws_byte_cursor *path = aws_uri_path(&uri);
@@ -709,8 +688,16 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
             goto on_error;
         }
         aws_byte_buf_clean_up(&buf);
+    } else {
+        if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("normalizedPath"), 
+            aws_json_value_new_string(allocator, *path))) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add path to object.");
+            goto on_error;
+        }
     }
 
+    const struct aws_byte_cursor *host_name = aws_uri_host_name(&uri);
+    AWS_ASSERT(path != NULL);
     bool is_ip = s_is_uri_ip(allocator, *host_name, true);
     if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("isIp"), 
             aws_json_value_new_boolean(allocator, is_ip))) {
@@ -735,12 +722,21 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_OBJECT;
     out_value->v.object = aws_string_new_from_buf(allocator, &buf);
 
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "FOO" PRInSTR, AWS_BYTE_BUF_PRI(buf));
+
     aws_byte_buf_clean_up(&buf);
+
+on_success:
+    aws_uri_clean_up(&uri);
     s_eval_value_clean_up(&argv_url, false);
+    if (root != NULL) {
+        aws_json_value_destroy(root);
+    }
 
     return AWS_OP_SUCCESS;
 
 on_error:
+    aws_uri_clean_up(&uri);
     if (root != NULL) {
         aws_json_value_destroy(root);
     }
@@ -751,8 +747,6 @@ static bool s_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdo
     bool next_is_alnum = true;
     size_t subdomain_count = 0;
     bool is_valid_host_label = true;
-
-    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "here " PRInSTR, AWS_BYTE_CURSOR_PRI(label));
 
     for (size_t i = 0; i < label.len; ++i) {
         if (subdomain_count > 63) {
@@ -868,7 +862,47 @@ static int s_eval_fn_aws_parse_arn(struct aws_allocator *allocator,
         goto on_error;
     }
 
-    /* TODO: resourceId needs to be split on / or : */
+    if (arn.partition.len == 0 ||
+        arn.resource_id.len == 0 ||
+        arn.service.len == 0) {
+        out_value->should_clean_up = true;
+        out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
+        goto on_success;
+    }
+
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, PRInSTR, AWS_BYTE_CURSOR_PRI(arn.resource_id));
+    struct aws_json_value *resource_id_node = aws_json_value_new_array(allocator);
+    size_t start = 0;
+    for (size_t i = 0; i < arn.resource_id.len; ++i) {
+        if (arn.resource_id.ptr[i] == '/' || arn.resource_id.ptr[i] == ':') {
+            struct aws_byte_cursor cur = {
+                .ptr = arn.resource_id.ptr + start,
+                .len = i - start,
+            };
+
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "" PRInSTR, AWS_BYTE_CURSOR_PRI(cur));
+            struct aws_json_value *element = aws_json_value_new_string(allocator, cur);
+            if (element == NULL || aws_json_value_add_array_element(resource_id_node, element)) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add resource id element");
+                goto on_error;
+            }
+
+            start = i + 1;
+        }
+    }
+
+    if (start <= arn.resource_id.len) {
+        struct aws_byte_cursor cur = {
+                .ptr = arn.resource_id.ptr + start,
+                .len = arn.resource_id.len - start,
+            };
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "" PRInSTR, AWS_BYTE_CURSOR_PRI(cur));
+        struct aws_json_value *element = aws_json_value_new_string(allocator, cur);
+        if (element == NULL || aws_json_value_add_array_element(resource_id_node, element)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add resource id element");
+            goto on_error;
+        }
+    }
 
     if (aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("partition"),
             aws_json_value_new_string(allocator, arn.partition)) ||
@@ -879,7 +913,7 @@ static int s_eval_fn_aws_parse_arn(struct aws_allocator *allocator,
         aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("accountId"),
             aws_json_value_new_string(allocator, arn.account_id)) ||
         aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("resourceId"),
-            aws_json_value_new_string(allocator, arn.resource_id))) {
+            resource_id_node)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add elements to object for parseArn.");
         goto on_error;
     }
@@ -888,8 +922,8 @@ static int s_eval_fn_aws_parse_arn(struct aws_allocator *allocator,
     aws_byte_buf_init(&json_blob, allocator, 0);
 
     if (aws_byte_buf_append_json_string(object, &json_blob)) {
-        aws_byte_buf_clean_up(&json_blob);
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to convert json to string.");
+        aws_byte_buf_clean_up(&json_blob);
         goto on_error;
     }
 
@@ -899,10 +933,11 @@ static int s_eval_fn_aws_parse_arn(struct aws_allocator *allocator,
         .v.object = aws_string_new_from_buf(allocator, &json_blob),
     };
 
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "" PRInSTR, AWS_BYTE_BUF_PRI(json_blob));
     *out_value = eval;
+    aws_byte_buf_clean_up(&json_blob);
 
 on_success:
-    aws_byte_buf_clean_up(&json_blob);
     if (object) {
         aws_json_value_destroy(object);
     }
@@ -1180,9 +1215,11 @@ static int s_path_through_object(struct aws_allocator *allocator,
         goto on_error;
     }
 
+    /* TODO: needed? */
     struct aws_byte_cursor val_cur = aws_byte_cursor_from_string(eval_val->type != AWS_ENDPOINTS_EVAL_VALUE_STRING ? 
         eval_val->v.string : eval_val->v.object);
-        
+    
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "FOO " PRInSTR, AWS_BYTE_CURSOR_PRI(val_cur));
     root_node = aws_json_value_new_from_string(allocator, val_cur);
     struct aws_json_value *node = root_node;
     struct aws_byte_cursor path_el_cur;
@@ -1210,7 +1247,7 @@ static int s_path_through_object(struct aws_allocator *allocator,
             node = aws_json_value_get_from_object(node, path_el_cur);
 
             if (node == NULL) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid path.");
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid path." PRInSTR ".", AWS_BYTE_CURSOR_PRI(path_el_cur));
                 goto on_error;
             }
         }
@@ -1225,13 +1262,15 @@ static int s_path_through_object(struct aws_allocator *allocator,
 
             node = aws_json_get_array_element(node, index);
 
-            struct eval_value eval = {
-                .should_clean_up = true,
-                .type = AWS_ENDPOINTS_EVAL_VALUE_NONE,
-            };
+            if (node == NULL) {
+                struct eval_value eval = {
+                    .should_clean_up = true,
+                    .type = AWS_ENDPOINTS_EVAL_VALUE_NONE,
+                };
 
-            *out_value = eval;
-            goto on_success;
+                *out_value = eval;
+                goto on_success;
+            }
         }
     }
 
@@ -1269,7 +1308,7 @@ static int s_path_through_object(struct aws_allocator *allocator,
     } else if (aws_json_value_is_boolean(node)) {
         struct eval_value eval = {
             .should_clean_up = true,
-            .type = AWS_ENDPOINTS_EVAL_VALUE_STRING,
+            .type = AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN,
             .v.boolean = false,
         };
 
@@ -1757,6 +1796,18 @@ int s_revert_scope(struct eval_scope *scope) {
     return AWS_OP_SUCCESS;
 }
 
+static void s_on_string_array_element_destroy(void *element) {
+    struct aws_string *str = *(struct aws_string **)element;
+    aws_string_destroy(str);
+}
+
+static void s_callback_headers_destroy(void *data) {
+    struct aws_array_list *array = data;
+    struct aws_allocator *alloc = array->alloc;
+    aws_array_list_deep_clean_up(array, s_on_string_array_element_destroy);
+    aws_mem_release(alloc, array);
+}
+
 int aws_endpoints_rule_engine_resolve(
     struct aws_endpoints_rule_engine *engine,
     const struct aws_endpoints_request_context *context,
@@ -1863,7 +1914,58 @@ int aws_endpoints_rule_engine_resolve(
                     goto on_error;
                 }
 
-                /* TODO: headers */
+                aws_hash_table_init(
+                    &endpoint->r.endpoint.headers,
+                    engine->allocator,
+                    aws_hash_table_get_entry_count(&rule->rule_data.endpoint.headers),
+                    aws_hash_string,
+                    aws_hash_callback_string_eq,
+                    aws_hash_callback_string_destroy,
+                    s_callback_headers_destroy);
+
+                for (struct aws_hash_iter iter = aws_hash_iter_begin(&rule->rule_data.endpoint.headers);
+                    !aws_hash_iter_done(&iter); aws_hash_iter_next(&iter)) {
+                    
+                    struct aws_string *key = (struct aws_string *)iter.element.key;
+                    struct aws_array_list *header_list = (struct aws_array_list *)iter.element.value;
+
+                    struct aws_array_list *resolved_headers = aws_mem_calloc(engine->allocator, 1, sizeof(struct aws_array_list));
+                    aws_array_list_init_dynamic(resolved_headers, engine->allocator,
+                            aws_array_list_length(header_list), sizeof(struct aws_string *));
+
+                    for (size_t i = 0; i < aws_array_list_length(header_list); ++i) {
+                        struct aws_endpoints_expr *expr = NULL;
+                        if (aws_array_list_get_at_ptr(header_list, (void **)&expr, i)) {
+                            s_callback_headers_destroy(resolved_headers);
+                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to get header.");
+                            goto on_error;
+                        }
+
+                        struct eval_value eval;
+                        if (s_eval_expr(engine->allocator, expr, &scope, &eval) || 
+                            eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
+                            s_callback_headers_destroy(resolved_headers);
+                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval header expr.");
+                            goto on_error;
+                        }
+
+                        struct aws_string *str = aws_string_clone_or_reuse(engine->allocator, eval.v.string);
+                        if (aws_array_list_push_back(resolved_headers, &str)) {
+                            s_eval_value_clean_up(&eval, false);
+                            s_callback_headers_destroy(resolved_headers);
+                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed add resolved header to result.");
+                            goto on_error;
+                        }
+
+                        s_eval_value_clean_up(&eval, false);
+                    }
+
+                    if (aws_hash_table_put(&endpoint->r.endpoint.headers,
+                        aws_string_clone_or_reuse(engine->allocator, key), resolved_headers, NULL)) {
+                        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed add resolved header to result.");
+                        goto on_error;
+                    }
+                }
 
                 *out_resolved_endpoint = endpoint;
                 goto on_success;

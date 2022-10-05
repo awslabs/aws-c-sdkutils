@@ -31,6 +31,7 @@ void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callba
         AWS_ASSERT(element);
         on_clean_up_element(element);
     }
+
     aws_array_list_clean_up(array);
 }
 
@@ -63,6 +64,8 @@ void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter) 
 
     aws_mem_release(parameter->allocator, parameter);
 }
+
+
 
 void aws_endpoints_rule_clean_up(struct aws_endpoints_rule *rule) {
     AWS_PRECONDITION(rule);
