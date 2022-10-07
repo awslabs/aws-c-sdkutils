@@ -1167,7 +1167,7 @@ static int s_path_through_array(
 
     if (index >= 0 && index < aws_array_list_length(&eval_val->v.array)) {
         struct aws_endpoints_expr *expr = NULL;
-        if (aws_array_list_get_at_ptr(&eval_val->v.array, (void **)&expr, index)) {
+        if (aws_array_list_get_at_ptr(&eval_val->v.array, (void **)&expr, (size_t)index)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to index into evaluated value");
             goto on_error;
         }
@@ -1252,7 +1252,7 @@ static int s_path_through_object(
                 goto on_error;
             }
 
-            node = aws_json_get_array_element(node, index);
+            node = aws_json_get_array_element(node, (size_t)index);
 
             if (node == NULL) {
                 struct eval_value eval = {
