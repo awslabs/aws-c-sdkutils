@@ -11,7 +11,9 @@
 #include <inttypes.h>
 
 #ifdef _MSC_VER
-#    pragma warning(disable : 4204)
+# pragma warning(disable : 4204)
+# pragma warning(disable : 4706)
+# pragma warning(disable : 4996)
 #endif
 
 /* 4 octets of 3 chars max + 3 separators + null terminator */
