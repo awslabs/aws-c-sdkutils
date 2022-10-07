@@ -1008,6 +1008,7 @@ static int s_eval_expr(
     struct aws_endpoints_expr *expr,
     struct eval_scope *scope,
     struct eval_value *out_value) {
+    AWS_ZERO_STRUCT(*out_value);
     switch (expr->type) {
         case AWS_ENDPOINTS_EXPR_STRING: {
             /* TODO: Instead of trying to resolve every string as templated, its
