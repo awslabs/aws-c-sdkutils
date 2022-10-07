@@ -93,7 +93,7 @@ bool aws_is_ipv6(struct aws_byte_cursor host, bool is_uri_encoded) {
     if (zone_delim != NULL) {
         size_t zone_len = host.len - (size_t)(zone_delim - host.ptr);
 
-        if (zone_len < (is_uri_encoded ? 4 : 2)) {
+        if (zone_len < (size_t)(is_uri_encoded ? 4 : 2)) {
             return false;
         }
 

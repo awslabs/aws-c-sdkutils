@@ -2090,8 +2090,6 @@ int aws_endpoints_rule_engine_resolve(
                 goto on_error;
             }
         }
-
-        ++scope.rule_idx;
     }
 
     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "All rules have been exhausted.");
