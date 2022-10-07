@@ -12,8 +12,6 @@
 
 #ifdef _MSC_VER
 #    pragma warning(disable : 4204)
-#    pragma warning(disable : 4706)
-#    pragma warning(disable : 4996)
 #endif
 
 /* 4 octets of 3 chars max + 3 separators + null terminator */
@@ -159,7 +157,7 @@ struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region
     memcpy(copy, region.ptr, region.len);
 
     char country[3] = {0};
-    char location[30] = {0};
+    char location[31] = {0};
     uint8_t num = 0;
 
     if (3 == sscanf(copy, "%2[^-]-%30[^-]-%03" SCNu8, country, location, &num)) {
