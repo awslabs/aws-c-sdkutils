@@ -625,9 +625,7 @@ static int s_on_headers_key(
         goto on_error;
     }
 
-    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "adding " PRInSTR, AWS_BYTE_CURSOR_PRI(*key));
     aws_hash_table_put(wrapper->table, aws_string_new_from_cursor(wrapper->allocator, key), headers, NULL);
-    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "size %d ", aws_hash_table_get_entry_count(wrapper->table));
 
     return AWS_OP_SUCCESS;
 
