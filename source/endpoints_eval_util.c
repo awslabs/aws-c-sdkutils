@@ -11,7 +11,9 @@
 #include <inttypes.h>
 
 #ifdef _MSC_VER
+#    pragma warning(disable : 4204)
 #    pragma warning(disable : 4706)
+#    pragma warning(disable : 4996)
 #endif
 
 /* 4 octets of 3 chars max + 3 separators + null terminator */
@@ -89,7 +91,7 @@ bool aws_is_ipv6(struct aws_byte_cursor host, bool is_uri_encoded) {
     uint8_t *zone_delim = memchr(host.ptr, '%', host.len);
 
     if (zone_delim != NULL) {
-        size_t zone_len = host.len - (zone_delim - host.ptr);
+        size_t zone_len = host.len - (size_t)(zone_delim - host.ptr);
 
         if (zone_len < (is_uri_encoded ? 4 : 2)) {
             return false;
