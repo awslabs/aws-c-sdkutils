@@ -10,6 +10,10 @@
 
 #include <inttypes.h>
 
+#ifdef _MSC_VER
+#    pragma warning(disable : 4706)
+#endif
+
 /* 4 octets of 3 chars max + 3 separators + null terminator */
 #define AWS_IPV4_STR_LEN 16
 #define IP_CHAR_FMT "%03" SCNu16

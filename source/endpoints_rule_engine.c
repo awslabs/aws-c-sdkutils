@@ -284,8 +284,7 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_INIT_FAILED);
 }
 
-static void s_scope_clean_up(struct aws_allocator *allocator, struct eval_scope *scope) {
-    AWS_PRECONDITION(allocator);
+static void s_scope_clean_up(struct eval_scope *scope) {
     AWS_PRECONDITION(scope);
 
     aws_hash_table_clean_up(&scope->values);
@@ -804,6 +803,8 @@ static int s_eval_fn_aws_partition(
     struct aws_array_list *argv,
     struct eval_scope *scope,
     struct eval_value *out_value) {
+    (void)scope;
+    (void)argv;
     out_value->should_clean_up = true;
     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_OBJECT;
     out_value->v.object = aws_string_new_from_c_str(
@@ -1879,7 +1880,7 @@ static int s_resolve_headers(
         struct aws_string *key = (struct aws_string *)iter.element.key;
         struct aws_array_list *header_list = (struct aws_array_list *)iter.element.value;
 
-        struct aws_array_list *resolved_headers = aws_mem_calloc(allocator, 1, sizeof(struct aws_array_list));
+        resolved_headers = aws_mem_calloc(allocator, 1, sizeof(struct aws_array_list));
         aws_array_list_init_dynamic(
             resolved_headers, allocator, aws_array_list_length(header_list), sizeof(struct aws_string *));
 
@@ -2099,11 +2100,11 @@ int aws_endpoints_rule_engine_resolve(
 
 on_success:
     AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Successfully resolved endpoint.");
-    s_scope_clean_up(engine->allocator, &scope);
+    s_scope_clean_up(&scope);
     return AWS_OP_SUCCESS;
 
 on_error:
     AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unsuccessfully resolved endpoint.");
-    s_scope_clean_up(engine->allocator, &scope);
+    s_scope_clean_up(&scope);
     return AWS_OP_ERR;
 }
