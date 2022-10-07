@@ -162,8 +162,6 @@ static int is_value_truthy(const struct eval_value *value, bool *is_truthy) {
             *is_truthy = false;
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
     }
-
-    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
 static int s_deep_copy_context_to_scope(
