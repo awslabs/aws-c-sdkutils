@@ -11,9 +11,9 @@
 #include <inttypes.h>
 
 #ifdef _MSC_VER
-# pragma warning(disable : 4204)
-# pragma warning(disable : 4706)
-# pragma warning(disable : 4996)
+#    pragma warning(disable : 4204)
+#    pragma warning(disable : 4706)
+#    pragma warning(disable : 4996)
 #endif
 
 /* 4 octets of 3 chars max + 3 separators + null terminator */
@@ -163,7 +163,7 @@ struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region
     uint8_t num = 0;
 
     if (3 == sscanf(copy, "%2[^-]-%30[^-]-%03" SCNu8, country, location, &num)) {
-        for (size_t i = 0; i < sizeof(s_known_countries)/sizeof(s_known_countries[0]); ++i) {
+        for (size_t i = 0; i < sizeof(s_known_countries) / sizeof(s_known_countries[0]); ++i) {
             if (0 == strncmp(s_known_countries[i], country, 3)) {
                 if (location[0] != 0 && num > 0) {
                     return aws_byte_cursor_from_c_str("aws");
