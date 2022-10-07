@@ -694,10 +694,10 @@ static int s_parse_endpoints_rule_data_endpoint(
     }
 
     /* TODO: this is currently aws_string* to aws_array_list*
-    * We cannot use same trick as for params to use aws_byte_cursor as key,
-    * since value is a generic type. We can wrap list into a struct, but
-    * seems ugly. Anything cleaner?
-    */
+     * We cannot use same trick as for params to use aws_byte_cursor as key,
+     * since value is a generic type. We can wrap list into a struct, but
+     * seems ugly. Anything cleaner?
+     */
     aws_hash_table_init(
         &data_rule->headers,
         allocator,

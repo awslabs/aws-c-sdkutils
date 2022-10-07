@@ -6,8 +6,8 @@
 #include <aws/common/byte_buf.h>
 #include <aws/common/file.h>
 #include <aws/common/hash_table.h>
-#include <aws/common/string.h>
 #include <aws/common/json.h>
+#include <aws/common/string.h>
 #include <aws/sdkutils/endpoints_rule_engine.h>
 #include <aws/testing/aws_test_harness.h>
 #include <time.h>
@@ -71,9 +71,8 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset);
 
     struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
-    ASSERT_SUCCESS(
-        aws_endpoints_request_context_add_string(
-            allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-west-2")));
+    ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
+        allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-west-2")));
 
     struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
     clock_t begin_resolve = clock();
@@ -109,7 +108,7 @@ static int s_on_parameter_key(
     const struct aws_json_value *value,
     bool *out_should_continue,
     void *user_data) {
-    
+
     struct iteration_wrapper *wrapper = user_data;
 
     if (aws_json_value_is_string(value)) {
@@ -185,14 +184,16 @@ static int s_on_header_key(
 static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor file_name) {
     aws_sdkutils_library_init(allocator);
 
-    //allocator = aws_default_allocator();
+    // allocator = aws_default_allocator();
 
     struct aws_byte_buf ruleset_file_path;
-    ASSERT_SUCCESS(aws_byte_buf_init_copy_from_cursor(&ruleset_file_path, allocator, aws_byte_cursor_from_c_str("valid-rules/")));
+    ASSERT_SUCCESS(
+        aws_byte_buf_init_copy_from_cursor(&ruleset_file_path, allocator, aws_byte_cursor_from_c_str("valid-rules/")));
     ASSERT_SUCCESS(aws_byte_buf_append_dynamic(&ruleset_file_path, &file_name));
 
     struct aws_byte_buf test_cases_file_path;
-    ASSERT_SUCCESS(aws_byte_buf_init_copy_from_cursor(&test_cases_file_path, allocator, aws_byte_cursor_from_c_str("test-cases/")));
+    ASSERT_SUCCESS(aws_byte_buf_init_copy_from_cursor(
+        &test_cases_file_path, allocator, aws_byte_cursor_from_c_str("test-cases/")));
     ASSERT_SUCCESS(aws_byte_buf_append_dynamic(&test_cases_file_path, &file_name));
 
     struct aws_byte_buf ruleset_buf;
@@ -219,15 +220,16 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
     for (size_t i = 0; i < aws_json_get_array_size(tests); ++i) {
         struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
         struct aws_json_value *test = aws_json_get_array_element(tests, i);
-        
+
         struct aws_byte_cursor documentation;
-        struct aws_json_value *doc_json = aws_json_value_get_from_object(test, aws_byte_cursor_from_c_str("documentation"));
+        struct aws_json_value *doc_json =
+            aws_json_value_get_from_object(test, aws_byte_cursor_from_c_str("documentation"));
         ASSERT_SUCCESS(aws_json_value_get_string(doc_json, &documentation));
 
         AWS_LOGF_INFO(0, "Running test case #%zu: " PRInSTR, i, AWS_BYTE_CURSOR_PRI(documentation));
 
         struct aws_json_value *params = aws_json_value_get_from_object(test, aws_byte_cursor_from_c_str("params"));
-        struct iteration_wrapper wrapper = {.allocator = allocator, .context = context };
+        struct iteration_wrapper wrapper = {.allocator = allocator, .context = context};
         ASSERT_SUCCESS(aws_json_const_iterate_object(params, s_on_parameter_key, &wrapper));
 
         struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
@@ -238,14 +240,16 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
         AWS_LOGF_INFO(0, "Resolved in(s): %f", time_taken_resolve);
 
         struct aws_json_value *expect = aws_json_value_get_from_object(test, aws_byte_cursor_from_c_str("expect"));
-        struct aws_json_value *endpoint = aws_json_value_get_from_object(expect, aws_byte_cursor_from_c_str("endpoint"));
+        struct aws_json_value *endpoint =
+            aws_json_value_get_from_object(expect, aws_byte_cursor_from_c_str("endpoint"));
 
         if (endpoint != NULL) {
-            ASSERT_INT_EQUALS(AWS_ENDPOINTS_RESOLVED_ENDPOINT, aws_endpoints_resolved_endpoint_get_type(resolved_endpoint));
+            ASSERT_INT_EQUALS(
+                AWS_ENDPOINTS_RESOLVED_ENDPOINT, aws_endpoints_resolved_endpoint_get_type(resolved_endpoint));
             struct aws_byte_cursor url;
             ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url));
-            struct aws_json_value *expected_url_node = aws_json_value_get_from_object(endpoint,
-                                                aws_byte_cursor_from_c_str("url"));
+            struct aws_json_value *expected_url_node =
+                aws_json_value_get_from_object(endpoint, aws_byte_cursor_from_c_str("url"));
             struct aws_byte_cursor expected_url;
             aws_json_value_get_string(expected_url_node, &expected_url);
             ASSERT_TRUE(aws_byte_cursor_eq(&url, &expected_url));
@@ -254,40 +258,38 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
             ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_properties(resolved_endpoint, &properties));
 
             struct aws_json_value *properties_json = aws_json_value_new_from_string(allocator, properties);
-            struct aws_json_value *expected_properties = aws_json_value_get_from_object(endpoint,
-                                                aws_byte_cursor_from_c_str("properties"));
+            struct aws_json_value *expected_properties =
+                aws_json_value_get_from_object(endpoint, aws_byte_cursor_from_c_str("properties"));
 
             ASSERT_TRUE(expected_properties == NULL ? properties.len == 0 : properties.len > 0);
 
             if (expected_properties != NULL) {
                 ASSERT_TRUE(aws_json_value_compare(properties_json, expected_properties, true));
-            }                              
-            
+            }
+
             aws_json_value_destroy(properties_json);
 
             const struct aws_hash_table *headers;
             ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_headers(resolved_endpoint, &headers));
-            struct aws_json_value *expected_headers_node = aws_json_value_get_from_object(endpoint,
-                                                aws_byte_cursor_from_c_str("headers")); 
+            struct aws_json_value *expected_headers_node =
+                aws_json_value_get_from_object(endpoint, aws_byte_cursor_from_c_str("headers"));
             if (expected_headers_node) {
-                struct headers_wrapper wrapper = {
-                    .allocator = allocator,
-                    .headers = headers
-                };
+                struct headers_wrapper wrapper = {.allocator = allocator, .headers = headers};
                 ASSERT_SUCCESS(aws_json_const_iterate_object(expected_headers_node, s_on_header_key, &wrapper));
             }
         }
 
         struct aws_json_value *error_node = aws_json_value_get_from_object(expect, aws_byte_cursor_from_c_str("error"));
         if (error_node != NULL) {
-            ASSERT_INT_EQUALS(AWS_ENDPOINTS_RESOLVED_ERROR, aws_endpoints_resolved_endpoint_get_type(resolved_endpoint));
+            ASSERT_INT_EQUALS(
+                AWS_ENDPOINTS_RESOLVED_ERROR, aws_endpoints_resolved_endpoint_get_type(resolved_endpoint));
             struct aws_byte_cursor error;
             ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_error(resolved_endpoint, &error));
             struct aws_byte_cursor expected_error;
             ASSERT_SUCCESS(aws_json_value_get_string(error_node, &expected_error));
             ASSERT_TRUE(aws_byte_cursor_eq(&error, &expected_error));
         }
-        
+
         aws_endpoints_resolved_endpoint_release(resolved_endpoint);
         aws_endpoints_request_context_release(context);
     }

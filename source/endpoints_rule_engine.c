@@ -8,11 +8,11 @@
 #include <aws/common/json.h>
 #include <aws/common/string.h>
 #include <aws/common/uri.h>
-#include <aws/sdkutils/private/endpoints_ruleset_types_impl.h>
 #include <aws/sdkutils/private/endpoints_eval_util.h>
+#include <aws/sdkutils/private/endpoints_ruleset_types_impl.h>
 #include <aws/sdkutils/resource_name.h>
-#include <stdio.h>
 #include <inttypes.h>
+#include <stdio.h>
 
 /* TODO: checking for unknown enum values is annoying and is brittle. compile
 time assert on enum size or members would make it a lot simpler. */
@@ -43,6 +43,7 @@ struct aws_endpoints_request_context {
 ******************************
 */
 
+/* concrete type value */
 struct eval_value {
     enum eval_value_type type;
     union {
@@ -52,9 +53,13 @@ struct eval_value {
         double number;
         struct aws_array_list array;
     } v;
+    /* TODO: current flow is to mark any temp values as result of
+    function/etc... as should_clean_up and clean them up after caller is done
+    with them. This is annoying to handle at every */
     bool should_clean_up;
 };
 
+/* wrapper around eval_value to store it more easily in hash table*/
 struct scope_value {
     struct aws_allocator *allocator;
 
@@ -65,10 +70,14 @@ struct scope_value {
 };
 
 struct eval_scope {
+    /* current values in scope. byte_cur -> scope_value */
     struct aws_hash_table values;
+    /* list of value keys added since last cleanup */
     struct aws_array_list added_keys;
 
+    /* index of the rule currently being evaluated */
     size_t rule_idx;
+    /* pointer to rules array */
     const struct aws_array_list *rules;
 };
 
@@ -139,12 +148,10 @@ static int is_value_truthy(const struct eval_value *value, bool *is_truthy) {
         case AWS_ENDPOINTS_EVAL_VALUE_NONE:
             *is_truthy = false;
             return AWS_OP_SUCCESS;
-        case AWS_ENDPOINTS_EVAL_VALUE_STRING:
-            *is_truthy = true;
-            return AWS_OP_SUCCESS;
         case AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN:
             *is_truthy = value->v.boolean;
             return AWS_OP_SUCCESS;
+        case AWS_ENDPOINTS_EVAL_VALUE_STRING:
         case AWS_ENDPOINTS_EVAL_VALUE_OBJECT:
             *is_truthy = true;
             return AWS_OP_SUCCESS;
@@ -157,7 +164,6 @@ static int is_value_truthy(const struct eval_value *value, bool *is_truthy) {
     }
 
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
-    ;
 }
 
 static int s_deep_copy_context_to_scope(
@@ -286,16 +292,18 @@ static void s_scope_clean_up(struct aws_allocator *allocator, struct eval_scope 
     aws_array_list_clean_up(&scope->added_keys);
 }
 
-static int s_path_through_object(struct aws_allocator *allocator,
-                                struct eval_value *eval_val,
-                                struct aws_byte_cursor path_cur, 
-                                struct eval_value *out_value);
+static int s_path_through_object(
+    struct aws_allocator *allocator,
+    struct eval_value *eval_val,
+    struct aws_byte_cursor path_cur,
+    struct eval_value *out_value);
 
-static int s_path_through_array(struct aws_allocator *allocator,
-                                struct eval_scope *scope,
-                                struct eval_value *eval_val,
-                                struct aws_byte_cursor path_cur, 
-                                struct eval_value *out_value);
+static int s_path_through_array(
+    struct aws_allocator *allocator,
+    struct eval_scope *scope,
+    struct eval_value *eval_val,
+    struct aws_byte_cursor path_cur,
+    struct eval_value *out_value);
 
 static int s_eval_expr(
     struct aws_allocator *allocator,
@@ -303,12 +311,13 @@ static int s_eval_expr(
     struct eval_scope *scope,
     struct eval_value *out_value);
 
-static int s_eval_argv(struct aws_allocator *allocator,
-                        struct eval_scope *scope, 
-                        struct aws_array_list *argv, 
-                        size_t idx,
-                        enum eval_value_type expected_type,
-                        struct eval_value *out_value) {
+static int s_eval_argv(
+    struct aws_allocator *allocator,
+    struct eval_scope *scope,
+    struct aws_array_list *argv,
+    size_t idx,
+    enum eval_value_type expected_type,
+    struct eval_value *out_value) {
     struct aws_endpoints_expr argv_expr;
     if (aws_array_list_get_at(argv, &argv_expr, idx)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to parse argv");
@@ -322,8 +331,11 @@ static int s_eval_argv(struct aws_allocator *allocator,
     }
 
     if (expected_type != AWS_ENDPOINTS_EVAL_VALUE_ANY && argv_value.type != expected_type) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unexpected arg type actual: %u expected %u.",
-            argv_value.type, expected_type);
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_EVAL,
+            "Unexpected arg type actual: %u expected %u.",
+            argv_value.type,
+            expected_type);
         goto on_error;
     }
 
@@ -334,14 +346,20 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_fn_is_set(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+/*
+******************************
+* Standard lib.
+******************************
+*/
+static int s_eval_fn_is_set(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
     struct eval_value argv_value;
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_ANY, &argv_value)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval isSet.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval args for isSet.");
         goto on_error;
     }
 
@@ -356,14 +374,15 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_fn_not(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_not(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
     struct eval_value argv_value;
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_value)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval not.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval args for not.");
         goto on_error;
     }
 
@@ -379,28 +398,29 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_fn_get_attr(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_get_attr(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
-    struct eval_value argv_value_eval;
-    struct eval_value argv_path_eval;
-    if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_ANY, &argv_value_eval) ||
-        s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_path_eval)) {
+    struct eval_value argv_value;
+    struct eval_value argv_path;
+    if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_ANY, &argv_value) ||
+        s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_path)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval not.");
         goto on_error;
     }
 
-    struct aws_byte_cursor path_cur = aws_byte_cursor_from_string(argv_path_eval.v.string);
+    struct aws_byte_cursor path_cur = aws_byte_cursor_from_string(argv_path.v.string);
 
-    if (argv_value_eval.type == AWS_ENDPOINTS_EVAL_VALUE_OBJECT) {
-        if (s_path_through_object(allocator, &argv_value_eval, path_cur, out_value)) {
+    if (argv_value.type == AWS_ENDPOINTS_EVAL_VALUE_OBJECT) {
+        if (s_path_through_object(allocator, &argv_value, path_cur, out_value)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to path through object.");
             goto on_error;
         }
-    } else if(argv_value_eval.type == AWS_ENDPOINTS_EVAL_VALUE_ARRAY) {
-        if (s_path_through_array(allocator, scope, &argv_value_eval, path_cur, out_value)) {
+    } else if (argv_value.type == AWS_ENDPOINTS_EVAL_VALUE_ARRAY) {
+        if (s_path_through_array(allocator, scope, &argv_value, path_cur, out_value)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to path through array.");
             goto on_error;
         }
@@ -409,28 +429,29 @@ static int s_eval_fn_get_attr(struct aws_allocator *allocator,
         goto on_error;
     }
 
-    s_eval_value_clean_up(&argv_value_eval, false);
-    s_eval_value_clean_up(&argv_path_eval, false);
+    s_eval_value_clean_up(&argv_value, false);
+    s_eval_value_clean_up(&argv_path, false);
 
     return AWS_OP_SUCCESS;
 
 on_error:
-    s_eval_value_clean_up(&argv_value_eval, false);
-    s_eval_value_clean_up(&argv_path_eval, false);
+    s_eval_value_clean_up(&argv_value, false);
+    s_eval_value_clean_up(&argv_path, false);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_fn_substring(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_substring(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
     struct eval_value input_value;
     struct eval_value start_value;
     struct eval_value stop_value;
     struct eval_value reverse_value;
-    if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &input_value) || 
+    if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &input_value) ||
         s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_NUMBER, &start_value) ||
-        s_eval_argv(allocator, scope, argv, 2, AWS_ENDPOINTS_EVAL_VALUE_NUMBER, &stop_value) || 
+        s_eval_argv(allocator, scope, argv, 2, AWS_ENDPOINTS_EVAL_VALUE_NUMBER, &stop_value) ||
         s_eval_argv(allocator, scope, argv, 3, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &reverse_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval args for substring.");
         goto on_error;
@@ -453,8 +474,8 @@ static int s_eval_fn_substring(struct aws_allocator *allocator,
     }
 
     if (!reverse_value.v.boolean) {
-        struct aws_byte_cursor substring = 
-            aws_byte_cursor_from_substring(input_value.v.string, (size_t)start_value.v.number, (size_t)stop_value.v.number);
+        struct aws_byte_cursor substring = aws_byte_cursor_from_substring(
+            input_value.v.string, (size_t)start_value.v.number, (size_t)stop_value.v.number);
         out_value->should_clean_up = true;
         out_value->type = AWS_ENDPOINTS_EVAL_VALUE_STRING;
         out_value->v.string = aws_string_new_from_cursor(allocator, &substring);
@@ -463,8 +484,7 @@ static int s_eval_fn_substring(struct aws_allocator *allocator,
         size_t r_start = input_value.v.string->len - (size_t)stop_value.v.number;
         size_t r_stop = input_value.v.string->len - (size_t)start_value.v.number;
 
-        struct aws_byte_cursor substring = 
-            aws_byte_cursor_from_substring(input_value.v.string, r_start, r_stop);
+        struct aws_byte_cursor substring = aws_byte_cursor_from_substring(input_value.v.string, r_start, r_stop);
         out_value->should_clean_up = true;
         out_value->type = AWS_ENDPOINTS_EVAL_VALUE_STRING;
         out_value->v.string = aws_string_new_from_cursor(allocator, &substring);
@@ -486,10 +506,11 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_fn_string_equals(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_string_equals(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
     struct eval_value argv_value_1;
     struct eval_value argv_value_2;
@@ -502,19 +523,22 @@ static int s_eval_fn_string_equals(struct aws_allocator *allocator,
     out_value->should_clean_up = true;
     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN;
     out_value->v.boolean = aws_string_compare(argv_value_1.v.string, argv_value_2.v.string) == 0;
-    
+
     s_eval_value_clean_up(&argv_value_1, false);
     s_eval_value_clean_up(&argv_value_2, false);
     return AWS_OP_SUCCESS;
 
 on_error:
+    s_eval_value_clean_up(&argv_value_1, false);
+    s_eval_value_clean_up(&argv_value_2, false);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_fn_boolean_equals(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_boolean_equals(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
     struct eval_value argv_value_1;
     struct eval_value argv_value_2;
@@ -533,21 +557,24 @@ static int s_eval_fn_boolean_equals(struct aws_allocator *allocator,
     return AWS_OP_SUCCESS;
 
 on_error:
+    s_eval_value_clean_up(&argv_value_1, false);
+    s_eval_value_clean_up(&argv_value_2, false);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_fn_uri_encode(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_uri_encode(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
+    struct aws_byte_buf buf;
     struct eval_value argv_value;
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval parameter to uri encode.");
         goto on_error;
     }
 
-    struct aws_byte_buf buf;
     if (aws_byte_buf_init(&buf, allocator, 10)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval parameter to uri encode.");
         goto on_error;
@@ -571,20 +598,19 @@ static int s_eval_fn_uri_encode(struct aws_allocator *allocator,
 
 on_error:
     s_eval_value_clean_up(&argv_value, false);
+    aws_byte_buf_clean_up(&buf);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static bool s_is_uri_ip(struct aws_allocator *allocator, 
-                        struct aws_byte_cursor host,
-                        bool is_uri_encoded) {
-    
-    return aws_is_ipv4(allocator, host) || aws_is_ipv6(allocator, host, is_uri_encoded);
+static bool s_is_uri_ip(struct aws_byte_cursor host, bool is_uri_encoded) {
+    return aws_is_ipv4(host) || aws_is_ipv6(host, is_uri_encoded);
 }
 
-static int s_eval_fn_parse_url(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_parse_url(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
     struct aws_json_value *root = NULL;
     struct eval_value argv_url;
@@ -595,7 +621,7 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
 
     struct aws_uri uri;
     struct aws_byte_cursor uri_cur = aws_byte_cursor_from_string(argv_url.v.string);
-    if(aws_uri_init_parse(&uri, allocator, &uri_cur)) {
+    if (aws_uri_init_parse(&uri, allocator, &uri_cur)) {
         out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
         goto on_success;
     }
@@ -607,7 +633,7 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
 
     const struct aws_byte_cursor *scheme = aws_uri_scheme(&uri);
     AWS_ASSERT(scheme != NULL);
-    
+
     root = aws_json_value_new_object(allocator);
 
     if (scheme->len == 0) {
@@ -619,9 +645,9 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
         out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
         goto on_success;
     }
-    
-    if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("scheme"), 
-        aws_json_value_new_string(allocator, *scheme))) {
+
+    if (aws_json_value_add_to_object(
+            root, aws_byte_cursor_from_c_str("scheme"), aws_json_value_new_string(allocator, *scheme))) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add scheme to object.");
         goto on_error;
     }
@@ -634,8 +660,8 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
         goto on_success;
     }
 
-    if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("authority"), 
-        aws_json_value_new_string(allocator, *authority))) {
+    if (aws_json_value_add_to_object(
+            root, aws_byte_cursor_from_c_str("authority"), aws_json_value_new_string(allocator, *authority))) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add authority to object.");
         goto on_error;
     }
@@ -643,17 +669,17 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
     const struct aws_byte_cursor *path = aws_uri_path(&uri);
     AWS_ASSERT(path != NULL);
 
-    if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("path"), 
-        aws_json_value_new_string(allocator, *path))) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add path to object.");
-            goto on_error;
+    if (aws_json_value_add_to_object(
+            root, aws_byte_cursor_from_c_str("path"), aws_json_value_new_string(allocator, *path))) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add path to object.");
+        goto on_error;
     }
 
     /* Normalized path is just regular path that ensures that path starts and
     ends with slash */
-    if (path->ptr[0] != '/' || path->ptr[path->len-1] != '/') {
+    if (path->ptr[0] != '/' || path->ptr[path->len - 1] != '/') {
         struct aws_byte_buf buf;
-        if(aws_byte_buf_init(&buf, allocator, path->len + 2)){
+        if (aws_byte_buf_init(&buf, allocator, path->len + 2)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed init buffer for normalized path.");
             goto on_error;
         }
@@ -673,7 +699,7 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
             goto on_error;
         }
 
-        if (path->ptr[path->len-1] != '/') {
+        if (path->ptr[path->len - 1] != '/') {
             if (aws_byte_buf_append_dynamic(&buf, &slash)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to append slash to normalized path.");
                 aws_byte_buf_clean_up(&buf);
@@ -681,16 +707,18 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
             }
         }
 
-        if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("normalizedPath"), 
-            aws_json_value_new_string(allocator, aws_byte_cursor_from_buf(&buf)))) {
+        if (aws_json_value_add_to_object(
+                root,
+                aws_byte_cursor_from_c_str("normalizedPath"),
+                aws_json_value_new_string(allocator, aws_byte_cursor_from_buf(&buf)))) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add path to object.");
             aws_byte_buf_clean_up(&buf);
             goto on_error;
         }
         aws_byte_buf_clean_up(&buf);
     } else {
-        if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("normalizedPath"), 
-            aws_json_value_new_string(allocator, *path))) {
+        if (aws_json_value_add_to_object(
+                root, aws_byte_cursor_from_c_str("normalizedPath"), aws_json_value_new_string(allocator, *path))) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add path to object.");
             goto on_error;
         }
@@ -698,15 +726,15 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
 
     const struct aws_byte_cursor *host_name = aws_uri_host_name(&uri);
     AWS_ASSERT(path != NULL);
-    bool is_ip = s_is_uri_ip(allocator, *host_name, true);
-    if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("isIp"), 
-            aws_json_value_new_boolean(allocator, is_ip))) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add isIp to object.");
-            goto on_error;
+    bool is_ip = s_is_uri_ip(*host_name, true);
+    if (aws_json_value_add_to_object(
+            root, aws_byte_cursor_from_c_str("isIp"), aws_json_value_new_boolean(allocator, is_ip))) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add isIp to object.");
+        goto on_error;
     }
 
     struct aws_byte_buf buf;
-    if(aws_byte_buf_init(&buf, allocator, 0)){
+    if (aws_byte_buf_init(&buf, allocator, 0)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed init buffer for parseUrl return.");
         aws_byte_buf_clean_up(&buf);
         goto on_error;
@@ -721,8 +749,6 @@ static int s_eval_fn_parse_url(struct aws_allocator *allocator,
     out_value->should_clean_up = true;
     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_OBJECT;
     out_value->v.object = aws_string_new_from_buf(allocator, &buf);
-
-    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "FOO" PRInSTR, AWS_BYTE_BUF_PRI(buf));
 
     aws_byte_buf_clean_up(&buf);
 
@@ -743,60 +769,11 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static bool s_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains) {
-    bool next_is_alnum = true;
-    size_t subdomain_count = 0;
-    bool is_valid_host_label = true;
-
-    for (size_t i = 0; i < label.len; ++i) {
-        if (subdomain_count > 63) {
-            is_valid_host_label = false;
-            break;
-        }
-
-        if (label.ptr[i] == '.') {
-            if (!allow_subdomains || 
-                subdomain_count == 0) {
-                is_valid_host_label = false;
-                break;
-            }
-
-            if (!aws_isalnum(label.ptr[i-1])) {
-                is_valid_host_label = false;
-                break;
-            }
-
-
-            next_is_alnum = true;
-            subdomain_count = 0;
-            continue;
-        }
-
-        if (next_is_alnum) {
-            if (!aws_isalnum(label.ptr[i])) {      
-                is_valid_host_label = false;
-                break;
-            }
-        } else {
-            if (label.ptr[i] != '-' && !aws_isalnum(label.ptr[i])) {
-                is_valid_host_label = false;
-                break;
-            }
-        }
-
-        next_is_alnum = false;
-        ++subdomain_count;
-    }
-
-    return is_valid_host_label && 
-        (subdomain_count > 0 && subdomain_count <= 63) &&
-        aws_isalnum(label.ptr[label.len-1]);
-}
-
-static int s_eval_is_valid_host_label(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_is_valid_host_label(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
     struct eval_value argv_value;
     struct eval_value argv_allow_subdomains;
@@ -806,11 +783,11 @@ static int s_eval_is_valid_host_label(struct aws_allocator *allocator,
         goto on_error;
     }
 
-     struct aws_string *label = argv_value.v.string;
+    struct aws_string *label = argv_value.v.string;
 
     out_value->should_clean_up = true;
     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN;
-    out_value->v.boolean = s_is_valid_host_label(aws_byte_cursor_from_string(label), argv_allow_subdomains.v.boolean);
+    out_value->v.boolean = aws_is_valid_host_label(aws_byte_cursor_from_string(label), argv_allow_subdomains.v.boolean);
 
     s_eval_value_clean_up(&argv_value, false);
     s_eval_value_clean_up(&argv_allow_subdomains, false);
@@ -822,10 +799,11 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_fn_aws_partition(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_aws_partition(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
     out_value->should_clean_up = true;
     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_OBJECT;
     out_value->v.object = aws_string_new_from_c_str(
@@ -836,10 +814,11 @@ static int s_eval_fn_aws_partition(struct aws_allocator *allocator,
     return AWS_OP_SUCCESS;
 }
 
-static int s_eval_fn_aws_parse_arn(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_fn_aws_parse_arn(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
     struct aws_json_value *object = NULL;
     struct eval_value argv_value;
@@ -862,15 +841,14 @@ static int s_eval_fn_aws_parse_arn(struct aws_allocator *allocator,
         goto on_error;
     }
 
-    if (arn.partition.len == 0 ||
-        arn.resource_id.len == 0 ||
-        arn.service.len == 0) {
+    if (arn.partition.len == 0 || arn.resource_id.len == 0 || arn.service.len == 0) {
         out_value->should_clean_up = true;
         out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
         goto on_success;
     }
 
-    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, PRInSTR, AWS_BYTE_CURSOR_PRI(arn.resource_id));
+    /* Split resource id into components, either on : or / */
+    /* TODO: support multiple delims in existing split helper? */
     struct aws_json_value *resource_id_node = aws_json_value_new_array(allocator);
     size_t start = 0;
     for (size_t i = 0; i < arn.resource_id.len; ++i) {
@@ -893,9 +871,9 @@ static int s_eval_fn_aws_parse_arn(struct aws_allocator *allocator,
 
     if (start <= arn.resource_id.len) {
         struct aws_byte_cursor cur = {
-                .ptr = arn.resource_id.ptr + start,
-                .len = arn.resource_id.len - start,
-            };
+            .ptr = arn.resource_id.ptr + start,
+            .len = arn.resource_id.len - start,
+        };
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "" PRInSTR, AWS_BYTE_CURSOR_PRI(cur));
         struct aws_json_value *element = aws_json_value_new_string(allocator, cur);
         if (element == NULL || aws_json_value_add_array_element(resource_id_node, element)) {
@@ -904,16 +882,15 @@ static int s_eval_fn_aws_parse_arn(struct aws_allocator *allocator,
         }
     }
 
-    if (aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("partition"),
-            aws_json_value_new_string(allocator, arn.partition)) ||
-        aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("service"),
-            aws_json_value_new_string(allocator, arn.service)) ||
-        aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("region"),
-            aws_json_value_new_string(allocator, arn.region)) ||
-        aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("accountId"),
-            aws_json_value_new_string(allocator, arn.account_id)) ||
-        aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("resourceId"),
-            resource_id_node)) {
+    if (aws_json_value_add_to_object(
+            object, aws_byte_cursor_from_c_str("partition"), aws_json_value_new_string(allocator, arn.partition)) ||
+        aws_json_value_add_to_object(
+            object, aws_byte_cursor_from_c_str("service"), aws_json_value_new_string(allocator, arn.service)) ||
+        aws_json_value_add_to_object(
+            object, aws_byte_cursor_from_c_str("region"), aws_json_value_new_string(allocator, arn.region)) ||
+        aws_json_value_add_to_object(
+            object, aws_byte_cursor_from_c_str("accountId"), aws_json_value_new_string(allocator, arn.account_id)) ||
+        aws_json_value_add_to_object(object, aws_byte_cursor_from_c_str("resourceId"), resource_id_node)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add elements to object for parseArn.");
         goto on_error;
     }
@@ -952,10 +929,11 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_eval_is_virtual_hostable_s3_bucket(struct aws_allocator *allocator, 
-                            struct aws_array_list *argv,
-                            struct eval_scope *scope, 
-                            struct eval_value *out_value) {
+static int s_eval_is_virtual_hostable_s3_bucket(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
 
     struct eval_value argv_value;
     struct eval_value argv_allow_subdomains;
@@ -968,7 +946,7 @@ static int s_eval_is_virtual_hostable_s3_bucket(struct aws_allocator *allocator,
     struct aws_byte_cursor label_cur = aws_byte_cursor_from_string(argv_value.v.string);
 
     bool has_uppercase_chars = false;
-    for (size_t i = 0; i< label_cur.len; ++i) {
+    for (size_t i = 0; i < label_cur.len; ++i) {
         if (label_cur.ptr[i] >= 'A' && label_cur.ptr[i] <= 'Z') {
             has_uppercase_chars = true;
             break;
@@ -977,11 +955,9 @@ static int s_eval_is_virtual_hostable_s3_bucket(struct aws_allocator *allocator,
 
     out_value->should_clean_up = true;
     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN;
-    out_value->v.boolean = 
-        (label_cur.len >= 3 && label_cur.len <= 63) &&
-        !has_uppercase_chars &&
-        s_is_valid_host_label(label_cur, argv_allow_subdomains.v.boolean) &&
-        !aws_is_ipv4(allocator, label_cur);
+    out_value->v.boolean = (label_cur.len >= 3 && label_cur.len <= 63) && !has_uppercase_chars &&
+                           aws_is_valid_host_label(label_cur, argv_allow_subdomains.v.boolean) &&
+                           !aws_is_ipv4(label_cur);
 
     s_eval_value_clean_up(&argv_value, false);
     s_eval_value_clean_up(&argv_allow_subdomains, false);
@@ -993,16 +969,16 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-typedef int (eval_function_fn)(struct aws_allocator *allocator, 
-                                struct aws_array_list *argv,
-                                struct eval_scope *scope, 
-                                struct eval_value *out_value);
+typedef int(eval_function_fn)(
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value);
 
-static eval_function_fn *s_eval_fn_vt[AWS_ENDPOINTS_FN_LAST] = 
-{
+static eval_function_fn *s_eval_fn_vt[AWS_ENDPOINTS_FN_LAST] = {
     [AWS_ENDPOINTS_FN_IS_SET] = s_eval_fn_is_set,
     [AWS_ENDPOINTS_FN_NOT] = s_eval_fn_not,
-    [AWS_ENDPOINTS_FN_GET_ATTR] = s_eval_fn_get_attr, 
+    [AWS_ENDPOINTS_FN_GET_ATTR] = s_eval_fn_get_attr,
     [AWS_ENDPOINTS_FN_SUBSTRING] = s_eval_fn_substring,
     [AWS_ENDPOINTS_FN_STRING_EQUALS] = s_eval_fn_string_equals,
     [AWS_ENDPOINTS_FN_BOOLEAN_EQUALS] = s_eval_fn_boolean_equals,
@@ -1013,6 +989,12 @@ static eval_function_fn *s_eval_fn_vt[AWS_ENDPOINTS_FN_LAST] =
     [AWS_ENDPOINTS_FN_AWS_PARSE_ARN] = s_eval_fn_aws_parse_arn,
     [AWS_ENDPOINTS_FN_AWS_IS_VIRTUAL_HOSTABLE_S3_BUCKET] = s_eval_is_virtual_hostable_s3_bucket,
 };
+
+/*
+******************************
+* Expr/String eval
+******************************
+*/
 
 static int s_resolve_templated_string(
     struct aws_allocator *allocator,
@@ -1027,6 +1009,9 @@ static int s_eval_expr(
     struct eval_value *out_value) {
     switch (expr->type) {
         case AWS_ENDPOINTS_EXPR_STRING: {
+            /* TODO: Instead of trying to resolve every string as templated, its
+                probably more efficient to separate templated vs not in parsing
+                and precompute all the splits */
             struct aws_byte_buf buf;
             if (s_resolve_templated_string(allocator, expr->e.string, scope, &buf)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated string.");
@@ -1118,6 +1103,8 @@ static int s_eval_conditions(
             goto on_error;
         }
 
+        /* truthiness of all conditions is and of each condition truthiness,
+            hence first false one short circuits */
         if (!truthy) {
             goto on_short_circuit;
         }
@@ -1153,11 +1140,13 @@ static bool is_closing_bracket(uint8_t c) {
     return c == ']';
 }
 
-static int s_path_through_array(struct aws_allocator *allocator,
-                                struct eval_scope *scope,
-                                struct eval_value *eval_val,
-                                struct aws_byte_cursor path_cur, 
-                                struct eval_value *out_value) {
+/* TODO: pathing should be pulled into helpers */
+static int s_path_through_array(
+    struct aws_allocator *allocator,
+    struct eval_scope *scope,
+    struct eval_value *eval_val,
+    struct aws_byte_cursor path_cur,
+    struct eval_value *out_value) {
     struct aws_byte_cursor index_opening_char = aws_byte_cursor_from_c_str("[");
     struct aws_byte_cursor index_cur;
     if (aws_byte_cursor_find_exact(&path_cur, &index_opening_char, &index_cur)) {
@@ -1170,7 +1159,8 @@ static int s_path_through_array(struct aws_allocator *allocator,
 
     uint64_t index;
     if (aws_byte_cursor_utf8_parse_u64(index_cur, &index)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to parse index." PRInSTR, AWS_BYTE_CURSOR_PRI(index_cur));
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to parse index." PRInSTR, AWS_BYTE_CURSOR_PRI(index_cur));
         goto on_error;
     }
 
@@ -1201,10 +1191,11 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
-static int s_path_through_object(struct aws_allocator *allocator,
-                                struct eval_value *eval_val,
-                                struct aws_byte_cursor path_cur, 
-                                struct eval_value *out_value) {
+static int s_path_through_object(
+    struct aws_allocator *allocator,
+    struct eval_value *eval_val,
+    struct aws_byte_cursor path_cur,
+    struct eval_value *out_value) {
     struct aws_json_value *root_node = NULL;
     struct aws_array_list path_segments;
     if (aws_array_list_init_dynamic(&path_segments, allocator, 10, sizeof(struct aws_byte_cursor))) {
@@ -1216,10 +1207,9 @@ static int s_path_through_object(struct aws_allocator *allocator,
     }
 
     /* TODO: needed? */
-    struct aws_byte_cursor val_cur = aws_byte_cursor_from_string(eval_val->type != AWS_ENDPOINTS_EVAL_VALUE_STRING ? 
-        eval_val->v.string : eval_val->v.object);
-    
-    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "FOO " PRInSTR, AWS_BYTE_CURSOR_PRI(val_cur));
+    struct aws_byte_cursor val_cur = aws_byte_cursor_from_string(
+        eval_val->type != AWS_ENDPOINTS_EVAL_VALUE_STRING ? eval_val->v.string : eval_val->v.object);
+
     root_node = aws_json_value_new_from_string(allocator, val_cur);
     struct aws_json_value *node = root_node;
     struct aws_byte_cursor path_el_cur;
@@ -1247,7 +1237,8 @@ static int s_path_through_object(struct aws_allocator *allocator,
             node = aws_json_value_get_from_object(node, path_el_cur);
 
             if (node == NULL) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid path." PRInSTR ".", AWS_BYTE_CURSOR_PRI(path_el_cur));
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid path." PRInSTR ".", AWS_BYTE_CURSOR_PRI(path_el_cur));
                 goto on_error;
             }
         }
@@ -1255,8 +1246,8 @@ static int s_path_through_object(struct aws_allocator *allocator,
         if (has_index) {
             uint64_t index;
             if (aws_byte_cursor_utf8_parse_u64(index_cur, &index)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to parse index: " PRInSTR,
-                    AWS_BYTE_CURSOR_PRI(index_cur));
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to parse index: " PRInSTR, AWS_BYTE_CURSOR_PRI(index_cur));
                 goto on_error;
             }
 
@@ -1329,11 +1320,11 @@ static int s_path_through_object(struct aws_allocator *allocator,
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Could not parse string from node.");
             goto on_error;
         }
-        
+
         *out_value = eval;
     }
 
-on_success: 
+on_success:
     aws_json_value_destroy(root_node);
     aws_array_list_clean_up(&path_segments);
     return AWS_OP_SUCCESS;
@@ -1375,7 +1366,9 @@ static int s_resolve_templated_value_with_pathing(
 
     struct aws_hash_element *elem = NULL;
     if (aws_hash_table_find(&scope->values, &template_cur, &elem) || elem == NULL) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid value in templated string: " PRInSTR,
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_EVAL,
+            "Invalid value in templated string: " PRInSTR,
             AWS_BYTE_CURSOR_PRI(template_cur));
         goto on_error;
     }
@@ -1385,7 +1378,8 @@ static int s_resolve_templated_value_with_pathing(
 
     if (!has_path) {
         if (eval_val->value.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unexpected eval type: must be string if pathing is not provided");
+            AWS_LOGF_ERROR(
+                AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unexpected eval type: must be string if pathing is not provided");
             goto on_error;
         }
 
@@ -1398,7 +1392,7 @@ static int s_resolve_templated_value_with_pathing(
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to path through object.");
             goto on_error;
         }
-    } else if(eval_val->value.type == AWS_ENDPOINTS_EVAL_VALUE_ARRAY) {
+    } else if (eval_val->value.type == AWS_ENDPOINTS_EVAL_VALUE_ARRAY) {
         if (s_path_through_array(allocator, scope, &eval_val->value, path_cur, &resolved_value)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to path through array.");
             goto on_error;
@@ -1415,7 +1409,7 @@ static int s_resolve_templated_value_with_pathing(
 
     *out_value = aws_string_clone_or_reuse(allocator, resolved_value.v.string);
     s_eval_value_clean_up(&resolved_value, false);
-    
+
     return AWS_OP_SUCCESS;
 
 on_error:
@@ -1428,7 +1422,8 @@ static int s_resolve_templated_string(
     struct eval_scope *scope,
     struct aws_byte_buf *out_result_buf) {
 
-    if (aws_byte_buf_init(out_result_buf, allocator, string->len)) {
+    struct aws_byte_buf temp;
+    if (aws_byte_buf_init(&temp, allocator, string->len)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to init resolved buffer.");
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
     }
@@ -1443,15 +1438,11 @@ static int s_resolve_templated_string(
             }
 
             if (string->bytes[idx + 1] == '{') {
-                struct aws_byte_cursor cur = aws_byte_cursor_from_substring(string, copy_start, idx + 1);
-
-                aws_byte_buf_append_dynamic(out_result_buf, &cur);
                 ++idx;
-                copy_start = idx + 1;
             } else if (aws_isalpha(string->bytes[idx + 1])) {
                 /* TODO: extra is alpha check works around replacing templated
                 string in json blobs, by relying on the fact that curly braces
-                used for json purposes will never be followed by alpha char.*/ 
+                used for json purposes will never be followed by alpha char.*/
                 opening_idx = idx;
             }
             continue;
@@ -1463,11 +1454,7 @@ static int s_resolve_templated_string(
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid template string syntax.");
                     goto on_error;
                 }
-                struct aws_byte_cursor cur = aws_byte_cursor_from_substring(string, copy_start, idx);
-
-                aws_byte_buf_append_dynamic(out_result_buf, &cur);
                 ++idx;
-                copy_start = idx;
                 continue;
             }
 
@@ -1477,7 +1464,7 @@ static int s_resolve_templated_string(
 
             if (opening_idx > copy_start) {
                 struct aws_byte_cursor cur = aws_byte_cursor_from_substring(string, copy_start, opening_idx);
-                aws_byte_buf_append_dynamic(out_result_buf, &cur);
+                aws_byte_buf_append_dynamic(&temp, &cur);
             }
 
             struct aws_byte_cursor template_cur = aws_byte_cursor_from_substring(string, opening_idx + 1, idx);
@@ -1489,7 +1476,7 @@ static int s_resolve_templated_string(
             }
 
             struct aws_byte_cursor resolved_template_cur = aws_byte_cursor_from_string(resolved_template);
-            aws_byte_buf_append_dynamic(out_result_buf, &resolved_template_cur);
+            aws_byte_buf_append_dynamic(&temp, &resolved_template_cur);
             copy_start = idx + 1;
             opening_idx = SIZE_MAX;
             aws_string_destroy(resolved_template);
@@ -1498,13 +1485,19 @@ static int s_resolve_templated_string(
 
     if (copy_start < string->len) {
         struct aws_byte_cursor remainder = aws_byte_cursor_from_substring(string, copy_start, string->len);
-        aws_byte_buf_append_dynamic(out_result_buf, &remainder);
+        aws_byte_buf_append_dynamic(&temp, &remainder);
     }
 
+    if (aws_templated_string_strip_replace_escaped(allocator, aws_byte_cursor_from_buf(&temp), out_result_buf)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolved templated value.");
+        goto on_error;
+    }
+
+    aws_byte_buf_clean_up(&temp);
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_byte_buf_clean_up(out_result_buf);
+    aws_byte_buf_clean_up(&temp);
 
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
@@ -1787,7 +1780,7 @@ int s_revert_scope(struct eval_scope *scope) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to retrieve value.");
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
         }
-        
+
         aws_hash_table_remove(&scope->values, cur, NULL, NULL);
     }
 
@@ -1808,6 +1801,127 @@ static void s_callback_headers_destroy(void *data) {
     aws_mem_release(alloc, array);
 }
 
+static int s_resolve_reference_to_buffer(
+    struct aws_allocator *allocator,
+    struct eval_scope *scope,
+    struct aws_string *ref,
+    struct aws_byte_buf *out_buf) {
+    struct aws_endpoints_expr expr = {.type = AWS_ENDPOINTS_EXPR_REFERENCE, .e.reference = ref};
+
+    struct eval_value eval;
+    if (s_eval_expr(allocator, &expr, scope, &eval) || eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve template reference.");
+        goto on_error;
+    }
+
+    if (aws_byte_buf_init_copy_from_cursor(out_buf, allocator, aws_byte_cursor_from_string(eval.v.string))) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to create buffer for resolved reference.");
+        goto on_error;
+    }
+
+    s_eval_value_clean_up(&eval, false);
+    return AWS_OP_SUCCESS;
+
+on_error:
+    s_eval_value_clean_up(&eval, false);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+}
+
+static int s_resolve_function_to_buffer(
+    struct aws_allocator *allocator,
+    struct eval_scope *scope,
+    const struct aws_endpoints_function *fn,
+    struct aws_byte_buf *out_buf) {
+    struct aws_endpoints_expr expr = {.type = AWS_ENDPOINTS_EXPR_FUNCTION, .e.function = *fn};
+
+    struct eval_value eval;
+    if (s_eval_expr(allocator, &expr, scope, &eval) || eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve ref url.");
+        goto on_error;
+    }
+
+    if (aws_byte_buf_init_copy_from_cursor(out_buf, allocator, aws_byte_cursor_from_string(eval.v.string))) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to create buffer for resolved reference.");
+        goto on_error;
+    }
+
+    s_eval_value_clean_up(&eval, false);
+    return AWS_OP_SUCCESS;
+
+on_error:
+    s_eval_value_clean_up(&eval, false);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+}
+
+static int s_resolve_headers(
+    struct aws_allocator *allocator,
+    struct eval_scope *scope,
+    struct aws_hash_table *headers,
+    struct aws_hash_table *out_headers) {
+    struct eval_value eval;
+    struct aws_array_list *resolved_headers = NULL;
+
+    if (aws_hash_table_init(
+            out_headers,
+            allocator,
+            aws_hash_table_get_entry_count(headers),
+            aws_hash_string,
+            aws_hash_callback_string_eq,
+            aws_hash_callback_string_destroy,
+            s_callback_headers_destroy)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to init table for resolved headers");
+        goto on_error;
+    }
+
+    for (struct aws_hash_iter iter = aws_hash_iter_begin(headers); !aws_hash_iter_done(&iter);
+         aws_hash_iter_next(&iter)) {
+
+        struct aws_string *key = (struct aws_string *)iter.element.key;
+        struct aws_array_list *header_list = (struct aws_array_list *)iter.element.value;
+
+        struct aws_array_list *resolved_headers = aws_mem_calloc(allocator, 1, sizeof(struct aws_array_list));
+        aws_array_list_init_dynamic(
+            resolved_headers, allocator, aws_array_list_length(header_list), sizeof(struct aws_string *));
+
+        for (size_t i = 0; i < aws_array_list_length(header_list); ++i) {
+            struct aws_endpoints_expr *expr = NULL;
+            if (aws_array_list_get_at_ptr(header_list, (void **)&expr, i)) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to get header.");
+                goto on_error;
+            }
+
+            if (s_eval_expr(allocator, expr, scope, &eval) || eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval header expr.");
+                goto on_error;
+            }
+
+            struct aws_string *str = aws_string_clone_or_reuse(allocator, eval.v.string);
+            if (aws_array_list_push_back(resolved_headers, &str)) {
+                aws_string_destroy(str);
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed add resolved header to result.");
+                goto on_error;
+            }
+
+            s_eval_value_clean_up(&eval, false);
+        }
+
+        if (aws_hash_table_put(out_headers, aws_string_clone_or_reuse(allocator, key), resolved_headers, NULL)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed add resolved header to result.");
+            goto on_error;
+        }
+    }
+
+    return AWS_OP_SUCCESS;
+
+on_error:
+    s_eval_value_clean_up(&eval, false);
+    if (resolved_headers != NULL) {
+        s_callback_headers_destroy(resolved_headers);
+    }
+    aws_hash_table_clean_up(out_headers);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+}
+
 int aws_endpoints_rule_engine_resolve(
     struct aws_endpoints_rule_engine *engine,
     const struct aws_endpoints_request_context *context,
@@ -1817,6 +1931,30 @@ int aws_endpoints_rule_engine_resolve(
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EMPTY_RULESET);
     }
 
+    /*
+     * High level approach for eval dispatch.
+     * Rules are evaluated sequentially against scope.
+     * Rules can add values to the scope, that are valid for the duration of the
+     * rule.
+     * Scope is hence 'leveled' with each rule eval creating a new level and
+     * adding all values at that level, with level being rolled back once rule
+     * eval finishes.
+     * Since tree rule cannot be exited from, impl is simplified and tree forces
+     * all values into top level. So in practice eval goes back between top and
+     * first levels as evaluating rules. If that changes in future, scope can add
+     * explicit level number and cleanup only values at that level.
+     * flow is as follows:
+     * - Start with any values provided in context as scope
+     * - Add any default values provided in ruleset and validate all required
+     *   params are specified.
+     * - Iterate through rules and eval. for each rule:
+     * -- eval conditions with side effects
+     * -- if conditions are truthy return rule result
+     * -- if conditions are truthy and rule is tree, jump down a level and
+     *   restart eval with tree rules
+     * -- if conditions are falsy, rollback level and go to next rule
+     * - if no rules match, eval fails with exhausted error.
+     */
     struct eval_scope scope;
     if (s_init_top_level_scope(engine->allocator, context, engine->ruleset, &scope)) {
         goto on_error;
@@ -1847,64 +1985,44 @@ int aws_endpoints_rule_engine_resolve(
                 endpoint->type = AWS_ENDPOINTS_RESOLVED_ENDPOINT;
 
                 switch (rule->rule_data.endpoint.url_type) {
-                    case AWS_ENDPOINTS_URL_TEMPLATE:
-                    {
+                    case AWS_ENDPOINTS_URL_TEMPLATE: {
                         if (s_resolve_templated_string(
-                            engine->allocator, rule->rule_data.endpoint.url.template, &scope, &endpoint->r.endpoint.url)) {
+                                engine->allocator,
+                                rule->rule_data.endpoint.url.template,
+                                &scope,
+                                &endpoint->r.endpoint.url)) {
                             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated url.");
                             goto on_error;
                         }
                         break;
                     }
-                    case AWS_ENDPOINTS_URL_REFERENCE: 
-                    {
-                        /* TODO: make proper expr in parsing */
-                        struct aws_endpoints_expr expr = {
-                            .type = AWS_ENDPOINTS_EXPR_REFERENCE,
-                            .e.reference = rule->rule_data.endpoint.url.reference
-                        };
-
-                        struct eval_value eval;
-                        if (s_eval_expr(engine->allocator, &expr, &scope, &eval) || 
-                            eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve ref url.");
+                    case AWS_ENDPOINTS_URL_REFERENCE: {
+                        /* TODO: this was probably a bad decision to parse them
+                        separately. instead we should just parse them as expr
+                        and replace this whole switch with resolve expr */
+                        if (s_resolve_reference_to_buffer(
+                                engine->allocator,
+                                &scope,
+                                rule->rule_data.endpoint.url.reference,
+                                &endpoint->r.endpoint.url)) {
+                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve template reference.");
                             goto on_error;
                         }
-
-                        if (aws_byte_buf_init_copy_from_cursor(&endpoint->r.endpoint.url, engine->allocator,
-                            aws_byte_cursor_from_string(eval.v.string))) {
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to create buffer for resolved reference.");
-                            goto on_error;
-                        }
-
-                        s_eval_value_clean_up(&eval, false);
                         break;
                     }
-                    case AWS_ENDPOINTS_URL_FUNCTION: 
-                    {
-                        struct aws_endpoints_expr expr = {
-                            .type = AWS_ENDPOINTS_EXPR_FUNCTION,
-                            .e.function = rule->rule_data.endpoint.url.function
-                        };
-
-                        struct eval_value eval;
-                        if (s_eval_expr(engine->allocator, &expr, &scope, &eval) || 
-                            eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve ref url.");
+                    case AWS_ENDPOINTS_URL_FUNCTION: {
+                        if (s_resolve_function_to_buffer(
+                                engine->allocator,
+                                &scope,
+                                &rule->rule_data.endpoint.url.function,
+                                &endpoint->r.endpoint.url)) {
+                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve template function.");
                             goto on_error;
                         }
-
-                        if (aws_byte_buf_init_copy_from_cursor(&endpoint->r.endpoint.url, engine->allocator,
-                            aws_byte_cursor_from_string(eval.v.string))) {
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to create buffer for resolved reference.");
-                            goto on_error;
-                        }
-
-                        s_eval_value_clean_up(&eval, false);
                         break;
                     }
                 }
-                
+
                 if (rule->rule_data.endpoint.properties && s_resolve_templated_string(
                                                                engine->allocator,
                                                                rule->rule_data.endpoint.properties,
@@ -1914,57 +2032,10 @@ int aws_endpoints_rule_engine_resolve(
                     goto on_error;
                 }
 
-                aws_hash_table_init(
-                    &endpoint->r.endpoint.headers,
-                    engine->allocator,
-                    aws_hash_table_get_entry_count(&rule->rule_data.endpoint.headers),
-                    aws_hash_string,
-                    aws_hash_callback_string_eq,
-                    aws_hash_callback_string_destroy,
-                    s_callback_headers_destroy);
-
-                for (struct aws_hash_iter iter = aws_hash_iter_begin(&rule->rule_data.endpoint.headers);
-                    !aws_hash_iter_done(&iter); aws_hash_iter_next(&iter)) {
-                    
-                    struct aws_string *key = (struct aws_string *)iter.element.key;
-                    struct aws_array_list *header_list = (struct aws_array_list *)iter.element.value;
-
-                    struct aws_array_list *resolved_headers = aws_mem_calloc(engine->allocator, 1, sizeof(struct aws_array_list));
-                    aws_array_list_init_dynamic(resolved_headers, engine->allocator,
-                            aws_array_list_length(header_list), sizeof(struct aws_string *));
-
-                    for (size_t i = 0; i < aws_array_list_length(header_list); ++i) {
-                        struct aws_endpoints_expr *expr = NULL;
-                        if (aws_array_list_get_at_ptr(header_list, (void **)&expr, i)) {
-                            s_callback_headers_destroy(resolved_headers);
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to get header.");
-                            goto on_error;
-                        }
-
-                        struct eval_value eval;
-                        if (s_eval_expr(engine->allocator, expr, &scope, &eval) || 
-                            eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-                            s_callback_headers_destroy(resolved_headers);
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval header expr.");
-                            goto on_error;
-                        }
-
-                        struct aws_string *str = aws_string_clone_or_reuse(engine->allocator, eval.v.string);
-                        if (aws_array_list_push_back(resolved_headers, &str)) {
-                            s_eval_value_clean_up(&eval, false);
-                            s_callback_headers_destroy(resolved_headers);
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed add resolved header to result.");
-                            goto on_error;
-                        }
-
-                        s_eval_value_clean_up(&eval, false);
-                    }
-
-                    if (aws_hash_table_put(&endpoint->r.endpoint.headers,
-                        aws_string_clone_or_reuse(engine->allocator, key), resolved_headers, NULL)) {
-                        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed add resolved header to result.");
-                        goto on_error;
-                    }
+                if (s_resolve_headers(
+                        engine->allocator, &scope, &rule->rule_data.endpoint.headers, &endpoint->r.endpoint.headers)) {
+                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated headers.");
+                    goto on_error;
                 }
 
                 *out_resolved_endpoint = endpoint;
@@ -1973,62 +2044,31 @@ int aws_endpoints_rule_engine_resolve(
             case AWS_ENDPOINTS_RULE_ERROR: {
                 struct aws_endpoints_resolved_endpoint *error = s_endpoints_resolved_endpoint_new(engine->allocator);
                 error->type = AWS_ENDPOINTS_RESOLVED_ERROR;
-                
+
                 switch (rule->rule_data.error.error_type) {
-                    case AWS_ENDPOINTS_ERROR_TEMPLATE:
-                    {
+                    case AWS_ENDPOINTS_ERROR_TEMPLATE: {
                         if (s_resolve_templated_string(
-                            engine->allocator, rule->rule_data.error.error.template, &scope, &error->r.error)) {
+                                engine->allocator, rule->rule_data.error.error.template, &scope, &error->r.error)) {
                             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated url.");
                             goto on_error;
                         }
                         break;
                     }
-                    case AWS_ENDPOINTS_ERROR_REFERENCE: 
-                    {
+                    case AWS_ENDPOINTS_ERROR_REFERENCE: {
                         /* TODO: make proper expr in parsing */
-                        struct aws_endpoints_expr expr = {
-                            .type = AWS_ENDPOINTS_EXPR_REFERENCE,
-                            .e.reference = rule->rule_data.error.error.reference
-                        };
-
-                        struct eval_value eval;
-                        if (s_eval_expr(engine->allocator, &expr, &scope, &eval) || 
-                            eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve ref url.");
+                        if (s_resolve_reference_to_buffer(
+                                engine->allocator, &scope, rule->rule_data.error.error.reference, &error->r.error)) {
+                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve template reference.");
                             goto on_error;
                         }
-
-                        if (aws_byte_buf_init_copy_from_cursor(&error->r.error, engine->allocator,
-                            aws_byte_cursor_from_string(eval.v.string))) {
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to create buffer for resolved reference.");
-                            goto on_error;
-                        }
-
-                        s_eval_value_clean_up(&eval, false);
                         break;
                     }
-                    case AWS_ENDPOINTS_ERROR_FUNCTION: 
-                    {
-                        struct aws_endpoints_expr expr = {
-                            .type = AWS_ENDPOINTS_EXPR_FUNCTION,
-                            .e.function = rule->rule_data.error.error.function
-                        };
-
-                        struct eval_value eval;
-                        if (s_eval_expr(engine->allocator, &expr, &scope, &eval) || 
-                            eval.type != AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve ref url.");
+                    case AWS_ENDPOINTS_ERROR_FUNCTION: {
+                        if (s_resolve_function_to_buffer(
+                                engine->allocator, &scope, &rule->rule_data.error.error.function, &error->r.error)) {
+                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve template function.");
                             goto on_error;
                         }
-
-                        if (aws_byte_buf_init_copy_from_cursor(&error->r.error, engine->allocator,
-                            aws_byte_cursor_from_string(eval.v.string))) {
-                            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to create buffer for resolved reference.");
-                            goto on_error;
-                        }
-
-                        s_eval_value_clean_up(&eval, false);
                         break;
                     }
                 }
@@ -2037,6 +2077,7 @@ int aws_endpoints_rule_engine_resolve(
                 goto on_success;
             }
             case AWS_ENDPOINTS_RULE_TREE: {
+                /* jumping down a level */
                 aws_array_list_clear(&scope.added_keys);
                 scope.rule_idx = 0;
                 scope.rules = &rule->rule_data.tree.rules;
