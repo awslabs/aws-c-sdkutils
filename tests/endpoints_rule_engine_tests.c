@@ -108,6 +108,7 @@ static int s_on_parameter_key(
     const struct aws_json_value *value,
     bool *out_should_continue,
     void *user_data) {
+    (void)out_should_continue;
 
     struct iteration_wrapper *wrapper = user_data;
 
@@ -143,6 +144,7 @@ static int s_on_header_key(
     const struct aws_json_value *value,
     bool *out_should_continue,
     void *user_data) {
+    (void)out_should_continue;
 
     struct headers_wrapper *wrapper = user_data;
 
@@ -274,8 +276,8 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
             struct aws_json_value *expected_headers_node =
                 aws_json_value_get_from_object(endpoint, aws_byte_cursor_from_c_str("headers"));
             if (expected_headers_node) {
-                struct headers_wrapper wrapper = {.allocator = allocator, .headers = headers};
-                ASSERT_SUCCESS(aws_json_const_iterate_object(expected_headers_node, s_on_header_key, &wrapper));
+                struct headers_wrapper headers_wrapper = {.allocator = allocator, .headers = headers};
+                ASSERT_SUCCESS(aws_json_const_iterate_object(expected_headers_node, s_on_header_key, &headers_wrapper));
             }
         }
 
