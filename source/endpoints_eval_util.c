@@ -161,7 +161,7 @@ struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region
     uint8_t num = 0;
 
     if (3 == sscanf(copy, "%2[^-]-%30[^-]-%03" SCNu8, country, location, &num)) {
-        for (size_t i = 0; i < sizeof(s_known_countries); ++i) {
+        for (size_t i = 0; i < sizeof(s_known_countries)/sizeof(s_known_countries[0]); ++i) {
             if (0 == strncmp(s_known_countries[i], country, 3)) {
                 if (location[0] != 0 && num > 0) {
                     return aws_byte_cursor_from_c_str("aws");

@@ -1360,7 +1360,7 @@ static int s_resolve_templated_value_with_pathing(
         aws_byte_cursor_advance(&path_cur, 1);
     }
 
-    if (template_cur.len < 1 || path_cur.len < 1) {
+    if (template_cur.len < 1 || (has_path && path_cur.len < 1)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid value or path in template string.");
         goto on_error;
     }
