@@ -355,6 +355,7 @@ static int s_eval_fn_is_set(
     struct eval_value *out_value) {
 
     struct eval_value argv_value;
+    AWS_ZERO_STRUCT(argv_value);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_ANY, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval args for isSet.");
         goto on_error;
@@ -378,6 +379,7 @@ static int s_eval_fn_not(
     struct eval_value *out_value) {
 
     struct eval_value argv_value;
+    AWS_ZERO_STRUCT(argv_value);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval args for not.");
         goto on_error;
@@ -402,7 +404,9 @@ static int s_eval_fn_get_attr(
     struct eval_value *out_value) {
 
     struct eval_value argv_value;
+    AWS_ZERO_STRUCT(argv_value);
     struct eval_value argv_path;
+    AWS_ZERO_STRUCT(argv_path);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_ANY, &argv_value) ||
         s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_path)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval not.");
@@ -443,9 +447,13 @@ static int s_eval_fn_substring(
     struct eval_scope *scope,
     struct eval_value *out_value) {
     struct eval_value input_value;
+    AWS_ZERO_STRUCT(input_value);
     struct eval_value start_value;
+    AWS_ZERO_STRUCT(start_value);
     struct eval_value stop_value;
+    AWS_ZERO_STRUCT(stop_value);
     struct eval_value reverse_value;
+    AWS_ZERO_STRUCT(reverse_value);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &input_value) ||
         s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_NUMBER, &start_value) ||
         s_eval_argv(allocator, scope, argv, 2, AWS_ENDPOINTS_EVAL_VALUE_NUMBER, &stop_value) ||
@@ -510,7 +518,9 @@ static int s_eval_fn_string_equals(
     struct eval_value *out_value) {
 
     struct eval_value argv_value_1;
+    AWS_ZERO_STRUCT(argv_value_1);
     struct eval_value argv_value_2;
+    AWS_ZERO_STRUCT(argv_value_2);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value_1) ||
         s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value_2)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval stringEquals.");
@@ -538,7 +548,9 @@ static int s_eval_fn_boolean_equals(
     struct eval_value *out_value) {
 
     struct eval_value argv_value_1;
+    AWS_ZERO_STRUCT(argv_value_1);
     struct eval_value argv_value_2;
+    AWS_ZERO_STRUCT(argv_value_2);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_value_1) ||
         s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_value_2)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval booleanEquals.");
@@ -566,7 +578,9 @@ static int s_eval_fn_uri_encode(
     struct eval_value *out_value) {
 
     struct aws_byte_buf buf;
+    AWS_ZERO_STRUCT(buf);
     struct eval_value argv_value;
+    AWS_ZERO_STRUCT(argv_value);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval parameter to uri encode.");
         goto on_error;
@@ -610,8 +624,10 @@ static int s_eval_fn_parse_url(
     struct eval_value *out_value) {
 
     struct aws_uri uri;
+    AWS_ZERO_STRUCT(uri);
     struct aws_json_value *root = NULL;
     struct eval_value argv_url;
+    AWS_ZERO_STRUCT(argv_url);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_url)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval args for parse url.");
         goto on_error;
@@ -773,7 +789,9 @@ static int s_eval_is_valid_host_label(
     struct eval_value *out_value) {
 
     struct eval_value argv_value;
+    AWS_ZERO_STRUCT(argv_value);
     struct eval_value argv_allow_subdomains;
+    AWS_ZERO_STRUCT(argv_allow_subdomains);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value) ||
         s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_allow_subdomains)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval not.");
@@ -821,6 +839,7 @@ static int s_eval_fn_aws_parse_arn(
 
     struct aws_json_value *object = NULL;
     struct eval_value argv_value;
+    AWS_ZERO_STRUCT(argv_value);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval parseArn.");
         goto on_error;
@@ -935,7 +954,9 @@ static int s_eval_is_virtual_hostable_s3_bucket(
     struct eval_value *out_value) {
 
     struct eval_value argv_value;
+    AWS_ZERO_STRUCT(argv_value);
     struct eval_value argv_allow_subdomains;
+    AWS_ZERO_STRUCT(argv_allow_subdomains);
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value) ||
         s_eval_argv(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_allow_subdomains)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval args for isVirtualHostableS3Bucket.");
