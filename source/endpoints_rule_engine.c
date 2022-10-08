@@ -609,6 +609,7 @@ static int s_eval_fn_parse_url(
     struct eval_scope *scope,
     struct eval_value *out_value) {
 
+    struct aws_uri uri;
     struct aws_json_value *root = NULL;
     struct eval_value argv_url;
     if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_url)) {
@@ -616,7 +617,6 @@ static int s_eval_fn_parse_url(
         goto on_error;
     }
 
-    struct aws_uri uri;
     struct aws_byte_cursor uri_cur = aws_byte_cursor_from_string(argv_url.v.string);
     if (aws_uri_init_parse(&uri, allocator, &uri_cur)) {
         out_value->type = AWS_ENDPOINTS_EVAL_VALUE_NONE;
