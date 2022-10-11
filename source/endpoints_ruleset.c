@@ -8,7 +8,7 @@
 #include <aws/common/json.h>
 #include <aws/common/ref_count.h>
 #include <aws/common/string.h>
-#include <aws/sdkutils/private/endpoints_ruleset_types_impl.h>
+#include <aws/sdkutils/private/endpoints_types_impl.h>
 
 /* parameter types */
 static struct aws_byte_cursor s_string_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("string");
@@ -930,7 +930,7 @@ static int s_init_ruleset_from_json(
         goto error_clean_up;
     }
 
-#ifdef VERSION_CHECK /* TODO: samples are currently inconsistent with versions. skip check for now */
+#ifdef ENDPOINTS_VERSION_CHECK /* TODO: samples are currently inconsistent with versions. skip check for now */
     if (aws_byte_cursor_eq_c_str(&version_cur, &s_supported_version)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unsupported ruleset version.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);

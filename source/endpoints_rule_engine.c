@@ -9,8 +9,9 @@
 #include <aws/common/string.h>
 #include <aws/common/uri.h>
 #include <aws/sdkutils/private/endpoints_eval_util.h>
-#include <aws/sdkutils/private/endpoints_ruleset_types_impl.h>
+#include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/resource_name.h>
+#include <aws/sdkutils/partitions.h>
 #include <inttypes.h>
 #include <stdio.h>
 
@@ -79,6 +80,8 @@ struct eval_scope {
     size_t rule_idx;
     /* pointer to rules array */
     const struct aws_array_list *rules;
+
+    const struct aws_partitions_config *partitions;
 };
 
 static struct scope_value *s_scope_value_new(struct aws_allocator *allocator, struct aws_byte_cursor name_cur) {
@@ -210,6 +213,7 @@ static int s_init_top_level_scope(
     struct aws_allocator *allocator,
     const struct aws_endpoints_request_context *context,
     const struct aws_endpoints_ruleset *ruleset,
+    const struct aws_partitions_config *partitions,
     struct eval_scope *scope) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(context);
@@ -219,6 +223,7 @@ static int s_init_top_level_scope(
     struct scope_value *val = NULL;
     scope->rule_idx = 0;
     scope->rules = &ruleset->rules;
+    scope->partitions = partitions;
 
     if (s_deep_copy_context_to_scope(allocator, context, scope)) {
         goto on_error;
@@ -819,16 +824,51 @@ static int s_eval_fn_aws_partition(
     struct aws_array_list *argv,
     struct eval_scope *scope,
     struct eval_value *out_value) {
-    (void)scope;
-    (void)argv;
+
+    struct eval_value argv_region;
+    AWS_ZERO_STRUCT(argv_region);
+
+    if (s_eval_argv(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_region)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval arguments for partitions.");
+        goto on_error;
+    }
+
+    struct aws_hash_element *element = NULL;
+    struct aws_byte_cursor key = aws_byte_cursor_from_string(argv_region.v.string);
+    if (aws_hash_table_find(&scope->partitions->region_to_partition_info, &key, &element)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to find partition info.");
+        goto on_error;
+    }
+
+    if (element != NULL) {
+        out_value->should_clean_up = true;
+        out_value->type = AWS_ENDPOINTS_EVAL_VALUE_OBJECT;
+        out_value->v.object = aws_string_clone_or_reuse(allocator, ((struct aws_partition_info *)element->value)->info);
+        goto on_success;
+    }
+
+    key = aws_map_region_to_partition(key);
+
+    if (key.len == 0) {
+        key = aws_byte_cursor_from_c_str("aws");
+    }
+
+    if (aws_hash_table_find(&scope->partitions->region_to_partition_info, &key, &element) || element == NULL) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to find partition info.");
+        goto on_error;
+    }
+
     out_value->should_clean_up = true;
     out_value->type = AWS_ENDPOINTS_EVAL_VALUE_OBJECT;
-    out_value->v.object = aws_string_new_from_c_str(
-        allocator,
-        "{\"name\": \"aws\",\"dnsSuffix\": \"amazonaws.com\",\"dualStackDnsSuffix\": \"api.aws\","
-        "\"supportsFIPS\": true, \"supportsDualStack\": true}");
+    out_value->v.object = aws_string_clone_or_reuse(allocator, ((struct aws_partition_info *)element->value)->info);
 
+on_success:
+    s_eval_value_clean_up(&argv_region, false);
     return AWS_OP_SUCCESS;
+
+on_error:
+    s_eval_value_clean_up(&argv_region, false);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
 }
 
 static int s_eval_fn_aws_parse_arn(
@@ -1749,6 +1789,7 @@ struct aws_endpoints_rule_engine {
     struct aws_ref_count ref_count;
 
     struct aws_endpoints_ruleset *ruleset;
+    struct aws_partitions_config *partitions_config;
 };
 
 static void s_endpoints_rule_engine_destroy(void *data) {
@@ -1758,21 +1799,25 @@ static void s_endpoints_rule_engine_destroy(void *data) {
 
     struct aws_endpoints_rule_engine *engine = data;
     aws_endpoints_ruleset_release(engine->ruleset);
+    aws_partitions_config_release(engine->partitions_config);
 
     aws_mem_release(engine->allocator, engine);
 }
 
 struct aws_endpoints_rule_engine *aws_endpoints_rule_engine_new(
     struct aws_allocator *allocator,
-    struct aws_endpoints_ruleset *ruleset) {
+    struct aws_endpoints_ruleset *ruleset, 
+    struct aws_partitions_config *partitions_config) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(ruleset);
 
     struct aws_endpoints_rule_engine *engine = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_rule_engine));
     engine->allocator = allocator;
     engine->ruleset = ruleset;
+    engine->partitions_config = partitions_config;
 
     aws_endpoints_ruleset_acquire(ruleset);
+    aws_partitions_config_acquire(partitions_config);
     aws_ref_count_init(&engine->ref_count, engine, s_endpoints_rule_engine_destroy);
 
     return engine;
@@ -1977,7 +2022,7 @@ int aws_endpoints_rule_engine_resolve(
      * - if no rules match, eval fails with exhausted error.
      */
     struct eval_scope scope;
-    if (s_init_top_level_scope(engine->allocator, context, engine->ruleset, &scope)) {
+    if (s_init_top_level_scope(engine->allocator, context, engine->ruleset, engine->partitions_config, &scope)) {
         goto on_error;
     }
 

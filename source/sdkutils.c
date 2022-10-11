@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0.
  */
 
-#include <aws/sdkutils/private/endpoints_ruleset_types_impl.h>
+#include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/sdkutils.h>
 
 /* clang-format off */
@@ -17,7 +17,8 @@ static struct aws_error_info s_errors[] = {
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED, "Unexpected eval error", "aws-c-sdkutils"),
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_EMPTY_RULESET, "Ruleset has no rules", "aws-c-sdkutils"),
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_RULESET_EXHAUSTED, "Ruleset was exhausted before finding a matching rule", "aws-c-sdkutils"),
-    
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARTITIONS_UNSUPPORTED, "Partitions version not supported.", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED, "Partitions parsing failed.", "aws-c-sdkutils"),
 };
 /* clang-format on */
 

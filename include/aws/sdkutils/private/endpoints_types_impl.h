@@ -9,6 +9,8 @@
 #include <aws/common/ref_count.h>
 #include <aws/sdkutils/endpoints_rule_engine.h>
 
+struct aws_json_value;
+
 enum aws_endpoints_rule_type { AWS_ENDPOINTS_RULE_ENDPOINT, AWS_ENDPOINTS_RULE_ERROR, AWS_ENDPOINTS_RULE_TREE };
 
 enum aws_endpoints_url_type { AWS_ENDPOINTS_URL_TEMPLATE, AWS_ENDPOINTS_URL_REFERENCE, AWS_ENDPOINTS_URL_FUNCTION };
@@ -149,7 +151,29 @@ struct aws_endpoints_rule {
     } rule_data;
 };
 
-bool aws_endpoints_byte_cursor_eq(const void *a, const void *b);
+struct aws_partition_info {
+    struct aws_allocator *allocator;
+    struct aws_byte_cursor name_cur;
+    struct aws_string *name;
+
+    bool is_copy;
+    struct aws_string *info;
+};
+
+struct aws_partitions_config {
+    struct aws_allocator *allocator;
+    struct aws_ref_count ref_count;
+
+    /* map of (byte_cur -> aws_partition_info) */
+    struct aws_hash_table region_to_partition_info;
+
+    struct aws_string *version;
+};
+
+struct aws_partition_info *aws_partition_info_new(
+    struct aws_allocator *allocator,
+    struct aws_byte_cursor name_cur);
+void aws_partition_info_destroy(struct aws_partition_info *partition_info);
 
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     struct aws_allocator *allocator,
@@ -166,6 +190,8 @@ void aws_endpoints_condition_clean_up(struct aws_endpoints_condition *condition)
 void aws_endpoints_function_clean_up(struct aws_endpoints_function *function);
 void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr);
 
+bool aws_endpoints_byte_cursor_eq(const void *a, const void *b);
+
 /*
  * Helpers to do deep clean up of array list.
  * TODO: move to aws-c-common?
@@ -178,5 +204,7 @@ void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callba
  * TODO: move to a better place
  */
 void aws_endpoints_rule_engine_init(void);
+
+struct aws_string *aws_string_new_from_json_value(struct aws_allocator *allocator, struct aws_json_value *value);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H */

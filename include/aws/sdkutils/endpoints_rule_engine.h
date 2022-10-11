@@ -11,6 +11,7 @@
 #include <aws/sdkutils/sdkutils.h>
 
 struct aws_endpoints_ruleset;
+struct aws_partitions_config;
 struct aws_endpoints_parameter;
 struct aws_endpoints_rule_engine;
 struct aws_endpoints_resolved_endpoint;
@@ -165,7 +166,8 @@ AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_service_id(
  */
 AWS_SDKUTILS_API struct aws_endpoints_rule_engine *aws_endpoints_rule_engine_new(
     struct aws_allocator *allocator,
-    struct aws_endpoints_ruleset *ruleset);
+    struct aws_endpoints_ruleset *ruleset, 
+    struct aws_partitions_config *partitions_config);
 
 /*
  * Increment rule engine ref count.
