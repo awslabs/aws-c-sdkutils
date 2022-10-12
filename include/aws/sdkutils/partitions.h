@@ -13,7 +13,7 @@ struct aws_partitions_config;
 
 AWS_EXTERN_C_BEGIN
 
-struct aws_byte_cursor aws_partitions_get_supported_version(void);
+AWS_SDKUTILS_API struct aws_byte_cursor aws_partitions_get_supported_version(void);
 
 /*
  * Create new partitions config from a json string.

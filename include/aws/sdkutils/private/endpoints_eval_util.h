@@ -14,12 +14,23 @@ struct aws_byte_buf;
 struct aws_byte_cursor aws_byte_cursor_from_substring(const struct aws_string *src, size_t start, size_t end);
 
 /*
- * Replaced escaped chars within endpoints templated strings.
+ * Replace escaped chars within endpoints templated strings.
  * Basically replaces {{ with { and }} with }.
- * Note: this function does not care about existence of since { or } and will
+ * Note: this function does not care about existence of { or } and will
  * leave them as is.
  */
-AWS_SDKUTILS_API int aws_templated_string_strip_replace_escaped(
+AWS_SDKUTILS_API int aws_templated_string_replace_escaped(
+    struct aws_allocator *allocator,
+    struct aws_byte_cursor str,
+    struct aws_byte_buf *out_buf);
+
+/*
+ * Replace escaped chars within endpoints templated strings embedded into json.
+ * Basically replaces {{ with { and }} with }.
+ * Note: this function does not care about existence of { or } and will
+ * leave them as is.
+ */
+AWS_SDKUTILS_API int aws_json_templated_strings_replace_escaped(
     struct aws_allocator *allocator,
     struct aws_byte_cursor str,
     struct aws_byte_buf *out_buf);

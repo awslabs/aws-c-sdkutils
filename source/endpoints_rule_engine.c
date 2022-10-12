@@ -695,7 +695,13 @@ static int s_eval_fn_parse_url(
 
     /* Normalized path is just regular path that ensures that path starts and
     ends with slash */
-    if (path->ptr[0] != '/' || path->ptr[path->len - 1] != '/') {
+    if (path->len == 0) {
+        if (aws_json_value_add_to_object(root, aws_byte_cursor_from_c_str("normalizedPath"),
+                aws_json_value_new_string(allocator, aws_byte_cursor_from_c_str("/")))) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add path to object.");
+            goto on_error;
+        }
+    } else if (path->ptr[0] != '/' || path->ptr[path->len - 1] != '/') {
         struct aws_byte_buf buf;
         if (aws_byte_buf_init(&buf, allocator, path->len + 2)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed init buffer for normalized path.");
@@ -1060,7 +1066,8 @@ static int s_resolve_templated_string(
     struct aws_allocator *allocator,
     struct aws_string *string,
     struct eval_scope *scope,
-    struct aws_byte_buf *out_result_buf);
+    struct aws_byte_buf *out_result_buf, 
+    bool inside_json);
 
 static int s_eval_expr(
     struct aws_allocator *allocator,
@@ -1074,7 +1081,7 @@ static int s_eval_expr(
                 probably more efficient to separate templated vs not in parsing
                 and precompute all the splits */
             struct aws_byte_buf buf;
-            if (s_resolve_templated_string(allocator, expr->e.string, scope, &buf)) {
+            if (s_resolve_templated_string(allocator, expr->e.string, scope, &buf, false)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated string.");
                 goto on_error;
             }
@@ -1481,7 +1488,10 @@ static int s_resolve_templated_string(
     struct aws_allocator *allocator,
     struct aws_string *string,
     struct eval_scope *scope,
-    struct aws_byte_buf *out_result_buf) {
+    struct aws_byte_buf *out_result_buf, 
+    bool inside_json) {
+    /* TODO: this can be done better. needs refactor and more clean separation
+        on replacing inside json vs regular string */
 
     struct aws_byte_buf temp;
     if (aws_byte_buf_init(&temp, allocator, string->len)) {
@@ -1549,9 +1559,16 @@ static int s_resolve_templated_string(
         aws_byte_buf_append_dynamic(&temp, &remainder);
     }
 
-    if (aws_templated_string_strip_replace_escaped(allocator, aws_byte_cursor_from_buf(&temp), out_result_buf)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolved templated value.");
-        goto on_error;
+    if (inside_json) {
+        if (aws_json_templated_strings_replace_escaped(allocator, aws_byte_cursor_from_buf(&temp), out_result_buf)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolved templated value.");
+            goto on_error;
+        }
+    } else {
+        if (aws_templated_string_replace_escaped(allocator, aws_byte_cursor_from_buf(&temp), out_result_buf)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolved templated value.");
+            goto on_error;
+        }
     }
 
     aws_byte_buf_clean_up(&temp);
@@ -2056,7 +2073,7 @@ int aws_endpoints_rule_engine_resolve(
                                 engine->allocator,
                                 rule->rule_data.endpoint.url.template,
                                 &scope,
-                                &endpoint->r.endpoint.url)) {
+                                &endpoint->r.endpoint.url, false)) {
                             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated url.");
                             goto on_error;
                         }
@@ -2093,7 +2110,7 @@ int aws_endpoints_rule_engine_resolve(
                                                                engine->allocator,
                                                                rule->rule_data.endpoint.properties,
                                                                &scope,
-                                                               &endpoint->r.endpoint.properties)) {
+                                                               &endpoint->r.endpoint.properties, true)) {
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated properties.");
                     goto on_error;
                 }
@@ -2114,7 +2131,7 @@ int aws_endpoints_rule_engine_resolve(
                 switch (rule->rule_data.error.error_type) {
                     case AWS_ENDPOINTS_ERROR_TEMPLATE: {
                         if (s_resolve_templated_string(
-                                engine->allocator, rule->rule_data.error.error.template, &scope, &error->r.error)) {
+                                engine->allocator, rule->rule_data.error.error.template, &scope, &error->r.error, false)) {
                             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to resolve templated url.");
                             goto on_error;
                         }

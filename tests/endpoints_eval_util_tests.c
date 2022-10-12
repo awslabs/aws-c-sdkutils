@@ -110,31 +110,44 @@ static int s_test_template_replace(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     struct aws_byte_buf buf1;
-    ASSERT_SUCCESS(aws_templated_string_strip_replace_escaped(allocator, aws_byte_cursor_from_c_str("{{}}"), &buf1));
+    ASSERT_SUCCESS(aws_templated_string_replace_escaped(allocator, aws_byte_cursor_from_c_str("{{}}"), &buf1));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf1, "{}"));
     aws_byte_buf_clean_up(&buf1);
 
     struct aws_byte_buf buf2;
-    ASSERT_SUCCESS(aws_templated_string_strip_replace_escaped(allocator, aws_byte_cursor_from_c_str("{}"), &buf2));
+    ASSERT_SUCCESS(aws_templated_string_replace_escaped(allocator, aws_byte_cursor_from_c_str("{}"), &buf2));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf2, "{}"));
     aws_byte_buf_clean_up(&buf2);
 
     struct aws_byte_buf buf3;
     ASSERT_SUCCESS(
-        aws_templated_string_strip_replace_escaped(allocator, aws_byte_cursor_from_c_str("long { string }"), &buf3));
+        aws_templated_string_replace_escaped(allocator, aws_byte_cursor_from_c_str("long { string }"), &buf3));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf3, "long { string }"));
     aws_byte_buf_clean_up(&buf3);
 
     struct aws_byte_buf buf4;
-    ASSERT_SUCCESS(aws_templated_string_strip_replace_escaped(
+    ASSERT_SUCCESS(aws_templated_string_replace_escaped(
         allocator, aws_byte_cursor_from_c_str("another long {{ string }"), &buf4));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf4, "another long { string }"));
     aws_byte_buf_clean_up(&buf4);
 
     struct aws_byte_buf buf5;
-    ASSERT_SUCCESS(aws_templated_string_strip_replace_escaped(allocator, aws_byte_cursor_from_c_str(""), &buf5));
+    ASSERT_SUCCESS(aws_templated_string_replace_escaped(allocator, aws_byte_cursor_from_c_str(""), &buf5));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf5, ""));
     aws_byte_buf_clean_up(&buf5);
+
+    return AWS_OP_SUCCESS;
+}
+
+AWS_TEST_CASE(endpoints_json_template_replace, s_test_json_template_replace)
+static int s_test_json_template_replace(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    struct aws_byte_buf buf1;
+    ASSERT_SUCCESS(aws_json_templated_strings_replace_escaped(allocator,
+        aws_byte_cursor_from_c_str("{\"foo\":{\"bar\":\"{{}}\"}}"), &buf1));
+    ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf1, "{\"foo\":{\"bar\":\"{}\"}}"));
+    aws_byte_buf_clean_up(&buf1);
 
     return AWS_OP_SUCCESS;
 }

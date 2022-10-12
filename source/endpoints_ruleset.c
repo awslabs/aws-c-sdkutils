@@ -931,7 +931,7 @@ static int s_init_ruleset_from_json(
     }
 
 #ifdef ENDPOINTS_VERSION_CHECK /* TODO: samples are currently inconsistent with versions. skip check for now */
-    if (aws_byte_cursor_eq_c_str(&version_cur, &s_supported_version)) {
+    if (!aws_byte_cursor_eq_c_str(&version_cur, &s_supported_version)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unsupported ruleset version.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);
         goto error_clean_up;
