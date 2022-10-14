@@ -282,13 +282,7 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
             ASSERT_TRUE(expected_properties == NULL ? properties.len == 0 : properties.len > 0);
 
             if (expected_properties != NULL) {
-                struct aws_string *str = aws_string_new_from_json_value(allocator, expected_properties);
-                struct aws_byte_cursor cur = aws_byte_cursor_from_string(str);
-                AWS_LOGF_INFO(0, "Foo " PRInSTR, AWS_BYTE_CURSOR_PRI(cur));
-                AWS_LOGF_INFO(0, "Bar " PRInSTR, AWS_BYTE_CURSOR_PRI(properties));
-
                 ASSERT_TRUE(aws_json_value_compare(properties_json, expected_properties, false));
-                aws_string_destroy(str);
             }
 
             aws_json_value_destroy(properties_json);
