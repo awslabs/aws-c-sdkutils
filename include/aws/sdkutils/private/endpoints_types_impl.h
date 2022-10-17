@@ -13,14 +13,6 @@ struct aws_json_value;
 
 enum aws_endpoints_rule_type { AWS_ENDPOINTS_RULE_ENDPOINT, AWS_ENDPOINTS_RULE_ERROR, AWS_ENDPOINTS_RULE_TREE };
 
-enum aws_endpoints_url_type { AWS_ENDPOINTS_URL_TEMPLATE, AWS_ENDPOINTS_URL_REFERENCE, AWS_ENDPOINTS_URL_FUNCTION };
-
-enum aws_endpoints_error_type {
-    AWS_ENDPOINTS_ERROR_TEMPLATE,
-    AWS_ENDPOINTS_ERROR_REFERENCE,
-    AWS_ENDPOINTS_ERROR_FUNCTION
-};
-
 enum aws_endpoints_expr_type {
     AWS_ENDPOINTS_EXPR_STRING,
     AWS_ENDPOINTS_EXPR_NUMBER,
@@ -50,34 +42,35 @@ enum aws_endpoints_fn_type {
 struct aws_endpoints_parameter {
     struct aws_allocator *allocator;
 
-    struct aws_byte_cursor name_cur;
-    struct aws_string *name;
+    struct aws_byte_cursor name;
 
     enum aws_endpoints_parameter_value_type type;
-    struct aws_string *built_in;
+    struct aws_byte_cursor built_in;
 
     bool has_default_value;
     union {
-        struct aws_string *string;
+        struct aws_byte_cursor string;
         bool boolean;
     } default_value;
 
     bool is_required;
-    struct aws_string *documentation;
+    struct aws_byte_cursor documentation;
     bool is_deprecated;
-    struct aws_string *deprecated_message;
-    struct aws_string *deprecated_since;
+    struct aws_byte_cursor deprecated_message;
+    struct aws_byte_cursor deprecated_since;
 };
 
 struct aws_endpoints_ruleset {
     struct aws_allocator *allocator;
     struct aws_ref_count ref_count;
 
+    struct aws_json_value *json_root;
+
     /* list of (aws_endpoints_rule) */
     struct aws_array_list rules;
 
-    struct aws_string *version;
-    struct aws_string *service_id;
+    struct aws_byte_cursor version;
+    struct aws_byte_cursor service_id;
     /* map of (aws_byte_cursor *) -> (aws_endpoints_parameter *) */
     struct aws_hash_table parameters;
 };
@@ -91,41 +84,31 @@ struct aws_endpoints_function {
 struct aws_endpoints_expr {
     enum aws_endpoints_expr_type type;
     union {
-        struct aws_string *string;
+        struct aws_byte_cursor string;
         double number;
         bool boolean;
         struct aws_array_list array; /* List of (aws_endpoints_expr) */
-        struct aws_string *reference;
+        struct aws_byte_cursor reference;
         struct aws_endpoints_function function;
     } e;
 };
 
 struct aws_endpoints_rule_data_endpoint {
     struct aws_allocator *allocator;
-    enum aws_endpoints_url_type url_type;
-    union {
-        struct aws_string *template;
-        struct aws_string *reference;
-        struct aws_endpoints_function function;
-    } url;
+    struct aws_endpoints_expr url;
 
     /*
      * Note: this is a custom properties json associated with the result.
      * Properties are unstable and format can change frequently.
      * Its up to caller to parse json to retrieve properties.
      */
-    struct aws_string *properties;
+    struct aws_byte_buf properties;
     /* Map of (aws_string *) -> (aws_array_list * of aws_endpoints_expr) */
     struct aws_hash_table headers;
 };
 
 struct aws_endpoints_rule_data_error {
-    enum aws_endpoints_error_type error_type;
-    union {
-        struct aws_string *template;
-        struct aws_string *reference;
-        struct aws_endpoints_function function;
-    } error;
+    struct aws_endpoints_expr error;
 };
 
 struct aws_endpoints_rule_data_tree {
@@ -135,13 +118,13 @@ struct aws_endpoints_rule_data_tree {
 
 struct aws_endpoints_condition {
     struct aws_endpoints_function function;
-    struct aws_string *assign;
+    struct aws_byte_cursor assign;
 };
 
 struct aws_endpoints_rule {
     /* List of (aws_endpoints_condition) */
     struct aws_array_list conditions;
-    struct aws_string *documentation;
+    struct aws_byte_cursor documentation;
 
     enum aws_endpoints_rule_type type;
     union {
@@ -153,8 +136,7 @@ struct aws_endpoints_rule {
 
 struct aws_partition_info {
     struct aws_allocator *allocator;
-    struct aws_byte_cursor name_cur;
-    struct aws_string *name;
+    struct aws_byte_cursor name;
 
     bool is_copy;
     struct aws_string *info;
@@ -164,6 +146,8 @@ struct aws_partitions_config {
     struct aws_allocator *allocator;
     struct aws_ref_count ref_count;
 
+    struct aws_json_value *json_root;
+
     /* map of (byte_cur -> aws_partition_info) */
     struct aws_hash_table region_to_partition_info;
 
@@ -172,12 +156,12 @@ struct aws_partitions_config {
 
 struct aws_partition_info *aws_partition_info_new(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor name_cur);
+    struct aws_byte_cursor name);
 void aws_partition_info_destroy(struct aws_partition_info *partition_info);
 
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor name_cur);
+    struct aws_byte_cursor name);
 void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter);
 
 void aws_endpoints_rule_clean_up(struct aws_endpoints_rule *rule);

@@ -42,7 +42,7 @@ AWS_SDKUTILS_API enum aws_endpoints_parameter_value_type aws_endpoints_parameter
  * NULL return does not indicate error.
  * Owned by parameter. Can be NULL if no mapping exists.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_built_in(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_built_in(
     const struct aws_endpoints_parameter *parameter);
 
 /*
@@ -53,7 +53,7 @@ AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_built_in(
  */
 AWS_SDKUTILS_API int aws_endpoints_parameter_get_default_string(
     const struct aws_endpoints_parameter *parameter,
-    const struct aws_string **out_string);
+    struct aws_byte_cursor *out_cursor);
 
 /*
  * Default boolean value.
@@ -74,7 +74,7 @@ AWS_SDKUTILS_API bool aws_endpoints_parameter_get_is_required(const struct aws_e
  * Parameter documentation.
  * Owned by parameter. Will not be NULL as doc is required.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_documentation(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_documentation(
     const struct aws_endpoints_parameter *parameter);
 
 /*
@@ -87,7 +87,7 @@ AWS_SDKUTILS_API bool aws_endpoints_parameters_get_is_deprecated(const struct aw
  * NULL return does not indicate error.
  * Owned by parameter.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_deprecated_message(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_message(
     const struct aws_endpoints_parameter *parameter);
 
 /*
@@ -95,7 +95,7 @@ AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_deprecated
  * NULL return does not indicate error.
  * Owned by parameter.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_deprecated_since(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_since(
     const struct aws_endpoints_parameter *parameter);
 
 /*
@@ -143,7 +143,7 @@ AWS_SDKUTILS_API const struct aws_hash_table *aws_endpoints_ruleset_get_paramete
  * Returned pointer is owned by ruleset.
  * Will not return NULL as version is a required field for ruleset.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_version(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_ruleset_get_version(
     const struct aws_endpoints_ruleset *ruleset);
 
 /*
@@ -151,7 +151,7 @@ AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_version(
  * Returned pointer is owned by ruleset.
  * Can be NULL if not specified in ruleset.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_service_id(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_ruleset_get_service_id(
     const struct aws_endpoints_ruleset *ruleset);
 
 /*

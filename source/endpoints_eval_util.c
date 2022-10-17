@@ -5,6 +5,7 @@
 
 #include <aws/common/logging.h>
 #include <aws/common/string.h>
+#include <aws/common/json.h>
 #include <aws/sdkutils/private/endpoints_eval_util.h>
 #include <aws/sdkutils/sdkutils.h>
 
@@ -348,4 +349,72 @@ AWS_SDKUTILS_API int aws_json_templated_strings_replace_escaped(
 on_error:
     aws_byte_buf_clean_up(out_buf);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+}
+
+struct aws_byte_cursor s_path_slash = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("/");
+
+int aws_uri_normalize_path(struct aws_allocator *allocator, 
+                            struct aws_byte_cursor path,
+                            struct aws_byte_buf *out_normalized_path) {
+    /* Normalized path is just regular path that ensures that path starts and ends with slash */
+
+    if (aws_byte_buf_init(out_normalized_path, allocator, path.len + 2)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed init buffer for parseUrl return.");
+        goto on_error;
+    }
+
+    if (path.len == 0) {
+        if (aws_byte_buf_append(out_normalized_path, &s_path_slash)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add path to object.");
+            goto on_error;
+        }
+        return AWS_OP_SUCCESS;
+    }
+
+    if (path.ptr[0] != '/') {
+        if (aws_byte_buf_append_dynamic(out_normalized_path, &s_path_slash)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to append slash to normalized path.");
+            goto on_error;
+        }
+    }
+
+    if (aws_byte_buf_append_dynamic(out_normalized_path, &path)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to append path to normalized path.");
+        goto on_error;
+    }
+
+    if (out_normalized_path->buffer[out_normalized_path->len - 1] != '/') {
+        if (aws_byte_buf_append_dynamic(out_normalized_path, &s_path_slash)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to append slash to normalized path.");
+            goto on_error;
+        }
+    }
+
+    return AWS_OP_SUCCESS;
+
+on_error:
+    aws_byte_buf_clean_up(out_normalized_path);
+    return AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED;
+}
+
+struct aws_string *aws_string_from_json(struct aws_allocator *allocator, struct aws_json_value *value) {
+    struct aws_byte_buf json_blob;
+    if (aws_byte_buf_init(&json_blob, allocator, 0)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to init buffer for json conversion.");
+        goto on_error;
+    }
+
+    if (aws_byte_buf_append_json_string(value, &json_blob)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to convert json to string.");
+        goto on_error;
+    }
+
+    struct aws_string *ret = aws_string_new_from_buf(allocator, &json_blob);
+    aws_byte_buf_clean_up(&json_blob);
+    return ret;
+
+on_error:
+    aws_byte_buf_clean_up(&json_blob);
+    aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+    return NULL;
 }

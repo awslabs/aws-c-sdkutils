@@ -10,6 +10,7 @@
 
 struct aws_string;
 struct aws_byte_buf;
+struct aws_json_value;
 
 struct aws_byte_cursor aws_byte_cursor_from_substring(const struct aws_string *src, size_t start, size_t end);
 
@@ -57,5 +58,11 @@ AWS_SDKUTILS_API bool aws_is_valid_host_label(struct aws_byte_cursor label, bool
  * partitions file.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region);
+
+AWS_SDKUTILS_API int aws_uri_normalize_path(struct aws_allocator *allocator, 
+                                            struct aws_byte_cursor path,
+                                            struct aws_byte_buf *out_normalized_path);
+
+AWS_SDKUTILS_API struct aws_string *aws_string_from_json(struct aws_allocator *allocator, struct aws_json_value *value);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_EVAL_UTIL_H */

@@ -46,6 +46,8 @@ AWS_TEST_CASE(parse_ruleset_from_string, s_test_parse_ruleset_from_string)
 static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
+    allocator = aws_default_allocator();
+
     aws_sdkutils_library_init(allocator);
 
     struct aws_byte_buf buf;
@@ -73,9 +75,9 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     aws_hash_table_find(parameters, &param_name_cur, &element);
     ASSERT_NOT_NULL(element);
 
-    const struct aws_string *built_in =
+    struct aws_byte_cursor built_in =
         aws_endpoints_parameter_get_built_in((struct aws_endpoints_parameter *)element->value);
-    ASSERT_TRUE(aws_string_eq_c_str(built_in, "AWS::Region"));
+    ASSERT_TRUE(aws_byte_cursor_eq_c_str(&built_in, "AWS::Region"));
 
     struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset, partitions);
 
@@ -305,6 +307,7 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
             ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_error(resolved_endpoint, &error));
             struct aws_byte_cursor expected_error;
             ASSERT_SUCCESS(aws_json_value_get_string(error_node, &expected_error));
+
             ASSERT_TRUE(aws_byte_cursor_eq(&error, &expected_error));
         }
 

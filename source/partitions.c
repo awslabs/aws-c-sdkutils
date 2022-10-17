@@ -25,6 +25,8 @@ static void s_partitions_config_destroy(void *data) {
 
     struct aws_partitions_config *partitions = data;
 
+    aws_json_value_destroy(partitions->json_root);
+
     aws_string_destroy(partitions->version);
 
     aws_hash_table_clean_up(&partitions->region_to_partition_info);
@@ -42,6 +44,7 @@ static int s_on_region_merge(
     const struct aws_json_value *value,
     bool *out_should_continue,
     void *user_data) {
+    (void)out_should_continue;
     
     struct region_merge_wrapper *merge = user_data;
 
@@ -73,6 +76,7 @@ static int s_on_region_element(
     const struct aws_json_value *value,
     bool *out_should_continue,
     void *user_data) {
+    (void)out_should_continue;
     
     struct aws_partition_info *partition_info = NULL;
     struct partition_parse_wrapper *wrapper = user_data;
@@ -98,7 +102,7 @@ static int s_on_region_element(
     }
 
     if (aws_hash_table_put(&wrapper->partitions->region_to_partition_info,
-        &partition_info->name_cur, partition_info, NULL)) {
+        &partition_info->name, partition_info, NULL)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to add partition info.");
         goto on_error;
     }
@@ -118,6 +122,7 @@ static int s_on_partition_element(
     bool *out_should_continue,
     void *user_data) {
     (void)out_should_continue;
+    (void)idx;
 
     struct aws_partitions_config *partitions = user_data;
 
@@ -143,7 +148,7 @@ static int s_on_partition_element(
         goto on_error;
     }
 
-    if (aws_hash_table_put(&partitions->region_to_partition_info, &partition_info->name_cur, partition_info, NULL)) {
+    if (aws_hash_table_put(&partitions->region_to_partition_info, &partition_info->name, partition_info, NULL)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to add partition info.");
         goto on_error;
     }
@@ -178,6 +183,8 @@ static int s_init_partitions_config_from_json(
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
     }
 
+    partitions->json_root = root;
+
     struct aws_byte_cursor version_cur;
     struct aws_json_value *version_node = aws_json_value_get_from_object(root, aws_byte_cursor_from_c_str("version"));
     if (version_node == NULL || aws_json_value_get_string(version_node, &version_cur)) {
@@ -201,11 +208,9 @@ static int s_init_partitions_config_from_json(
         goto on_error;
     }
 
-    aws_json_value_destroy(root);
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_json_value_destroy(root);
     return AWS_OP_ERR;
 }
 

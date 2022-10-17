@@ -90,6 +90,7 @@ add_test_case(endpoints_eval_util_is_ipv6)
 add_test_case(endpoints_map_region_to_partition)
 add_test_case(endpoints_template_replace)
 add_test_case(endpoints_json_template_replace)
+add_test_case(endpoints_uri_normalize_path)
 
 set(TEST_BINARY_NAME ${PROJECT_NAME}-tests)
 generate_test_driver(${TEST_BINARY_NAME})
