@@ -149,7 +149,7 @@ void aws_endpoints_rule_data_tree_clean_up(struct aws_endpoints_rule_data_tree *
 void aws_endpoints_condition_clean_up(struct aws_endpoints_condition *condition) {
     AWS_PRECONDITION(condition);
 
-    aws_endpoints_function_clean_up(&condition->function);
+    aws_endpoints_expr_clean_up(&condition->expr);
     AWS_ZERO_STRUCT(*condition);
 }
 

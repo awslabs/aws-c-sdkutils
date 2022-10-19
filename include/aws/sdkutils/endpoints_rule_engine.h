@@ -7,7 +7,6 @@
 #define AWS_SDKUTILS_ENDPOINTS_RULESET_H
 
 #include <aws/common/byte_buf.h>
-#include <aws/common/hash_table.h>
 #include <aws/sdkutils/sdkutils.h>
 
 struct aws_endpoints_ruleset;

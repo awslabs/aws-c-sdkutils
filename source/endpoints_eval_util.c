@@ -11,7 +11,8 @@
 
 #include <inttypes.h>
 
-#ifdef _MSC_VER
+/* Disable sscanf warnings on windows. */ 
+#ifdef _MSC_VER 
 #    pragma warning(disable : 4204)
 #    pragma warning(disable : 4706)
 #    pragma warning(disable : 4996)
@@ -23,13 +24,6 @@
 
 /* arbitrary max length of a region. curent longest region name is 16 chars */
 #define AWS_REGION_LEN 50
-
-struct aws_byte_cursor aws_byte_cursor_from_substring(const struct aws_string *src, size_t start, size_t end) {
-    AWS_PRECONDITION(aws_string_is_valid(src));
-    AWS_PRECONDITION(start < end && end <= src->len);
-
-    return aws_byte_cursor_from_array(aws_string_bytes(src) + start, end - start);
-}
 
 bool aws_is_ipv4(struct aws_byte_cursor host) {
     if (host.len > AWS_IPV4_STR_LEN - 1) {
@@ -164,11 +158,15 @@ struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region
     uint8_t num = 0;
 
     if (3 == sscanf(copy, "%2[^-]-%30[^-]-%03" SCNu8, country, location, &num)) {
-        for (size_t i = 0; i < sizeof(s_known_countries) / sizeof(s_known_countries[0]); ++i) {
-            if (0 == strncmp(s_known_countries[i], country, 3)) {
-                if (location[0] != 0 && num > 0) {
+        if (location[0] != 0 && num > 0) {
+            for (size_t i = 0; i < sizeof(s_known_countries) / sizeof(s_known_countries[0]); ++i) {
+                if (0 == strncmp(s_known_countries[i], country, 3)) {
                     return aws_byte_cursor_from_c_str("aws");
                 }
+            }
+
+            if (0 == strncmp("cn", country, 3)) {
+                return aws_byte_cursor_from_c_str("aws-cn");
             }
         }
     }
@@ -176,12 +174,6 @@ struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region
     if (2 == sscanf(copy, "us-gov-%30[^-]-%03" SCNu8, location, &num)) {
         if (location[0] != 0 && num > 0) {
             return aws_byte_cursor_from_c_str("aws-us-gov");
-        }
-    }
-
-    if (2 == sscanf(copy, "cn-%30[^-]-%03" SCNu8, location, &num)) {
-        if (location[0] != 0 && num > 0) {
-            return aws_byte_cursor_from_c_str("aws-cn");
         }
     }
 
@@ -201,49 +193,39 @@ struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region
 }
 
 bool aws_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains) {
-    bool next_is_alnum = true;
+    bool next_must_be_alnum = true;
     size_t subdomain_count = 0;
-    bool is_valid_host_label = true;
 
     for (size_t i = 0; i < label.len; ++i) {
-        if (subdomain_count > 63) {
-            is_valid_host_label = false;
-            break;
-        }
-
         if (label.ptr[i] == '.') {
             if (!allow_subdomains || subdomain_count == 0) {
-                is_valid_host_label = false;
-                break;
+                return false;
             }
 
             if (!aws_isalnum(label.ptr[i - 1])) {
-                is_valid_host_label = false;
-                break;
+                return false;
             }
 
-            next_is_alnum = true;
+            next_must_be_alnum = true;
             subdomain_count = 0;
             continue;
         }
 
-        if (next_is_alnum) {
-            if (!aws_isalnum(label.ptr[i])) {
-                is_valid_host_label = false;
-                break;
-            }
-        } else {
-            if (label.ptr[i] != '-' && !aws_isalnum(label.ptr[i])) {
-                is_valid_host_label = false;
-                break;
-            }
+        if (next_must_be_alnum && !aws_isalnum(label.ptr[i])) {
+            return false;
+        } else if (label.ptr[i] != '-' && !aws_isalnum(label.ptr[i])) {
+            return false;
         }
 
-        next_is_alnum = false;
+        next_must_be_alnum = false;
         ++subdomain_count;
+
+        if (subdomain_count > 63) {
+            return false;
+        }
     }
 
-    return is_valid_host_label && (subdomain_count > 0 && subdomain_count <= 63) &&
+    return  (subdomain_count > 0 && subdomain_count <= 63) &&
            aws_isalnum(label.ptr[label.len - 1]);
 }
 
@@ -290,7 +272,7 @@ AWS_SDKUTILS_API int aws_templated_string_replace_escaped(
 
     if (aws_byte_buf_init(out_buf, allocator, str.len)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to init buffer during replacing escaped chars");
-        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+        goto on_error;
     }
 
     if (s_replace_escaped(allocator, str, out_buf)) {

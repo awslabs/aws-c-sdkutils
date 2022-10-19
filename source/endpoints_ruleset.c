@@ -527,7 +527,8 @@ static int s_on_condition_element(
     struct aws_endpoints_condition condition;
     AWS_ZERO_STRUCT(condition);
 
-    if (s_parse_function(wrapper->allocator, condition_node, &condition.function)) {
+    condition.expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
+    if (s_parse_function(wrapper->allocator, condition_node, &condition.expr.e.function)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse function.");
         goto on_error;
     }

@@ -7,9 +7,40 @@
 #define AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H
 
 #include <aws/common/ref_count.h>
+#include <aws/common/hash_table.h>
 #include <aws/sdkutils/endpoints_rule_engine.h>
 
 struct aws_json_value;
+
+/*
+* Rule engine is built around 2 major types:
+* - expr - can be a literal, like bool or number or expression like function or ref
+* - value - literal types only. result of resolving expr. Can have special None
+*   value depending on how expr is resolved. Ex. accessing array past bounds or
+*   substrings with invalid start/end combination will both result in null.
+*
+* There is a lot of overlap between expr and value, so why do we need both?
+* Primary reason is to create a clean boundary between ruleset and resolved
+* values as it allows to distinguish easily between things that need to be
+* resolved and things that have been lowered. Given this type system, rule
+* engine basically performs a task of transforming exprs into values to get
+* final result.
+*
+* Other important types:
+* Parameter - definition of values that can be provided to rule engine during
+* resolution. Can define default values if caller didn't provide a value for
+* parameter.
+* Request Context - set of parameter value defined for a particular request that
+* are used during resolution
+* Scope - set of values defined during resolution of a rule. Can grow/shrink as
+* rules are evaluated. Ex. scope can have value with name "Region" and value "us-west-2".
+*/
+
+/*
+******************************
+* Parse types.
+******************************
+*/
 
 enum aws_endpoints_rule_type { AWS_ENDPOINTS_RULE_ENDPOINT, AWS_ENDPOINTS_RULE_ERROR, AWS_ENDPOINTS_RULE_TREE };
 
@@ -117,7 +148,7 @@ struct aws_endpoints_rule_data_tree {
 };
 
 struct aws_endpoints_condition {
-    struct aws_endpoints_function function;
+    struct aws_endpoints_expr expr;
     struct aws_byte_cursor assign;
 };
 
@@ -152,6 +183,73 @@ struct aws_partitions_config {
     struct aws_hash_table region_to_partition_info;
 
     struct aws_string *version;
+};
+
+/*
+******************************
+* Eval types.
+******************************
+*/
+
+enum eval_value_type {
+    /* Special value to represent that any value type is expected from resolving an expresion.
+        Note a valid value for a value type. */
+    AWS_ENDPOINTS_EVAL_VALUE_ANY,
+
+    AWS_ENDPOINTS_EVAL_VALUE_NONE,
+    AWS_ENDPOINTS_EVAL_VALUE_STRING,
+    AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN,
+    AWS_ENDPOINTS_EVAL_VALUE_OBJECT, /* Generic type returned by some functions. Represented as json string under the covers. */
+    AWS_ENDPOINTS_EVAL_VALUE_NUMBER,
+    AWS_ENDPOINTS_EVAL_VALUE_ARRAY
+};
+
+struct aws_endpoints_request_context {
+    struct aws_allocator *allocator;
+    struct aws_ref_count ref_count;
+
+    struct aws_hash_table values;
+};
+
+struct owning_cursor {
+    struct aws_byte_cursor cur;
+    struct aws_string *string;
+};
+
+/* concrete type value */
+struct eval_value {
+    enum eval_value_type type;
+    union {
+        struct owning_cursor string;
+        bool boolean;
+        struct owning_cursor object;
+        double number;
+        struct aws_array_list array;
+    } v;
+};
+
+/* wrapper around eval_value to store it more easily in hash table*/
+struct scope_value {
+    struct aws_allocator *allocator;
+
+    struct aws_byte_cursor name_cur;
+    struct aws_string *name;
+
+    struct eval_value value;
+};
+
+struct eval_scope {
+    /* current values in scope. byte_cur -> scope_value */
+    struct aws_hash_table values;
+    /* list of value keys added since last cleanup */
+    struct aws_array_list added_keys;
+
+    /* index of the rule currently being evaluated */
+    size_t rule_idx;
+    /* pointer to rules array */
+    const struct aws_array_list *rules;
+
+    const struct aws_partitions_config *partitions;
 };
 
 struct aws_partition_info *aws_partition_info_new(

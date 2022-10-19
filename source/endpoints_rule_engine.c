@@ -17,72 +17,55 @@
 /* TODO: checking for unknown enum values is annoying and is brittle. compile
 time assert on enum size or members would make it a lot simpler. */
 
-static struct aws_byte_cursor s_scheme_http = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("http");
-static struct aws_byte_cursor s_scheme_https = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("https");
-
-enum eval_value_type {
-    AWS_ENDPOINTS_EVAL_VALUE_ANY,
-    AWS_ENDPOINTS_EVAL_VALUE_NONE,
-    AWS_ENDPOINTS_EVAL_VALUE_STRING,
-    AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN,
-    AWS_ENDPOINTS_EVAL_VALUE_OBJECT,
-    AWS_ENDPOINTS_EVAL_VALUE_NUMBER,
-    AWS_ENDPOINTS_EVAL_VALUE_ARRAY
-};
-
-struct aws_endpoints_request_context {
-    struct aws_allocator *allocator;
-    struct aws_ref_count ref_count;
-
-    struct aws_hash_table values;
-};
+/* TODO: code uses terms resolve and eval interchangeably. Pick one. */
 
 /*
-******************************
-* Eval logic.
-******************************
+* How rule resolution works. 
+* Note: read comments in endpoint_types_impl.h first to understand type system.
+* 
+* Initial scope is created from parameters defined in request context and
+* default values defined in ruleset (s_init_top_level_scope). Validation that
+* all required parameters have values is done at this point as well. 
+* 
+* Rules are then evaluated sequentially against scope.
+* First list of conditions associated with the rule is evaluated
+* (s_eval_conditions). Final result of conditions evaluation is an AND of
+* truthiness of resolved values (as defined in is_value_truthy) for each
+* condition. If resolution is true then rule is selected.
+* - For endpoint and error rules that means terminal state is reached and rule
+*   data is returned
+* - For tree rule, the engine starts resolving rules associated with tree rule.
+*   Note: tree rules are terminal and once engine jumps into tree rule
+*   resolution there is no way to jump back out.
+*  
+* Conditions can add values to scope. Those values are valid for the duration of
+* rule resolution. Note: for tree rules, any values added in tree conditions are
+* valid for all rules within the tree.
+* Scope can be though of as a 'leveled' structure. Top level or 0 level
+* represents all values from context and defaults. Levels 1 and up represent
+* values added by rules. Ex. if we start at level 0, all values added by rule
+* can be though of as level 1.  
+* Since tree rule cannot be exited from, engine is simplified by making all
+* values in scope top level whenever tree is jumped into. So in practice eval
+* goes back between top level and first level as evaluating rules. If that
+* changes in future, scope can add explicit level number and cleanup only values
+* at that level when going to next rule. 
+*
+* Overall flow is as follows:
+* - Start with any values provided in context as scope
+* - Add any default values provided in ruleset and validate all required
+*   params are specified.
+* - Iterate through rules and resolve each rule:
+* -- eval conditions with side effects
+* -- if conditions are truthy return rule result
+* -- if conditions are truthy and rule is tree, jump down a level and
+*   restart eval with tree rules
+* -- if conditions are falsy, rollback level and go to next rule
+* - if no rules match, eval fails with exhausted error.
 */
 
-struct owning_cursor {
-    struct aws_byte_cursor cur;
-    struct aws_string *string;
-};
-
-/* concrete type value */
-struct eval_value {
-    enum eval_value_type type;
-    union {
-        struct owning_cursor string;
-        bool boolean;
-        struct owning_cursor object;
-        double number;
-        struct aws_array_list array;
-    } v;
-};
-
-/* wrapper around eval_value to store it more easily in hash table*/
-struct scope_value {
-    struct aws_allocator *allocator;
-
-    struct aws_byte_cursor name_cur;
-    struct aws_string *name;
-
-    struct eval_value value;
-};
-
-struct eval_scope {
-    /* current values in scope. byte_cur -> scope_value */
-    struct aws_hash_table values;
-    /* list of value keys added since last cleanup */
-    struct aws_array_list added_keys;
-
-    /* index of the rule currently being evaluated */
-    size_t rule_idx;
-    /* pointer to rules array */
-    const struct aws_array_list *rules;
-
-    const struct aws_partitions_config *partitions;
-};
+static struct aws_byte_cursor s_scheme_http = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("http");
+static struct aws_byte_cursor s_scheme_https = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("https");
 
 static struct owning_cursor s_owning_cursor_create(struct aws_string *str) {
     struct owning_cursor ret = { .string = str, .cur = aws_byte_cursor_from_string(str) };
@@ -269,19 +252,22 @@ static int s_init_top_level_scope(
             val = s_scope_value_new(allocator, key);
             AWS_ASSERT(val);
 
-            if (value->type == AWS_ENDPOINTS_PARAMETER_STRING) {
-                val->value.type = AWS_ENDPOINTS_EVAL_VALUE_STRING;
-                val->value.v.string = s_non_owning_cursor_create(value->default_value.string);
-            } else if (value->type == AWS_ENDPOINTS_PARAMETER_BOOLEAN) {
-                val->value.type = AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN;
-                val->value.v.boolean = value->default_value.boolean;
-            } else {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unexpected parameter type.");
-                goto on_error;
+            switch (value->type) {
+                case AWS_ENDPOINTS_PARAMETER_STRING:
+                    val->value.type = AWS_ENDPOINTS_EVAL_VALUE_STRING;
+                    val->value.v.string = s_non_owning_cursor_create(value->default_value.string);
+                    break;
+                case AWS_ENDPOINTS_PARAMETER_BOOLEAN:
+                    val->value.type = AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN;
+                    val->value.v.boolean = value->default_value.boolean;
+                    break;
+                default:
+                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unexpected parameter type.");
+                    goto on_error;
             }
 
             if (aws_hash_table_put(&scope->values, &val->name_cur, val, NULL)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Unexpected parameter type.");
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add value to top level scope.");
                 goto on_error;
             }
         }
@@ -1061,14 +1047,8 @@ static int s_eval_conditions(
             goto on_error;
         }
 
-        /* TODO: can safe construction here by parsing it as expr to begin with */
-        struct aws_endpoints_expr expr = {
-            .type = AWS_ENDPOINTS_EXPR_FUNCTION,
-            .e.function = condition->function,
-        };
-
         struct eval_value val;
-        if (s_eval_expr(allocator, &expr, scope, &val)) {
+        if (s_eval_expr(allocator, &condition->expr, scope, &val)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to evaluate expr.");
             goto on_error;
         }
@@ -1094,8 +1074,15 @@ static int s_eval_conditions(
                 goto on_error;
             }
 
-            if (aws_hash_table_put(&scope->values, &scope_value->name_cur, scope_value, NULL)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to update key at given scope.");
+            int was_created = 1;
+            if (aws_hash_table_put(&scope->values, &scope_value->name_cur, scope_value, &was_created)) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to set assigned variable.");
+                goto on_error;
+            }
+
+            /* Shadowing existing values is prohibited in sep. */
+            if (!was_created) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Assigned variable shadows existing one.");
                 goto on_error;
             }
         }
@@ -1851,30 +1838,6 @@ int aws_endpoints_rule_engine_resolve(
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EMPTY_RULESET);
     }
 
-    /*
-     * High level approach for eval dispatch.
-     * Rules are evaluated sequentially against scope.
-     * Rules can add values to the scope, that are valid for the duration of the
-     * rule.
-     * Scope is hence 'leveled' with each rule eval creating a new level and
-     * adding all values at that level, with level being rolled back once rule
-     * eval finishes.
-     * Since tree rule cannot be exited from, impl is simplified and tree forces
-     * all values into top level. So in practice eval goes back between top and
-     * first levels as evaluating rules. If that changes in future, scope can add
-     * explicit level number and cleanup only values at that level.
-     * flow is as follows:
-     * - Start with any values provided in context as scope
-     * - Add any default values provided in ruleset and validate all required
-     *   params are specified.
-     * - Iterate through rules and eval. for each rule:
-     * -- eval conditions with side effects
-     * -- if conditions are truthy return rule result
-     * -- if conditions are truthy and rule is tree, jump down a level and
-     *   restart eval with tree rules
-     * -- if conditions are falsy, rollback level and go to next rule
-     * - if no rules match, eval fails with exhausted error.
-     */
     struct eval_scope scope;
     if (s_init_top_level_scope(engine->allocator, context, engine->ruleset, engine->partitions_config, &scope)) {
         goto on_error;

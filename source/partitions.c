@@ -239,17 +239,21 @@ struct aws_partitions_config *aws_partitions_config_new_from_string(
         s_callback_partition_info_destroy)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to init partition info map.");
         aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
-        return NULL;
+        goto on_error;
     }
 
     if (s_init_partitions_config_from_json(allocator, partitions, partitions_cur)) {
-        s_partitions_config_destroy(partitions);
-        return NULL;
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to init partition info from json.");
+        goto on_error;
     }
 
     aws_ref_count_init(&partitions->ref_count, partitions, s_partitions_config_destroy);
 
     return partitions;
+
+on_error:
+    s_partitions_config_destroy(partitions);
+    return NULL;
 }
 
 struct aws_partitions_config *aws_partitions_config_acquire(struct aws_partitions_config *partitions) {

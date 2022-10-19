@@ -12,8 +12,6 @@ struct aws_string;
 struct aws_byte_buf;
 struct aws_json_value;
 
-struct aws_byte_cursor aws_byte_cursor_from_substring(const struct aws_string *src, size_t start, size_t end);
-
 /*
  * Replace escaped chars within endpoints templated strings.
  * Basically replaces {{ with { and }} with }.
