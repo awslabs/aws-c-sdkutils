@@ -28,24 +28,6 @@ struct aws_byte_cursor aws_endpoints_get_supported_ruleset_version(void) {
     return s_supported_version;
 }
 
-static uint64_t s_fn_name_hash[AWS_ENDPOINTS_FN_LAST];
-
-void aws_endpoints_rule_engine_init() {
-    s_fn_name_hash[AWS_ENDPOINTS_FN_IS_SET] = aws_hash_c_string("isSet");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_NOT] = aws_hash_c_string("not");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_GET_ATTR] = aws_hash_c_string("getAttr");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_SUBSTRING] = aws_hash_c_string("substring");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_STRING_EQUALS] = aws_hash_c_string("stringEquals");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_BOOLEAN_EQUALS] = aws_hash_c_string("booleanEquals");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_URI_ENCODE] = aws_hash_c_string("uriEncode");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_PARSE_URL] = aws_hash_c_string("parseURL");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_IS_VALID_HOST_LABEL] = aws_hash_c_string("isValidHostLabel");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_AWS_PARTITION] = aws_hash_c_string("aws.partition");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_AWS_PARSE_ARN] = aws_hash_c_string("aws.parseArn");
-    s_fn_name_hash[AWS_ENDPOINTS_FN_AWS_IS_VIRTUAL_HOSTABLE_S3_BUCKET] =
-        aws_hash_c_string("aws.isVirtualHostableS3Bucket");
-}
-
 /*
 ******************************
 * Parameter Getters.
@@ -357,7 +339,7 @@ static int s_parse_function(
     function->fn = AWS_ENDPOINTS_FN_LAST;
     uint64_t hash = aws_hash_byte_cursor_ptr(&fn_cur);
     for (size_t idx = AWS_ENDPOINTS_FN_FIRST; idx < AWS_ENDPOINTS_FN_LAST; ++idx) {
-        if (s_fn_name_hash[idx] == hash) {
+        if (aws_endpoints_fn_name_hash[idx] == hash) {
             function->fn = idx;
             break;
         }

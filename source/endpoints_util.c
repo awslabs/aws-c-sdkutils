@@ -216,7 +216,7 @@ bool aws_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains
         }
     }
 
-    return (subdomain_count > 0 && subdomain_count <= 63) && aws_isalnum(label.ptr[label.len - 1]);
+    return aws_isalnum(label.ptr[label.len - 1]);
 }
 
 struct aws_byte_cursor s_path_slash = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("/");
@@ -306,6 +306,7 @@ void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callba
     aws_array_list_clean_up(array);
 }
 
+/* TODO: this can be moved into common */
 static bool s_split_on_first_delim(
     struct aws_byte_cursor input,
     char split_on,

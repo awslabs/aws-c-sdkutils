@@ -273,10 +273,40 @@ void aws_endpoints_condition_clean_up(struct aws_endpoints_condition *condition)
 void aws_endpoints_function_clean_up(struct aws_endpoints_function *function);
 void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr);
 
-/*
- * Helper to init rule engine.
- * TODO: move to a better place
- */
+struct owning_cursor aws_endpoints_owning_cursor_create(struct aws_string *str);
+struct owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur);
+
+void aws_endpoints_eval_value_clean_up(struct eval_value *eval_value);
+
+/* Helper to resolve argv. Implemented in rule engine. */
+int aws_endpoints_argv_expect(
+    struct aws_allocator *allocator,
+    struct eval_scope *scope,
+    struct aws_array_list *argv,
+    size_t idx,
+    enum eval_value_type expected_type,
+    struct eval_value *out_value);
+
+extern uint64_t aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_LAST];
 void aws_endpoints_rule_engine_init(void);
+
+int aws_endpoints_dispatch_standard_lib_fn_resolve(enum aws_endpoints_fn_type type,
+            struct aws_allocator *allocator,
+            struct aws_array_list *argv,
+            struct eval_scope *scope,
+            struct eval_value *out_value);
+
+int aws_endpoints_path_through_array(
+    struct aws_allocator *allocator,
+    struct eval_scope *scope,
+    struct eval_value *eval_val,
+    struct aws_byte_cursor path_cur,
+    struct eval_value *out_value);
+
+int aws_endpoints_path_through_object(
+    struct aws_allocator *allocator,
+    struct eval_value *eval_val,
+    struct aws_byte_cursor path_cur,
+    struct eval_value *out_value);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H */
