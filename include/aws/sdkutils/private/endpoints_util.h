@@ -13,28 +13,6 @@ struct aws_byte_buf;
 struct aws_json_value;
 
 /*
- * Replace escaped chars within endpoints templated strings.
- * Basically replaces {{ with { and }} with }.
- * Note: this function does not care about existence of { or } and will
- * leave them as is.
- */
-AWS_SDKUTILS_API int aws_templated_string_replace_escaped(
-    struct aws_allocator *allocator,
-    struct aws_byte_cursor str,
-    struct aws_byte_buf *out_buf);
-
-/*
- * Replace escaped chars within endpoints templated strings embedded into json.
- * Basically replaces {{ with { and }} with }.
- * Note: this function does not care about existence of { or } and will
- * leave them as is.
- */
-AWS_SDKUTILS_API int aws_json_templated_strings_replace_escaped(
-    struct aws_allocator *allocator,
-    struct aws_byte_cursor str,
-    struct aws_byte_buf *out_buf);
-
-/*
  * Determine whether host cursor is IPv4 string.
  */
 AWS_SDKUTILS_API bool aws_is_ipv4(struct aws_byte_cursor host);
