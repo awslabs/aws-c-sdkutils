@@ -290,11 +290,12 @@ int aws_endpoints_argv_expect(
 extern uint64_t aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_LAST];
 void aws_endpoints_rule_engine_init(void);
 
-int aws_endpoints_dispatch_standard_lib_fn_resolve(enum aws_endpoints_fn_type type,
-            struct aws_allocator *allocator,
-            struct aws_array_list *argv,
-            struct eval_scope *scope,
-            struct eval_value *out_value);
+int aws_endpoints_dispatch_standard_lib_fn_resolve(
+    enum aws_endpoints_fn_type type,
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value);
 
 int aws_endpoints_path_through_array(
     struct aws_allocator *allocator,

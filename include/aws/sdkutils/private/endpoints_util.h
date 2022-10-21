@@ -67,22 +67,21 @@ AWS_SDKUTILS_API int aws_byte_buf_init_from_resolved_templated_string(
     bool is_json);
 
 /*
-* Path through json structure and return final json node in out_value.
-* In cases of error, error is returned and out_value is set to NULL.
-* Array access out of bounds returns success, but set out_value to NULL (to be
-* consistent with spec).
-*
-* Path is defined as a string of '.' delimited fields names, that can optionally
-* end with [] to indicate indexing.
-* Note: only last element can be indexed.
-* ex. path "a.b.c[5]" results in going through a, b and then c and finally
-* taking index of 5.
-*/
+ * Path through json structure and return final json node in out_value.
+ * In cases of error, error is returned and out_value is set to NULL.
+ * Array access out of bounds returns success, but set out_value to NULL (to be
+ * consistent with spec).
+ *
+ * Path is defined as a string of '.' delimited fields names, that can optionally
+ * end with [] to indicate indexing.
+ * Note: only last element can be indexed.
+ * ex. path "a.b.c[5]" results in going through a, b and then c and finally
+ * taking index of 5.
+ */
 AWS_SDKUTILS_API int aws_path_through_json(
     struct aws_allocator *allocator,
     const struct aws_json_value *root,
     struct aws_byte_cursor path,
     const struct aws_json_value **out_value);
-
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_EVAL_UTIL_H */

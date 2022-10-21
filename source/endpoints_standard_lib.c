@@ -4,12 +4,12 @@
  */
 
 #include <aws/common/json.h>
-#include <aws/common/uri.h>
 #include <aws/common/string.h>
+#include <aws/common/uri.h>
 
-#include <aws/sdkutils/resource_name.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/private/endpoints_util.h>
+#include <aws/sdkutils/resource_name.h>
 
 static struct aws_byte_cursor s_scheme_http = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("http");
 static struct aws_byte_cursor s_scheme_https = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("https");
@@ -391,7 +391,8 @@ static int s_eval_is_valid_host_label(
     struct eval_value argv_value;
     struct eval_value argv_allow_subdomains;
     if (aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_allow_subdomains)) {
+        aws_endpoints_argv_expect(
+            allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_allow_subdomains)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval not.");
         goto on_error;
     }
@@ -566,7 +567,8 @@ static int s_eval_is_virtual_hostable_s3_bucket(
     struct eval_value argv_value;
     struct eval_value argv_allow_subdomains;
     if (aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_EVAL_VALUE_STRING, &argv_value) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_allow_subdomains)) {
+        aws_endpoints_argv_expect(
+            allocator, scope, argv, 1, AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN, &argv_allow_subdomains)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to eval args for isVirtualHostableS3Bucket.");
         goto on_error;
     }
@@ -617,10 +619,11 @@ static eval_function_fn *s_eval_fn_vt[AWS_ENDPOINTS_FN_LAST] = {
     [AWS_ENDPOINTS_FN_AWS_IS_VIRTUAL_HOSTABLE_S3_BUCKET] = s_eval_is_virtual_hostable_s3_bucket,
 };
 
-int aws_endpoints_dispatch_standard_lib_fn_resolve(enum aws_endpoints_fn_type type,
-            struct aws_allocator *allocator,
-            struct aws_array_list *argv,
-            struct eval_scope *scope,
-            struct eval_value *out_value) {
+int aws_endpoints_dispatch_standard_lib_fn_resolve(
+    enum aws_endpoints_fn_type type,
+    struct aws_allocator *allocator,
+    struct aws_array_list *argv,
+    struct eval_scope *scope,
+    struct eval_value *out_value) {
     return s_eval_fn_vt[type](allocator, argv, scope, out_value);
 }

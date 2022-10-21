@@ -94,8 +94,8 @@ static int s_deep_copy_value(struct aws_allocator *allocator, const struct scope
     to->value.type = from->value.type;
 
     if (to->value.type == AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-        to->value.v.string = aws_endpoints_owning_cursor_create(
-            aws_string_new_from_cursor(allocator, &from->value.v.string.cur));
+        to->value.v.string =
+            aws_endpoints_owning_cursor_create(aws_string_new_from_cursor(allocator, &from->value.v.string.cur));
     } else if (to->value.type == AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN) {
         to->value.v.boolean = from->value.v.boolean;
     } else {
@@ -264,8 +264,7 @@ static int s_eval_expr(
     struct eval_scope *scope,
     struct eval_value *out_value);
 
-static struct aws_string *s_resolve_template(
-    struct aws_byte_cursor template, void *user_data);
+static struct aws_string *s_resolve_template(struct aws_byte_cursor template, void *user_data);
 
 int aws_endpoints_argv_expect(
     struct aws_allocator *allocator,
@@ -367,8 +366,8 @@ static int s_eval_expr(
             break;
         }
         case AWS_ENDPOINTS_EXPR_FUNCTION: {
-            if (aws_endpoints_dispatch_standard_lib_fn_resolve(expr->e.function.fn, 
-                                            allocator, &expr->e.function.argv, scope, out_value)) {
+            if (aws_endpoints_dispatch_standard_lib_fn_resolve(
+                    expr->e.function.fn, allocator, &expr->e.function.argv, scope, out_value)) {
                 goto on_error;
             }
             break;
