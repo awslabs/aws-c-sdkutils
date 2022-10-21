@@ -244,8 +244,6 @@ static int s_try_parse_reference(const struct aws_json_value *node, struct aws_b
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse ref.");
         AWS_ZERO_STRUCT(*out_reference);
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
-
-        return AWS_OP_SUCCESS;
     }
 
     return AWS_OP_SUCCESS;
