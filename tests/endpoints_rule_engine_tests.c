@@ -9,8 +9,8 @@
 #include <aws/common/json.h>
 #include <aws/common/string.h>
 #include <aws/sdkutils/endpoints_rule_engine.h>
-#include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/partitions.h>
+#include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/testing/aws_test_harness.h>
 #include <time.h>
 
@@ -63,7 +63,8 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     ASSERT_NOT_NULL(ruleset);
 
     struct aws_byte_buf partitions_buf;
-    ASSERT_SUCCESS(read_file_contents(&partitions_buf, allocator, aws_byte_cursor_from_c_str("sample_partitions.json")));
+    ASSERT_SUCCESS(
+        read_file_contents(&partitions_buf, allocator, aws_byte_cursor_from_c_str("sample_partitions.json")));
     struct aws_byte_cursor partitions_json = aws_byte_cursor_from_buf(&partitions_buf);
     struct aws_partitions_config *partitions = aws_partitions_config_new_from_string(allocator, partitions_json);
 

@@ -6,35 +6,35 @@
 #ifndef AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H
 #define AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H
 
-#include <aws/common/ref_count.h>
 #include <aws/common/hash_table.h>
+#include <aws/common/ref_count.h>
 #include <aws/sdkutils/endpoints_rule_engine.h>
 
 struct aws_json_value;
 
 /*
-* Rule engine is built around 2 major types:
-* - expr - can be a literal, like bool or number or expression like function or ref
-* - value - literal types only. result of resolving expr. Can have special None
-*   value depending on how expr is resolved. Ex. accessing array past bounds or
-*   substrings with invalid start/end combination will both result in null.
-*
-* There is a lot of overlap between expr and value, so why do we need both?
-* Primary reason is to create a clean boundary between ruleset and resolved
-* values as it allows to distinguish easily between things that need to be
-* resolved and things that have been lowered. Given this type system, rule
-* engine basically performs a task of transforming exprs into values to get
-* final result.
-*
-* Other important types:
-* Parameter - definition of values that can be provided to rule engine during
-* resolution. Can define default values if caller didn't provide a value for
-* parameter.
-* Request Context - set of parameter value defined for a particular request that
-* are used during resolution
-* Scope - set of values defined during resolution of a rule. Can grow/shrink as
-* rules are evaluated. Ex. scope can have value with name "Region" and value "us-west-2".
-*/
+ * Rule engine is built around 2 major types:
+ * - expr - can be a literal, like bool or number or expression like function or ref
+ * - value - literal types only. result of resolving expr. Can have special None
+ *   value depending on how expr is resolved. Ex. accessing array past bounds or
+ *   substrings with invalid start/end combination will both result in null.
+ *
+ * There is a lot of overlap between expr and value, so why do we need both?
+ * Primary reason is to create a clean boundary between ruleset and resolved
+ * values as it allows to distinguish easily between things that need to be
+ * resolved and things that have been lowered. Given this type system, rule
+ * engine basically performs a task of transforming exprs into values to get
+ * final result.
+ *
+ * Other important types:
+ * Parameter - definition of values that can be provided to rule engine during
+ * resolution. Can define default values if caller didn't provide a value for
+ * parameter.
+ * Request Context - set of parameter value defined for a particular request that
+ * are used during resolution
+ * Scope - set of values defined during resolution of a rule. Can grow/shrink as
+ * rules are evaluated. Ex. scope can have value with name "Region" and value "us-west-2".
+ */
 
 /*
 ******************************
@@ -75,7 +75,7 @@ struct aws_endpoints_parameter {
 
     struct aws_byte_cursor name;
 
-    enum aws_endpoints_parameter_value_type type;
+    enum aws_endpoints_parameter_type type;
     struct aws_byte_cursor built_in;
 
     bool has_default_value;
@@ -199,9 +199,12 @@ enum eval_value_type {
     AWS_ENDPOINTS_EVAL_VALUE_NONE,
     AWS_ENDPOINTS_EVAL_VALUE_STRING,
     AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN,
-    AWS_ENDPOINTS_EVAL_VALUE_OBJECT, /* Generic type returned by some functions. Represented as json string under the covers. */
+    AWS_ENDPOINTS_EVAL_VALUE_OBJECT, /* Generic type returned by some functions. Represented as json string under the
+                                        covers. */
     AWS_ENDPOINTS_EVAL_VALUE_NUMBER,
-    AWS_ENDPOINTS_EVAL_VALUE_ARRAY
+    AWS_ENDPOINTS_EVAL_VALUE_ARRAY,
+
+    AWS_ENDPOINTS_EVAL_VALUE_SIZE
 };
 
 struct aws_endpoints_request_context {
@@ -252,9 +255,7 @@ struct eval_scope {
     const struct aws_partitions_config *partitions;
 };
 
-struct aws_partition_info *aws_partition_info_new(
-    struct aws_allocator *allocator,
-    struct aws_byte_cursor name);
+struct aws_partition_info *aws_partition_info_new(struct aws_allocator *allocator, struct aws_byte_cursor name);
 void aws_partition_info_destroy(struct aws_partition_info *partition_info);
 
 struct aws_endpoints_parameter *aws_endpoints_parameter_new(
@@ -272,21 +273,10 @@ void aws_endpoints_condition_clean_up(struct aws_endpoints_condition *condition)
 void aws_endpoints_function_clean_up(struct aws_endpoints_function *function);
 void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr);
 
-bool aws_endpoints_byte_cursor_eq(const void *a, const void *b);
-
-/*
- * Helpers to do deep clean up of array list.
- * TODO: move to aws-c-common?
- */
-typedef void(aws_array_callback_clean_up_fn)(void *value);
-void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callback_clean_up_fn on_clean_up_element);
-
 /*
  * Helper to init rule engine.
  * TODO: move to a better place
  */
 void aws_endpoints_rule_engine_init(void);
-
-struct aws_string *aws_string_new_from_json_value(struct aws_allocator *allocator, struct aws_json_value *value);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H */

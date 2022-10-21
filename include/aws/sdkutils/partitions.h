@@ -6,8 +6,8 @@
 #ifndef AWS_SDKUTILS_PARTITIONS_H
 #define AWS_SDKUTILS_PARTITIONS_H
 
-#include <aws/sdkutils/sdkutils.h>
 #include <aws/common/byte_buf.h>
+#include <aws/sdkutils/sdkutils.h>
 
 struct aws_partitions_config;
 
@@ -21,7 +21,7 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_partitions_get_supported_version(voi
  */
 AWS_SDKUTILS_API struct aws_partitions_config *aws_partitions_config_new_from_string(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor partitions_cur);
+    struct aws_byte_cursor json);
 
 /*
  * Increment ref count

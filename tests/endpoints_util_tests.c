@@ -5,7 +5,7 @@
 
 #include <aws/common/byte_buf.h>
 #include <aws/common/string.h>
-#include <aws/sdkutils/private/endpoints_eval_util.h>
+#include <aws/sdkutils/private/endpoints_util.h>
 #include <aws/testing/aws_test_harness.h>
 
 AWS_TEST_CASE(endpoints_eval_util_is_ipv4, s_test_is_ipv4)
@@ -126,8 +126,8 @@ static int s_test_template_replace(struct aws_allocator *allocator, void *ctx) {
     aws_byte_buf_clean_up(&buf3);
 
     struct aws_byte_buf buf4;
-    ASSERT_SUCCESS(aws_templated_string_replace_escaped(
-        allocator, aws_byte_cursor_from_c_str("another long {{ string }"), &buf4));
+    ASSERT_SUCCESS(
+        aws_templated_string_replace_escaped(allocator, aws_byte_cursor_from_c_str("another long {{ string }"), &buf4));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf4, "another long { string }"));
     aws_byte_buf_clean_up(&buf4);
 
@@ -144,8 +144,8 @@ static int s_test_json_template_replace(struct aws_allocator *allocator, void *c
     (void)ctx;
 
     struct aws_byte_buf buf1;
-    ASSERT_SUCCESS(aws_json_templated_strings_replace_escaped(allocator,
-        aws_byte_cursor_from_c_str("{\"foo\":{\"bar\":\"{{}}\"}}"), &buf1));
+    ASSERT_SUCCESS(aws_json_templated_strings_replace_escaped(
+        allocator, aws_byte_cursor_from_c_str("{\"foo\":{\"bar\":\"{{}}\"}}"), &buf1));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf1, "{\"foo\":{\"bar\":\"{}\"}}"));
     aws_byte_buf_clean_up(&buf1);
 
@@ -157,30 +157,29 @@ static int s_test_uri_normalize_path(struct aws_allocator *allocator, void *ctx)
     (void)ctx;
 
     struct aws_byte_buf buf1;
-    ASSERT_SUCCESS(aws_uri_normalize_path(allocator, aws_byte_cursor_from_c_str("/"), &buf1));
+    ASSERT_SUCCESS(aws_byte_buf_init_from_normalized_uri_path(allocator, aws_byte_cursor_from_c_str("/"), &buf1));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf1, "/"));
     aws_byte_buf_clean_up(&buf1);
 
     struct aws_byte_buf buf2;
-    ASSERT_SUCCESS(aws_uri_normalize_path(allocator, aws_byte_cursor_from_c_str("aaa"), &buf2));
+    ASSERT_SUCCESS(aws_byte_buf_init_from_normalized_uri_path(allocator, aws_byte_cursor_from_c_str("aaa"), &buf2));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf2, "/aaa/"));
     aws_byte_buf_clean_up(&buf2);
 
     struct aws_byte_buf buf3;
-    ASSERT_SUCCESS(aws_uri_normalize_path(allocator, aws_byte_cursor_from_c_str("aaa/"), &buf3));
+    ASSERT_SUCCESS(aws_byte_buf_init_from_normalized_uri_path(allocator, aws_byte_cursor_from_c_str("aaa/"), &buf3));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf3, "/aaa/"));
     aws_byte_buf_clean_up(&buf3);
 
     struct aws_byte_buf buf4;
-    ASSERT_SUCCESS(aws_uri_normalize_path(allocator, aws_byte_cursor_from_c_str("/aaa"), &buf4));
+    ASSERT_SUCCESS(aws_byte_buf_init_from_normalized_uri_path(allocator, aws_byte_cursor_from_c_str("/aaa"), &buf4));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf4, "/aaa/"));
     aws_byte_buf_clean_up(&buf4);
 
     struct aws_byte_buf buf5;
-    ASSERT_SUCCESS(aws_uri_normalize_path(allocator, aws_byte_cursor_from_c_str(""), &buf5));
+    ASSERT_SUCCESS(aws_byte_buf_init_from_normalized_uri_path(allocator, aws_byte_cursor_from_c_str(""), &buf5));
     ASSERT_TRUE(aws_byte_buf_eq_c_str(&buf5, "/"));
     aws_byte_buf_clean_up(&buf5);
-
 
     return AWS_OP_SUCCESS;
 }

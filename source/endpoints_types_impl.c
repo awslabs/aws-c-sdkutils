@@ -8,6 +8,7 @@
 #include <aws/common/json.h>
 #include <aws/common/string.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
+#include <aws/sdkutils/private/endpoints_util.h>
 
 static void s_on_condition_array_element_clean_up(void *element) {
     struct aws_endpoints_condition *condition = element;
@@ -24,39 +25,7 @@ static void s_on_expr_array_element_clean_up(void *element) {
     aws_endpoints_expr_clean_up(expr);
 }
 
-void aws_array_list_deep_clean_up(struct aws_array_list *array, aws_array_callback_clean_up_fn on_clean_up_element) {
-    for (size_t idx = 0; idx < aws_array_list_length(array); ++idx) {
-        void *element = NULL;
-
-        aws_array_list_get_at_ptr(array, &element, idx);
-        AWS_ASSERT(element);
-        on_clean_up_element(element);
-    }
-
-    aws_array_list_clean_up(array);
-}
-
-struct aws_string *aws_string_new_from_json_value(struct aws_allocator *allocator, struct aws_json_value *value) {
-    struct aws_byte_buf buf;
-
-    if (aws_byte_buf_init(&buf, allocator, 0) || 
-        aws_byte_buf_append_json_string(value, &buf)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to create string from json.");
-        goto on_error;
-    }
-
-    struct aws_string *ret = aws_string_new_from_buf(allocator, &buf);
-    aws_byte_buf_clean_up(&buf);
-    return ret;
-
-on_error:
-    aws_byte_buf_clean_up(&buf);
-    return NULL;
-}
-
-struct aws_partition_info *aws_partition_info_new(
-    struct aws_allocator *allocator,
-    struct aws_byte_cursor name) {
+struct aws_partition_info *aws_partition_info_new(struct aws_allocator *allocator, struct aws_byte_cursor name) {
     AWS_PRECONDITION(allocator);
     struct aws_partition_info *partition_info = aws_mem_calloc(allocator, 1, sizeof(struct aws_partition_info));
 
@@ -74,7 +43,7 @@ void aws_partition_info_destroy(struct aws_partition_info *partition_info) {
     if (!partition_info->is_copy) {
         aws_string_destroy(partition_info->info);
     }
-    
+
     aws_mem_release(partition_info->allocator, partition_info);
 }
 

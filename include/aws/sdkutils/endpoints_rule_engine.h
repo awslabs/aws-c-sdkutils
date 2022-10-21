@@ -17,7 +17,7 @@ struct aws_endpoints_resolved_endpoint;
 struct aws_endpoints_request_context;
 struct aws_hash_table;
 
-enum aws_endpoints_parameter_value_type { AWS_ENDPOINTS_PARAMETER_STRING, AWS_ENDPOINTS_PARAMETER_BOOLEAN };
+enum aws_endpoints_parameter_type { AWS_ENDPOINTS_PARAMETER_STRING, AWS_ENDPOINTS_PARAMETER_BOOLEAN };
 enum aws_endpoints_resolved_endpoint_type { AWS_ENDPOINTS_RESOLVED_ENDPOINT, AWS_ENDPOINTS_RESOLVED_ERROR };
 
 AWS_EXTERN_C_BEGIN
@@ -33,7 +33,7 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_get_supported_ruleset_vers
 /*
  * Value type of parameter.
  */
-AWS_SDKUTILS_API enum aws_endpoints_parameter_value_type aws_endpoints_parameter_get_value_type(
+AWS_SDKUTILS_API enum aws_endpoints_parameter_type aws_endpoints_parameter_get_type(
     const struct aws_endpoints_parameter *parameter);
 
 /*
@@ -142,8 +142,7 @@ AWS_SDKUTILS_API const struct aws_hash_table *aws_endpoints_ruleset_get_paramete
  * Returned pointer is owned by ruleset.
  * Will not return NULL as version is a required field for ruleset.
  */
-AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_ruleset_get_version(
-    const struct aws_endpoints_ruleset *ruleset);
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_ruleset_get_version(const struct aws_endpoints_ruleset *ruleset);
 
 /*
  * Ruleset service id.
@@ -165,7 +164,7 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_ruleset_get_service_id(
  */
 AWS_SDKUTILS_API struct aws_endpoints_rule_engine *aws_endpoints_rule_engine_new(
     struct aws_allocator *allocator,
-    struct aws_endpoints_ruleset *ruleset, 
+    struct aws_endpoints_ruleset *ruleset,
     struct aws_partitions_config *partitions_config);
 
 /*

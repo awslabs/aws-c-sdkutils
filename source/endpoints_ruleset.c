@@ -9,6 +9,7 @@
 #include <aws/common/ref_count.h>
 #include <aws/common/string.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
+#include <aws/sdkutils/private/endpoints_util.h>
 
 /* parameter types */
 static struct aws_byte_cursor s_string_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("string");
@@ -50,8 +51,7 @@ void aws_endpoints_rule_engine_init() {
 * Parameter Getters.
 ******************************
 */
-enum aws_endpoints_parameter_value_type aws_endpoints_parameter_get_value_type(
-    const struct aws_endpoints_parameter *parameter) {
+enum aws_endpoints_parameter_type aws_endpoints_parameter_get_type(const struct aws_endpoints_parameter *parameter) {
     AWS_PRECONDITION(parameter);
     return parameter->type;
 }
@@ -104,8 +104,7 @@ bool aws_endpoints_parameters_get_is_deprecated(const struct aws_endpoints_param
     return parameter->is_deprecated;
 }
 
-struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_message(
-    const struct aws_endpoints_parameter *parameter) {
+struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_message(const struct aws_endpoints_parameter *parameter) {
     AWS_PRECONDITION(parameter);
     return parameter->deprecated_message;
 }
@@ -141,12 +140,6 @@ struct aws_byte_cursor aws_endpoints_ruleset_get_service_id(const struct aws_end
 * Parser helpers.
 ******************************
 */
-
-bool aws_endpoints_byte_cursor_eq(const void *a, const void *b) {
-    const struct aws_byte_cursor *a_cur = a;
-    const struct aws_byte_cursor *b_cur = b;
-    return aws_byte_cursor_eq(a_cur, b_cur);
-}
 
 static void s_on_rule_array_element_clean_up(void *element) {
     struct aws_endpoints_rule *rule = element;
@@ -241,11 +234,7 @@ static int s_parse_function(
  * Note: this function only fails in cases where node is a ref (ie object with a
  * ref field), but cannot be parsed completely.
  */
-static int s_try_parse_reference(
-    struct aws_allocator *allocator,
-    const struct aws_json_value *node,
-    struct aws_byte_cursor *out_reference) {
-    AWS_PRECONDITION(allocator);
+static int s_try_parse_reference(const struct aws_json_value *node, struct aws_byte_cursor *out_reference) {
     AWS_PRECONDITION(node);
 
     AWS_ZERO_STRUCT(*out_reference);
@@ -323,7 +312,7 @@ static int s_parse_expr(
     }
 
     struct aws_byte_cursor reference;
-    if (s_try_parse_reference(allocator, node, &reference)) {
+    if (s_try_parse_reference(node, &reference)) {
         goto on_error;
     }
 
@@ -427,7 +416,7 @@ static int s_on_parameter_key(
         goto on_error;
     }
 
-    enum aws_endpoints_parameter_value_type type;
+    enum aws_endpoints_parameter_type type;
     if (aws_byte_cursor_eq_ignore_case(&type_cur, &s_string_type_cur)) {
         type = AWS_ENDPOINTS_PARAMETER_STRING;
     } else if (aws_byte_cursor_eq_ignore_case(&type_cur, &s_boolean_type_cur)) {
@@ -473,12 +462,13 @@ static int s_on_parameter_key(
     struct aws_json_value *default_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("default"));
     parameter->has_default_value = default_node != NULL;
     if (default_node != NULL) {
-        if (type == AWS_ENDPOINTS_PARAMETER_STRING && 
-                aws_json_value_get_string(default_node, &parameter->default_value.string)) {
+        if (type == AWS_ENDPOINTS_PARAMETER_STRING &&
+            aws_json_value_get_string(default_node, &parameter->default_value.string)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for default parameter value.");
             goto on_error;
-        } else if (type == AWS_ENDPOINTS_PARAMETER_BOOLEAN &&
-                aws_json_value_get_boolean(default_node, &parameter->default_value.boolean)) {
+        } else if (
+            type == AWS_ENDPOINTS_PARAMETER_BOOLEAN &&
+            aws_json_value_get_boolean(default_node, &parameter->default_value.boolean)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for default parameter value.");
             goto on_error;
         }
@@ -489,16 +479,16 @@ static int s_on_parameter_key(
     if (deprecated_node != NULL) {
         struct aws_json_value *deprecated_message_node =
             aws_json_value_get_from_object(deprecated_node, aws_byte_cursor_from_c_str("message"));
-        if (deprecated_message_node != NULL && 
-                aws_json_value_get_string(deprecated_message_node, &parameter->deprecated_message)) {
+        if (deprecated_message_node != NULL &&
+            aws_json_value_get_string(deprecated_message_node, &parameter->deprecated_message)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for deprecated message.");
             goto on_error;
         }
 
         struct aws_json_value *deprecated_since_node =
             aws_json_value_get_from_object(deprecated_node, aws_byte_cursor_from_c_str("since"));
-        if (deprecated_since_node != NULL && 
-                aws_json_value_get_string(deprecated_since_node, &parameter->deprecated_since)) {
+        if (deprecated_since_node != NULL &&
+            aws_json_value_get_string(deprecated_since_node, &parameter->deprecated_since)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for deprecated since.");
             goto on_error;
         }
@@ -618,7 +608,7 @@ static int s_parse_endpoints_rule_data_endpoint(
         aws_json_value_get_string(url_node, &data_rule->url.e.string);
     } else {
         struct aws_byte_cursor reference;
-        if (s_try_parse_reference(allocator, url_node, &reference)) {
+        if (s_try_parse_reference(url_node, &reference)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse reference.");
             goto on_error;
         }
@@ -694,7 +684,7 @@ static int s_parse_endpoints_rule_data_error(
     }
 
     struct aws_byte_cursor reference;
-    if (s_try_parse_reference(allocator, error_node, &reference)) {
+    if (s_try_parse_reference(error_node, &reference)) {
         goto on_error;
     }
 
@@ -948,14 +938,14 @@ static void s_endpoints_ruleset_destroy(void *data) {
 
 struct aws_endpoints_ruleset *aws_endpoints_ruleset_new_from_string(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor ruleset_cur) {
+    struct aws_byte_cursor json) {
     AWS_PRECONDITION(allocator);
-    AWS_PRECONDITION(aws_byte_cursor_is_valid(&ruleset_cur));
+    AWS_PRECONDITION(aws_byte_cursor_is_valid(&json));
 
     struct aws_endpoints_ruleset *ruleset = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_ruleset));
     ruleset->allocator = allocator;
 
-    if (s_init_ruleset_from_json(allocator, ruleset, ruleset_cur)) {
+    if (s_init_ruleset_from_json(allocator, ruleset, json)) {
         s_endpoints_ruleset_destroy(ruleset);
         return NULL;
     }
