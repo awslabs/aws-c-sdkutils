@@ -169,33 +169,83 @@ void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr) {
     AWS_ZERO_STRUCT(*expr);
 }
 
-struct owning_cursor aws_endpoints_owning_cursor_create(struct aws_string *str) {
-    struct owning_cursor ret = {.string = str, .cur = aws_byte_cursor_from_string(str)};
+struct aws_owning_cursor aws_endpoints_owning_cursor_create(struct aws_allocator *allocator, const struct aws_string *str) {
+    struct aws_string *clone = aws_string_clone_or_reuse(allocator, str);
+    struct aws_owning_cursor ret = {.string = clone, .cur = aws_byte_cursor_from_string(clone)};
     return ret;
 }
 
-struct owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur) {
-    struct owning_cursor ret = {.string = NULL, .cur = cur};
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str) {
+    struct aws_owning_cursor ret = {.string = str, .cur = aws_byte_cursor_from_string(str)};
     return ret;
 }
 
-static void s_eval_value_clean_up_cb(void *value);
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(struct aws_allocator *allocator, const struct aws_byte_cursor cur) {
+    struct aws_string *clone = aws_string_new_from_cursor(allocator, &cur);
+    struct aws_owning_cursor ret = {.string = clone, .cur = aws_byte_cursor_from_string(clone)};
+    return ret;
+}
 
-void aws_endpoints_eval_value_clean_up(struct eval_value *eval_value) {
-    if (eval_value->type == AWS_ENDPOINTS_EVAL_VALUE_STRING) {
-        aws_string_destroy(eval_value->v.string.string);
+struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur) {
+    struct aws_owning_cursor ret = {.string = NULL, .cur = cur};
+    return ret;
+}
+
+struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(struct aws_allocator *allocator,
+    struct aws_byte_cursor name_cur) {
+    AWS_PRECONDITION(allocator);
+    struct aws_endpoints_scope_value *value = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_scope_value));
+
+    value->allocator = allocator;
+    value->name = aws_endpoints_owning_cursor_from_cursor(allocator, name_cur);
+
+    return value;
+}
+
+void aws_endpoints_scope_value_destroy(struct aws_endpoints_scope_value *scope_value) {
+    if (scope_value == NULL) {
+        return;
+    }
+    aws_string_destroy(scope_value->name.string);
+    aws_endpoints_value_clean_up(&scope_value->value);
+    aws_mem_release(scope_value->allocator, scope_value);
+}
+
+void aws_endpoints_value_clean_up_cb(void *value);
+
+void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_value) {
+    if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_STRING) {
+        aws_string_destroy(aws_endpoints_value->v.string.string);
     }
 
-    if (eval_value->type == AWS_ENDPOINTS_EVAL_VALUE_OBJECT) {
-        aws_string_destroy(eval_value->v.object.string);
+    if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_OBJECT) {
+        aws_string_destroy(aws_endpoints_value->v.object.string);
     }
 
-    if (eval_value->type == AWS_ENDPOINTS_EVAL_VALUE_ARRAY) {
-        aws_array_list_deep_clean_up(&eval_value->v.array, s_eval_value_clean_up_cb);
+    if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_ARRAY) {
+        aws_array_list_deep_clean_up(&aws_endpoints_value->v.array, aws_endpoints_value_clean_up_cb);
     }
 }
 
-static void s_eval_value_clean_up_cb(void *value) {
-    struct eval_value *eval_value = value;
-    aws_endpoints_eval_value_clean_up(eval_value);
+void aws_endpoints_value_clean_up_cb(void *value) {
+    struct aws_endpoints_value *aws_endpoints_value = value;
+    aws_endpoints_value_clean_up(aws_endpoints_value);
+}
+
+int aws_endpoints_deep_copy_parameter_value(struct aws_allocator *allocator,
+    const struct aws_endpoints_value *from,
+    struct aws_endpoints_value *to) {
+
+    to->type = from->type;
+
+    if (to->type == AWS_ENDPOINTS_VALUE_STRING) {
+        to->v.string = aws_endpoints_owning_cursor_create(allocator, from->v.string.string);
+    } else if (to->type == AWS_ENDPOINTS_VALUE_BOOLEAN) {
+        to->v.boolean = from->v.boolean;
+    } else {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected value type.");
+        return aws_raise_error(AWS_ERROR_INVALID_STATE);
+    }
+
+    return AWS_OP_SUCCESS;
 }

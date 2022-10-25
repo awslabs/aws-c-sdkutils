@@ -78,7 +78,7 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
 
     struct aws_byte_cursor built_in =
         aws_endpoints_parameter_get_built_in((struct aws_endpoints_parameter *)element->value);
-    ASSERT_TRUE(aws_byte_cursor_eq_c_str(&built_in, "AWS::Region"));
+    ASSERT_CURSOR_VALUE_CSTRING_EQUALS(built_in, "AWS::Region");
 
     struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset, partitions);
 
@@ -98,8 +98,7 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     struct aws_byte_cursor url_cur;
     ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
 
-    struct aws_byte_cursor url_const = aws_byte_cursor_from_c_str("https://example.us-west-2.amazonaws.com");
-    ASSERT_TRUE(aws_byte_cursor_eq(&url_cur, &url_const));
+    ASSERT_CURSOR_VALUE_CSTRING_EQUALS(url_cur, "https://example.us-west-2.amazonaws.com");
 
     aws_endpoints_ruleset_release(ruleset);
     aws_partitions_config_release(partitions);
@@ -199,8 +198,6 @@ static int s_on_header_key(
 
 static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor file_name) {
     aws_sdkutils_library_init(allocator);
-
-    // allocator = aws_default_allocator();
 
     struct aws_byte_buf ruleset_file_path;
     ASSERT_SUCCESS(

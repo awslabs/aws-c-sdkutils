@@ -191,20 +191,19 @@ struct aws_partitions_config {
 ******************************
 */
 
-enum eval_value_type {
+enum aws_endpoints_value_type {
     /* Special value to represent that any value type is expected from resolving an expresion.
         Note a valid value for a value type. */
-    AWS_ENDPOINTS_EVAL_VALUE_ANY,
+    AWS_ENDPOINTS_VALUE_ANY,
 
-    AWS_ENDPOINTS_EVAL_VALUE_NONE,
-    AWS_ENDPOINTS_EVAL_VALUE_STRING,
-    AWS_ENDPOINTS_EVAL_VALUE_BOOLEAN,
-    AWS_ENDPOINTS_EVAL_VALUE_OBJECT, /* Generic type returned by some functions. Represented as json string under the
-                                        covers. */
-    AWS_ENDPOINTS_EVAL_VALUE_NUMBER,
-    AWS_ENDPOINTS_EVAL_VALUE_ARRAY,
+    AWS_ENDPOINTS_VALUE_NONE,
+    AWS_ENDPOINTS_VALUE_STRING,
+    AWS_ENDPOINTS_VALUE_BOOLEAN,
+    AWS_ENDPOINTS_VALUE_OBJECT, /* Generic type returned by some functions. json string under the covers. */
+    AWS_ENDPOINTS_VALUE_NUMBER,
+    AWS_ENDPOINTS_VALUE_ARRAY,
 
-    AWS_ENDPOINTS_EVAL_VALUE_SIZE
+    AWS_ENDPOINTS_VALUE_SIZE
 };
 
 struct aws_endpoints_request_context {
@@ -214,35 +213,35 @@ struct aws_endpoints_request_context {
     struct aws_hash_table values;
 };
 
-struct owning_cursor {
+/* Cursor that optionally owns underlying memory. */
+struct aws_owning_cursor {
     struct aws_byte_cursor cur;
     struct aws_string *string;
 };
 
 /* concrete type value */
-struct eval_value {
-    enum eval_value_type type;
+struct aws_endpoints_value {
+    enum aws_endpoints_value_type type;
     union {
-        struct owning_cursor string;
+        struct aws_owning_cursor string;
         bool boolean;
-        struct owning_cursor object;
+        struct aws_owning_cursor object;
         double number;
         struct aws_array_list array;
     } v;
 };
 
-/* wrapper around eval_value to store it more easily in hash table*/
-struct scope_value {
+/* wrapper around aws_endpoints_value to store it more easily in hash table*/
+struct aws_endpoints_scope_value {
     struct aws_allocator *allocator;
 
-    struct aws_byte_cursor name_cur;
-    struct aws_string *name;
+    struct aws_owning_cursor name;
 
-    struct eval_value value;
+    struct aws_endpoints_value value;
 };
 
-struct eval_scope {
-    /* current values in scope. byte_cur -> scope_value */
+struct aws_endpoints_resolution_scope {
+    /* current values in scope. byte_cur -> aws_endpoints_scope_value */
     struct aws_hash_table values;
     /* list of value keys added since last cleanup */
     struct aws_array_list added_keys;
@@ -273,19 +272,33 @@ void aws_endpoints_condition_clean_up(struct aws_endpoints_condition *condition)
 void aws_endpoints_function_clean_up(struct aws_endpoints_function *function);
 void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr);
 
-struct owning_cursor aws_endpoints_owning_cursor_create(struct aws_string *str);
-struct owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur);
+struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(struct aws_allocator *allocator,
+    struct aws_byte_cursor name_cur);
+void aws_endpoints_scope_value_destroy(struct aws_endpoints_scope_value *scope_value);
 
-void aws_endpoints_eval_value_clean_up(struct eval_value *eval_value);
+/* Clones string and wraps it in owning cursor. */
+struct aws_owning_cursor aws_endpoints_owning_cursor_create(struct aws_allocator *allocator, const struct aws_string *str);
+/* Creates new cursor that takes ownership of created string. */
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str);
+/* Clones memory pointer to by cursor and wraps in owning cursor */
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(struct aws_allocator *allocator, const struct aws_byte_cursor cur);
+/* Creates owning cursor with memory pointer set to NULL */
+struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur);
+
+int aws_endpoints_deep_copy_parameter_value(struct aws_allocator *allocator,
+    const struct aws_endpoints_value *from,
+    struct aws_endpoints_value *to);
+
+void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_value);
 
 /* Helper to resolve argv. Implemented in rule engine. */
 int aws_endpoints_argv_expect(
     struct aws_allocator *allocator,
-    struct eval_scope *scope,
+    struct aws_endpoints_resolution_scope *scope,
     struct aws_array_list *argv,
     size_t idx,
-    enum eval_value_type expected_type,
-    struct eval_value *out_value);
+    enum aws_endpoints_value_type expected_type,
+    struct aws_endpoints_value *out_value);
 
 extern uint64_t aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_LAST];
 void aws_endpoints_rule_engine_init(void);
@@ -294,20 +307,20 @@ int aws_endpoints_dispatch_standard_lib_fn_resolve(
     enum aws_endpoints_fn_type type,
     struct aws_allocator *allocator,
     struct aws_array_list *argv,
-    struct eval_scope *scope,
-    struct eval_value *out_value);
+    struct aws_endpoints_resolution_scope *scope,
+    struct aws_endpoints_value *out_value);
 
 int aws_endpoints_path_through_array(
     struct aws_allocator *allocator,
-    struct eval_scope *scope,
-    struct eval_value *eval_val,
+    struct aws_endpoints_resolution_scope *scope,
+    struct aws_endpoints_value *eval_val,
     struct aws_byte_cursor path_cur,
-    struct eval_value *out_value);
+    struct aws_endpoints_value *out_value);
 
 int aws_endpoints_path_through_object(
     struct aws_allocator *allocator,
-    struct eval_value *eval_val,
+    struct aws_endpoints_value *eval_val,
     struct aws_byte_cursor path_cur,
-    struct eval_value *out_value);
+    struct aws_endpoints_value *out_value);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H */

@@ -38,16 +38,18 @@ AWS_SDKUTILS_API enum aws_endpoints_parameter_type aws_endpoints_parameter_get_t
 
 /*
  * Specifies whether parameter maps to one of SDK built ins (ex. "AWS::Region").
- * NULL return does not indicate error.
- * Owned by parameter. Can be NULL if no mapping exists.
+ * Return is a cursor specifying the name of associated built in. 
+ * If there is no mapping, cursor will be empty.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_built_in(
     const struct aws_endpoints_parameter *parameter);
 
 /*
  * Default string value.
- * Out arg will have pointer to value if default is specified, NULL otherwise.
- * Owned by parameter.
+ * out_cursor will point to default string value if one exist and will be empty
+ * otherwise. 
+ * Cursor is guaranteed to be valid for lifetime of paramater.
  * Returns AWS_OP_ERR if parameter is not a string.
  */
 AWS_SDKUTILS_API int aws_endpoints_parameter_get_default_string(
@@ -56,7 +58,7 @@ AWS_SDKUTILS_API int aws_endpoints_parameter_get_default_string(
 
 /*
  * Default boolean value.
- * Out arg will have pointer to value if default is specified, NULL otherwise.
+ * out_bool will have pointer to value if default is specified, NULL otherwise.
  * Owned by parameter.
  * Returns AWS_OP_ERR if parameter is not a boolean.
  */
@@ -70,8 +72,9 @@ AWS_SDKUTILS_API int aws_endpoints_parameter_get_default_boolean(
 AWS_SDKUTILS_API bool aws_endpoints_parameter_get_is_required(const struct aws_endpoints_parameter *parameter);
 
 /*
- * Parameter documentation.
- * Owned by parameter. Will not be NULL as doc is required.
+ * Returns cursor to parameter documentation.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
+ * Will not be empty as doc is required.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_documentation(
     const struct aws_endpoints_parameter *parameter);
@@ -82,17 +85,15 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_documentatio
 AWS_SDKUTILS_API bool aws_endpoints_parameters_get_is_deprecated(const struct aws_endpoints_parameter *parameter);
 
 /*
- * Deprecation message. Null if parameter is not deprecated.
- * NULL return does not indicate error.
- * Owned by parameter.
+ * Deprecation message. Cursor is empty if parameter is not deprecated.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_message(
     const struct aws_endpoints_parameter *parameter);
 
 /*
- * Deprecated since. Null if parameter is not deprecated.
- * NULL return does not indicate error.
- * Owned by parameter.
+ * Deprecated since. Cursor is empty if parameter is not deprecated.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_since(
     const struct aws_endpoints_parameter *parameter);
@@ -109,7 +110,7 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_s
  */
 AWS_SDKUTILS_API struct aws_endpoints_ruleset *aws_endpoints_ruleset_new_from_string(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor ruleset_cur);
+    struct aws_byte_cursor ruleset_json);
 
 /*
  * Increment ref count

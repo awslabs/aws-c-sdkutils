@@ -228,13 +228,13 @@ int aws_byte_buf_init_from_normalized_uri_path(
     /* Normalized path is just regular path that ensures that path starts and ends with slash */
 
     if (aws_byte_buf_init(out_normalized_path, allocator, path.len + 2)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed init buffer for parseUrl return.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed init buffer for parseUrl return.");
         goto on_error;
     }
 
     if (path.len == 0) {
         if (aws_byte_buf_append(out_normalized_path, &s_path_slash)) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to add path to object.");
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to add path to object.");
             goto on_error;
         }
         return AWS_OP_SUCCESS;
@@ -242,19 +242,19 @@ int aws_byte_buf_init_from_normalized_uri_path(
 
     if (path.ptr[0] != '/') {
         if (aws_byte_buf_append_dynamic(out_normalized_path, &s_path_slash)) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to append slash to normalized path.");
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to append slash to normalized path.");
             goto on_error;
         }
     }
 
     if (aws_byte_buf_append_dynamic(out_normalized_path, &path)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to append path to normalized path.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to append path to normalized path.");
         goto on_error;
     }
 
     if (out_normalized_path->buffer[out_normalized_path->len - 1] != '/') {
         if (aws_byte_buf_append_dynamic(out_normalized_path, &s_path_slash)) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to append slash to normalized path.");
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to append slash to normalized path.");
             goto on_error;
         }
     }
@@ -263,18 +263,18 @@ int aws_byte_buf_init_from_normalized_uri_path(
 
 on_error:
     aws_byte_buf_clean_up(out_normalized_path);
-    return AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED;
+    return AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED;
 }
 
 struct aws_string *aws_string_new_from_json(struct aws_allocator *allocator, const struct aws_json_value *value) {
     struct aws_byte_buf json_blob;
     if (aws_byte_buf_init(&json_blob, allocator, 0)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to init buffer for json conversion.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to init buffer for json conversion.");
         goto on_error;
     }
 
     if (aws_byte_buf_append_json_string(value, &json_blob)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to convert json to string.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to convert json to string.");
         goto on_error;
     }
 
@@ -284,7 +284,7 @@ struct aws_string *aws_string_new_from_json(struct aws_allocator *allocator, con
 
 on_error:
     aws_byte_buf_clean_up(&json_blob);
-    aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+    aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
     return NULL;
 }
 
@@ -396,7 +396,7 @@ int s_append_template_prefix_to_buffer(
     return AWS_OP_SUCCESS;
 
 on_error:
-    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
 int aws_byte_buf_init_from_resolved_templated_string(
@@ -412,7 +412,7 @@ int aws_byte_buf_init_from_resolved_templated_string(
 
     if (aws_byte_buf_init(out_buf, allocator, string.len)) {
         AWS_ZERO_STRUCT(out_buf);
-        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
     }
 
     size_t quote_count = is_json ? 0 : 1;
@@ -480,7 +480,7 @@ int aws_byte_buf_init_from_resolved_templated_string(
 
 on_error:
     aws_string_destroy(resolved_template);
-    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
 int aws_path_through_json(
@@ -499,7 +499,7 @@ int aws_path_through_json(
     for (size_t idx = 0; idx < aws_array_list_length(&path_segments); ++idx) {
         struct aws_byte_cursor path_el_cur;
         if (aws_array_list_get_at(&path_segments, &path_el_cur, idx)) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to get path element");
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to get path element");
             goto on_error;
         }
 
@@ -514,7 +514,7 @@ int aws_path_through_json(
             *out_value = aws_json_value_get_from_object(*out_value, element_cur);
             if (NULL == *out_value) {
                 AWS_LOGF_ERROR(
-                    AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Invalid path. " PRInSTR ".", AWS_BYTE_CURSOR_PRI(element_cur));
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Invalid path. " PRInSTR ".", AWS_BYTE_CURSOR_PRI(element_cur));
                 goto on_error;
             }
         }
@@ -523,7 +523,7 @@ int aws_path_through_json(
             uint64_t index;
             if (aws_byte_cursor_utf8_parse_u64(index_cur, &index)) {
                 AWS_LOGF_ERROR(
-                    AWS_LS_SDKUTILS_ENDPOINTS_EVAL, "Failed to parse index: " PRInSTR, AWS_BYTE_CURSOR_PRI(index_cur));
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to parse index: " PRInSTR, AWS_BYTE_CURSOR_PRI(index_cur));
                 goto on_error;
             }
             *out_value = aws_json_get_array_element(*out_value, (size_t)index);
@@ -541,6 +541,6 @@ on_success:
 on_error:
     aws_array_list_clean_up(&path_segments);
     *out_value = NULL;
-    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EVAL_FAILED);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
     ;
 }

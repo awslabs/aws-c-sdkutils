@@ -22,6 +22,8 @@ static struct aws_byte_cursor s_tree_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LI
 
 static struct aws_byte_cursor s_supported_version = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("1.0");
 
+static struct aws_byte_cursor s_empty_cursor = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("");
+
 /* TODO: improve error messages. Include json line num? or dump json node? */
 
 struct aws_byte_cursor aws_endpoints_get_supported_ruleset_version(void) {
@@ -54,6 +56,7 @@ int aws_endpoints_parameter_get_default_string(
         return AWS_OP_SUCCESS;
     };
 
+    *out_cursor = s_empty_cursor;
     return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
@@ -68,6 +71,7 @@ int aws_endpoints_parameter_get_default_boolean(
         return AWS_OP_SUCCESS;
     };
 
+    *out_bool = NULL;
     return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
@@ -918,14 +922,14 @@ static void s_endpoints_ruleset_destroy(void *data) {
 
 struct aws_endpoints_ruleset *aws_endpoints_ruleset_new_from_string(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor json) {
+    struct aws_byte_cursor ruleset_json) {
     AWS_PRECONDITION(allocator);
-    AWS_PRECONDITION(aws_byte_cursor_is_valid(&json));
+    AWS_PRECONDITION(aws_byte_cursor_is_valid(&ruleset_json));
 
     struct aws_endpoints_ruleset *ruleset = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_ruleset));
     ruleset->allocator = allocator;
 
-    if (s_init_ruleset_from_json(allocator, ruleset, json)) {
+    if (s_init_ruleset_from_json(allocator, ruleset, ruleset_json)) {
         s_endpoints_ruleset_destroy(ruleset);
         return NULL;
     }
