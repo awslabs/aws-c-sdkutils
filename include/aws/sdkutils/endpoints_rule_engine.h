@@ -38,7 +38,7 @@ AWS_SDKUTILS_API enum aws_endpoints_parameter_type aws_endpoints_parameter_get_t
 
 /*
  * Specifies whether parameter maps to one of SDK built ins (ex. "AWS::Region").
- * Return is a cursor specifying the name of associated built in. 
+ * Return is a cursor specifying the name of associated built in.
  * If there is no mapping, cursor will be empty.
  * Cursor is guaranteed to be valid for lifetime of paramater.
  */
@@ -48,7 +48,7 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_built_in(
 /*
  * Default string value.
  * out_cursor will point to default string value if one exist and will be empty
- * otherwise. 
+ * otherwise.
  * Cursor is guaranteed to be valid for lifetime of paramater.
  * Returns AWS_OP_ERR if parameter is not a string.
  */

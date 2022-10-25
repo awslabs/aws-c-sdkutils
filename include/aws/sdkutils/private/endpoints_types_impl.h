@@ -272,20 +272,26 @@ void aws_endpoints_condition_clean_up(struct aws_endpoints_condition *condition)
 void aws_endpoints_function_clean_up(struct aws_endpoints_function *function);
 void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr);
 
-struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(struct aws_allocator *allocator,
+struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(
+    struct aws_allocator *allocator,
     struct aws_byte_cursor name_cur);
 void aws_endpoints_scope_value_destroy(struct aws_endpoints_scope_value *scope_value);
 
 /* Clones string and wraps it in owning cursor. */
-struct aws_owning_cursor aws_endpoints_owning_cursor_create(struct aws_allocator *allocator, const struct aws_string *str);
+struct aws_owning_cursor aws_endpoints_owning_cursor_create(
+    struct aws_allocator *allocator,
+    const struct aws_string *str);
 /* Creates new cursor that takes ownership of created string. */
 struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str);
 /* Clones memory pointer to by cursor and wraps in owning cursor */
-struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(struct aws_allocator *allocator, const struct aws_byte_cursor cur);
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
+    struct aws_allocator *allocator,
+    const struct aws_byte_cursor cur);
 /* Creates owning cursor with memory pointer set to NULL */
 struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur);
 
-int aws_endpoints_deep_copy_parameter_value(struct aws_allocator *allocator,
+int aws_endpoints_deep_copy_parameter_value(
+    struct aws_allocator *allocator,
     const struct aws_endpoints_value *from,
     struct aws_endpoints_value *to);
 

@@ -138,13 +138,13 @@ static int s_init_top_level_scope(
     scope->partitions = partitions;
 
     if (aws_hash_table_init(
-        &scope->values,
-        allocator,
-        0,
-        aws_hash_byte_cursor_ptr,
-        aws_endpoints_byte_cursor_eq,
-        NULL,
-        s_scope_value_destroy_cb)) {
+            &scope->values,
+            allocator,
+            0,
+            aws_hash_byte_cursor_ptr,
+            aws_endpoints_byte_cursor_eq,
+            NULL,
+            s_scope_value_destroy_cb)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to init request context values.");
         goto on_error;
     }
@@ -370,7 +370,8 @@ static int s_resolve_conditions(
         }
 
         if (condition->assign.len > 0) {
-            struct aws_endpoints_scope_value *aws_endpoints_scope_value = aws_endpoints_scope_value_new(allocator, condition->assign);
+            struct aws_endpoints_scope_value *aws_endpoints_scope_value =
+                aws_endpoints_scope_value_new(allocator, condition->assign);
             aws_endpoints_scope_value->value = val;
 
             if (aws_array_list_push_back(&scope->added_keys, &aws_endpoints_scope_value->name.cur)) {
@@ -379,7 +380,8 @@ static int s_resolve_conditions(
             }
 
             int was_created = 1;
-            if (aws_hash_table_put(&scope->values, &aws_endpoints_scope_value->name.cur, aws_endpoints_scope_value, &was_created)) {
+            if (aws_hash_table_put(
+                    &scope->values, &aws_endpoints_scope_value->name.cur, aws_endpoints_scope_value, &was_created)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to set assigned variable.");
                 goto on_error;
             }

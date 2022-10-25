@@ -169,7 +169,9 @@ void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr) {
     AWS_ZERO_STRUCT(*expr);
 }
 
-struct aws_owning_cursor aws_endpoints_owning_cursor_create(struct aws_allocator *allocator, const struct aws_string *str) {
+struct aws_owning_cursor aws_endpoints_owning_cursor_create(
+    struct aws_allocator *allocator,
+    const struct aws_string *str) {
     struct aws_string *clone = aws_string_clone_or_reuse(allocator, str);
     struct aws_owning_cursor ret = {.string = clone, .cur = aws_byte_cursor_from_string(clone)};
     return ret;
@@ -180,7 +182,9 @@ struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_stri
     return ret;
 }
 
-struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(struct aws_allocator *allocator, const struct aws_byte_cursor cur) {
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
+    struct aws_allocator *allocator,
+    const struct aws_byte_cursor cur) {
     struct aws_string *clone = aws_string_new_from_cursor(allocator, &cur);
     struct aws_owning_cursor ret = {.string = clone, .cur = aws_byte_cursor_from_string(clone)};
     return ret;
@@ -191,7 +195,8 @@ struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_
     return ret;
 }
 
-struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(struct aws_allocator *allocator,
+struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(
+    struct aws_allocator *allocator,
     struct aws_byte_cursor name_cur) {
     AWS_PRECONDITION(allocator);
     struct aws_endpoints_scope_value *value = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_scope_value));
@@ -232,7 +237,8 @@ void aws_endpoints_value_clean_up_cb(void *value) {
     aws_endpoints_value_clean_up(aws_endpoints_value);
 }
 
-int aws_endpoints_deep_copy_parameter_value(struct aws_allocator *allocator,
+int aws_endpoints_deep_copy_parameter_value(
+    struct aws_allocator *allocator,
     const struct aws_endpoints_value *from,
     struct aws_endpoints_value *to) {
 

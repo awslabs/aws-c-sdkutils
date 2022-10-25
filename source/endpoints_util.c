@@ -523,7 +523,9 @@ int aws_path_through_json(
             uint64_t index;
             if (aws_byte_cursor_utf8_parse_u64(index_cur, &index)) {
                 AWS_LOGF_ERROR(
-                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to parse index: " PRInSTR, AWS_BYTE_CURSOR_PRI(index_cur));
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                    "Failed to parse index: " PRInSTR,
+                    AWS_BYTE_CURSOR_PRI(index_cur));
                 goto on_error;
             }
             *out_value = aws_json_get_array_element(*out_value, (size_t)index);

@@ -391,8 +391,7 @@ static int s_resolve_is_valid_host_label(
     struct aws_endpoints_value argv_value;
     struct aws_endpoints_value argv_allow_subdomains;
     if (aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value) ||
-        aws_endpoints_argv_expect(
-            allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
+        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve not.");
         goto on_error;
     }
@@ -433,8 +432,8 @@ static int s_resolve_fn_aws_partition(
 
     if (element != NULL) {
         out_value->type = AWS_ENDPOINTS_VALUE_OBJECT;
-        out_value->v.object = aws_endpoints_owning_cursor_create(
-            allocator, ((struct aws_partition_info *)element->value)->info);
+        out_value->v.object =
+            aws_endpoints_owning_cursor_create(allocator, ((struct aws_partition_info *)element->value)->info);
         goto on_success;
     }
 
@@ -451,8 +450,8 @@ static int s_resolve_fn_aws_partition(
     }
 
     out_value->type = AWS_ENDPOINTS_VALUE_OBJECT;
-    out_value->v.object = aws_endpoints_owning_cursor_create(
-        allocator, ((struct aws_partition_info *)element->value)->info);
+    out_value->v.object =
+        aws_endpoints_owning_cursor_create(allocator, ((struct aws_partition_info *)element->value)->info);
 
 on_success:
     aws_endpoints_value_clean_up(&argv_region);
@@ -567,8 +566,7 @@ static int s_resolve_is_virtual_hostable_s3_bucket(
     struct aws_endpoints_value argv_value;
     struct aws_endpoints_value argv_allow_subdomains;
     if (aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value) ||
-        aws_endpoints_argv_expect(
-            allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
+        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for isVirtualHostableS3Bucket.");
         goto on_error;
     }
