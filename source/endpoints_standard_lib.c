@@ -141,7 +141,9 @@ static int s_resolve_fn_substring(
         size_t start = (size_t)start_value.v.number;
         size_t end = (size_t)stop_value.v.number;
         struct aws_byte_cursor substring = {
-            .ptr = input_value.v.owning_cursor_string.cur.ptr + start, .len = end - start,};
+            .ptr = input_value.v.owning_cursor_string.cur.ptr + start,
+            .len = end - start,
+        };
 
         out_value->type = AWS_ENDPOINTS_VALUE_STRING;
         out_value->v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, substring);
@@ -150,7 +152,9 @@ static int s_resolve_fn_substring(
         size_t r_stop = input_value.v.owning_cursor_string.cur.len - (size_t)start_value.v.number;
 
         struct aws_byte_cursor substring = {
-            .ptr = input_value.v.owning_cursor_string.cur.ptr + r_start, .len = r_stop - r_start,};
+            .ptr = input_value.v.owning_cursor_string.cur.ptr + r_start,
+            .len = r_stop - r_start,
+        };
         out_value->type = AWS_ENDPOINTS_VALUE_STRING;
         out_value->v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, substring);
     }
