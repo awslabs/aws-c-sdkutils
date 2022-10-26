@@ -1095,5 +1095,5 @@ int aws_endpoints_rule_engine_resolve(
 on_done:
     AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Resolved endpoint with status %d", result);
     s_scope_clean_up(&scope);
-    return AWS_OP_ERR;
+    return result;
 }
