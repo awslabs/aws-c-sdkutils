@@ -528,7 +528,7 @@ int aws_path_through_json(
             }
             *out_value = aws_json_get_array_element(*out_value, (size_t)index);
             if (NULL == *out_value) {
-                *out_value = NULL;
+                aws_reset_error();
                 goto on_success;
             }
         }
@@ -541,7 +541,7 @@ on_success:
 on_error:
     aws_array_list_clean_up(&path_segments);
     *out_value = NULL;
-    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+    return ;
 }
 
 struct aws_owning_cursor aws_endpoints_owning_cursor_create(

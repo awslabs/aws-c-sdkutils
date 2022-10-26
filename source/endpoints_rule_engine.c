@@ -265,6 +265,7 @@ int aws_endpoints_argv_expect(
     return AWS_OP_SUCCESS;
 
 on_error:
+    aws_endpoints_value_clean_up(out_value);
     aws_endpoints_value_clean_up(&argv_value);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
@@ -980,26 +981,31 @@ int aws_endpoints_rule_engine_resolve(
     const struct aws_endpoints_request_context *context,
     struct aws_endpoints_resolved_endpoint **out_resolved_endpoint) {
 
+    
     if (aws_array_list_length(&engine->ruleset->rules) == 0) {
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EMPTY_RULESET);
     }
 
+    int result = AWS_OP_SUCCESS;
     struct aws_endpoints_resolution_scope scope;
     if (s_init_top_level_scope(engine->allocator, context, engine->ruleset, engine->partitions_config, &scope)) {
-        goto on_error;
+        result = AWS_OP_ERR;
+        goto on_done;
     }
 
     while (scope.rule_idx < aws_array_list_length(scope.rules)) {
         struct aws_endpoints_rule *rule = NULL;
         if (aws_array_list_get_at_ptr(scope.rules, (void **)&rule, scope.rule_idx)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to get rule.");
-            goto on_error;
+            result = AWS_OP_ERR;
+            goto on_done;
         }
 
         bool is_truthy = false;
         if (s_resolve_conditions(engine->allocator, &rule->conditions, &scope, &is_truthy)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve conditions.");
-            goto on_error;
+            result = AWS_OP_ERR;
+            goto on_done;
         }
 
         if (!is_truthy) {
@@ -1019,7 +1025,8 @@ int aws_endpoints_rule_engine_resolve(
                     aws_byte_buf_init_copy_from_cursor(
                         &endpoint->r.endpoint.url, engine->allocator, val.v.owning_cursor_string.cur)) {
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated url.");
-                    goto on_error;
+                    result = AWS_OP_ERR;
+                    goto on_done;
                 }
 
                 aws_endpoints_value_clean_up(&val);
@@ -1035,17 +1042,19 @@ int aws_endpoints_rule_engine_resolve(
                         &data,
                         true)) {
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated properties.");
-                    goto on_error;
+                    result = AWS_OP_ERR;
+                    goto on_done;
                 }
 
                 if (s_resolve_headers(
                         engine->allocator, &scope, &rule->rule_data.endpoint.headers, &endpoint->r.endpoint.headers)) {
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated headers.");
-                    goto on_error;
+                    result = AWS_OP_ERR;
+                    goto on_done;
                 }
 
                 *out_resolved_endpoint = endpoint;
-                goto on_success;
+                goto on_done;
             }
             case AWS_ENDPOINTS_RULE_ERROR: {
                 struct aws_endpoints_resolved_endpoint *error = s_endpoints_resolved_endpoint_new(engine->allocator);
@@ -1058,12 +1067,13 @@ int aws_endpoints_rule_engine_resolve(
                         &error->r.error, engine->allocator, val.v.owning_cursor_string.cur)) {
                     aws_endpoints_value_clean_up(&val);
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated url.");
-                    goto on_error;
+                    result = AWS_OP_ERR;
+                    goto on_done;
                 }
 
                 aws_endpoints_value_clean_up(&val);
                 *out_resolved_endpoint = error;
-                goto on_success;
+                goto on_done;
             }
             case AWS_ENDPOINTS_RULE_TREE: {
                 /* jumping down a level */
@@ -1074,23 +1084,17 @@ int aws_endpoints_rule_engine_resolve(
             }
             default: {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected rule type.");
-                aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
-                goto on_error;
+                result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+                goto on_done;
             }
         }
     }
 
     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "All rules have been exhausted.");
-    aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RULESET_EXHAUSTED);
-    goto on_error;
+    result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RULESET_EXHAUSTED);
 
-on_success:
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Successfully resolved endpoint.");
-    s_scope_clean_up(&scope);
-    return AWS_OP_SUCCESS;
-
-on_error:
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unsuccessfully resolved endpoint.");
+on_done:
+    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Resolved endpoint with status %d", result);
     s_scope_clean_up(&scope);
     return AWS_OP_ERR;
 }

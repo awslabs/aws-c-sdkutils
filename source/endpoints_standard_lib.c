@@ -208,13 +208,13 @@ static int s_resolve_fn_boolean_equals(
         aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_value_2)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve booleanEquals.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
-        goto on_error;
+        goto on_done;
     }
 
     out_value->type = AWS_ENDPOINTS_VALUE_BOOLEAN;
     out_value->v.boolean = argv_value_1.v.boolean == argv_value_2.v.boolean;
 
-on_error:
+on_done:
     aws_endpoints_value_clean_up(&argv_value_1);
     aws_endpoints_value_clean_up(&argv_value_2);
     return result;
@@ -227,7 +227,7 @@ static int s_resolve_fn_uri_encode(
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
-    struct aws_byte_buf buf;
+    struct aws_byte_buf buf = {0};
     struct aws_endpoints_value argv_value = {0};
     if (aws_array_list_length(argv) != 1 ||
         aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value)) {
