@@ -981,7 +981,6 @@ int aws_endpoints_rule_engine_resolve(
     const struct aws_endpoints_request_context *context,
     struct aws_endpoints_resolved_endpoint **out_resolved_endpoint) {
 
-    
     if (aws_array_list_length(&engine->ruleset->rules) == 0) {
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_EMPTY_RULESET);
     }

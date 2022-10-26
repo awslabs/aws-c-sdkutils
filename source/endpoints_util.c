@@ -541,7 +541,7 @@ on_success:
 on_error:
     aws_array_list_clean_up(&path_segments);
     *out_value = NULL;
-    return ;
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
 struct aws_owning_cursor aws_endpoints_owning_cursor_create(
