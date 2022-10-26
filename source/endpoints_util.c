@@ -408,7 +408,8 @@ int aws_byte_buf_init_from_resolved_templated_string(
     bool is_json) {
     AWS_PRECONDITION(allocator);
 
-    struct aws_owning_cursor resolved_template = {0};
+    struct aws_owning_cursor resolved_template;
+    AWS_ZERO_STRUCT(resolved_template);
 
     if (aws_byte_buf_init(out_buf, allocator, string.len)) {
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
