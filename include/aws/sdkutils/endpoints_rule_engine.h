@@ -208,7 +208,8 @@ AWS_SDKUTILS_API struct aws_endpoints_request_context *aws_endpoints_request_con
 /*
  * Add string value to request context.
  * Note: this function will make a copy of the memory backing the cursors.
- * Adding several value with the same name will result in the error.
+ * The function will override any previous value stored in the context with the
+ * same name.
  */
 AWS_SDKUTILS_API int aws_endpoints_request_context_add_string(
     struct aws_allocator *allocator,
@@ -219,7 +220,8 @@ AWS_SDKUTILS_API int aws_endpoints_request_context_add_string(
 /*
  * Add boolean value to request context.
  * Note: this function will make a copy of the memory backing the cursors.
- * Adding several value with the same name will result in the error.
+ * The function will override any previous value stored in the context with the
+ * same name.
  */
 AWS_SDKUTILS_API int aws_endpoints_request_context_add_boolean(
     struct aws_allocator *allocator,

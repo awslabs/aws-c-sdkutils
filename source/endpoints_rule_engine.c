@@ -187,7 +187,8 @@ static int s_init_top_level_scope(
             switch (value->type) {
                 case AWS_ENDPOINTS_PARAMETER_STRING:
                     val->value.type = AWS_ENDPOINTS_VALUE_STRING;
-                    val->value.v.string = aws_endpoints_non_owning_cursor_create(value->default_value.string);
+                    val->value.v.owning_cursor_string =
+                        aws_endpoints_non_owning_cursor_create(value->default_value.string);
                     break;
                 case AWS_ENDPOINTS_PARAMETER_BOOLEAN:
                     val->value.type = AWS_ENDPOINTS_VALUE_BOOLEAN;
@@ -225,7 +226,10 @@ static int s_resolve_expr(
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value);
 
-static struct aws_string *s_resolve_template(struct aws_byte_cursor template, void *user_data);
+static int s_resolve_template(
+    struct aws_byte_cursor template,
+    void *user_data,
+    struct aws_owning_cursor *out_owning_cursor);
 
 int aws_endpoints_argv_expect(
     struct aws_allocator *allocator,
@@ -234,14 +238,15 @@ int aws_endpoints_argv_expect(
     size_t idx,
     enum aws_endpoints_value_type expected_type,
     struct aws_endpoints_value *out_value) {
+
     AWS_ZERO_STRUCT(*out_value);
+    struct aws_endpoints_value argv_value = {0};
     struct aws_endpoints_expr argv_expr;
     if (aws_array_list_get_at(argv, &argv_expr, idx)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to parse argv");
         goto on_error;
     }
 
-    struct aws_endpoints_value argv_value;
     if (s_resolve_expr(allocator, &argv_expr, scope, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve argv.");
         goto on_error;
@@ -260,6 +265,7 @@ int aws_endpoints_argv_expect(
     return AWS_OP_SUCCESS;
 
 on_error:
+    aws_endpoints_value_clean_up(&argv_value);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
@@ -286,7 +292,8 @@ static int s_resolve_expr(
             }
 
             out_value->type = AWS_ENDPOINTS_VALUE_STRING;
-            out_value->v.string = aws_endpoints_owning_cursor_from_string(aws_string_new_from_buf(allocator, &buf));
+            out_value->v.owning_cursor_string =
+                aws_endpoints_owning_cursor_from_string(aws_string_new_from_buf(allocator, &buf));
             aws_byte_buf_clean_up(&buf);
             break;
         }
@@ -321,9 +328,9 @@ static int s_resolve_expr(
                 if (aws_endpoints_scope_value->value.type == AWS_ENDPOINTS_VALUE_STRING) {
                     /* Value will not own underlying mem and instead its owned
                     by the scope, so set it to NULL. */
-                    out_value->v.string.string = NULL;
+                    out_value->v.owning_cursor_string.string = NULL;
                 } else if (aws_endpoints_scope_value->value.type == AWS_ENDPOINTS_VALUE_OBJECT) {
-                    out_value->v.object.string = NULL;
+                    out_value->v.owning_cursor_object.string = NULL;
                 }
             }
             break;
@@ -454,8 +461,8 @@ int aws_endpoints_path_through_object(
     AWS_ZERO_STRUCT(*out_value);
     struct aws_json_value *root_node = NULL;
 
-    struct aws_byte_cursor value_cur =
-        value->type != AWS_ENDPOINTS_VALUE_STRING ? value->v.string.cur : value->v.object.cur;
+    struct aws_byte_cursor value_cur = value->type != AWS_ENDPOINTS_VALUE_STRING ? value->v.owning_cursor_string.cur
+                                                                                 : value->v.owning_cursor_object.cur;
 
     root_node = aws_json_value_new_from_string(allocator, value_cur);
     const struct aws_json_value *result;
@@ -474,7 +481,7 @@ int aws_endpoints_path_through_object(
         }
 
         out_value->type = AWS_ENDPOINTS_VALUE_STRING;
-        out_value->v.string = aws_endpoints_owning_cursor_from_cursor(allocator, final);
+        out_value->v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, final);
     } else if (aws_json_value_is_array(result) || aws_json_value_is_object(result)) {
         struct aws_byte_buf json_blob;
         aws_byte_buf_init(&json_blob, allocator, 0);
@@ -487,9 +494,9 @@ int aws_endpoints_path_through_object(
 
         aws_byte_buf_clean_up(&json_blob);
         out_value->type = AWS_ENDPOINTS_VALUE_OBJECT;
-        out_value->v.object = aws_endpoints_owning_cursor_from_string(aws_string_new_from_buf(allocator, &json_blob));
+        out_value->v.owning_cursor_object =
+            aws_endpoints_owning_cursor_from_string(aws_string_new_from_buf(allocator, &json_blob));
     } else if (aws_json_value_is_boolean(result)) {
-
         if (aws_json_value_get_boolean(result, &out_value->v.boolean)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Could not parse boolean from node.");
             goto on_error;
@@ -517,8 +524,9 @@ static int s_resolve_templated_value_with_pathing(
     struct aws_allocator *allocator,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_byte_cursor template_cur,
-    struct aws_string **out_value) {
+    struct aws_owning_cursor *out_owning_cursor) {
 
+    struct aws_endpoints_value resolved_value = {0};
     struct aws_byte_cursor split = {0};
     if (!aws_byte_cursor_next_split(&template_cur, '#', &split) || split.len == 0) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Invalid value in template string.");
@@ -533,8 +541,6 @@ static int s_resolve_templated_value_with_pathing(
     }
 
     struct aws_endpoints_scope_value *scope_value = elem->value;
-    struct aws_endpoints_value resolved_value;
-
     if (!aws_byte_cursor_next_split(&template_cur, '#', &split)) {
         if (scope_value->value.type != AWS_ENDPOINTS_VALUE_STRING) {
             AWS_LOGF_ERROR(
@@ -542,7 +548,7 @@ static int s_resolve_templated_value_with_pathing(
             goto on_error;
         }
 
-        *out_value = aws_string_new_from_cursor(allocator, &scope_value->value.v.string.cur);
+        *out_owning_cursor = aws_endpoints_non_owning_cursor_create(scope_value->value.v.owning_cursor_string.cur);
         return AWS_OP_SUCCESS;
     }
 
@@ -566,27 +572,35 @@ static int s_resolve_templated_value_with_pathing(
         goto on_error;
     }
 
-    *out_value = aws_string_new_from_cursor(allocator, &resolved_value.v.string.cur);
+    if (resolved_value.v.owning_cursor_string.string != NULL) {
+        /* Transfer ownership of the underlying string. */
+        *out_owning_cursor = aws_endpoints_owning_cursor_from_string(resolved_value.v.owning_cursor_string.string);
+        resolved_value.v.owning_cursor_string.string = NULL;
+    } else {
+        /* Unlikely to get here since current pathing always return new string. */
+        *out_owning_cursor = aws_endpoints_non_owning_cursor_create(resolved_value.v.owning_cursor_string.cur);
+    }
+
     aws_endpoints_value_clean_up(&resolved_value);
 
     return AWS_OP_SUCCESS;
 
 on_error:
+    aws_endpoints_value_clean_up(&resolved_value);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
-static struct aws_string *s_resolve_template(struct aws_byte_cursor template, void *user_data) {
+static int s_resolve_template(struct aws_byte_cursor template, void *user_data, struct aws_owning_cursor *out_cursor) {
 
     struct resolve_template_callback_data *data = user_data;
 
-    struct aws_string *result;
-    if (s_resolve_templated_value_with_pathing(data->allocator, data->scope, template, &result)) {
+    if (s_resolve_templated_value_with_pathing(data->allocator, data->scope, template, out_cursor)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve template value.");
-        aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
-        return NULL;
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        ;
     }
 
-    return result;
+    return AWS_OP_SUCCESS;
 }
 
 /*
@@ -660,7 +674,7 @@ int aws_endpoints_request_context_add_string(
 
     struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name);
     val->value.type = AWS_ENDPOINTS_VALUE_STRING;
-    val->value.v.string = aws_endpoints_owning_cursor_from_cursor(allocator, value);
+    val->value.v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, value);
 
     if (aws_hash_table_put(&context->values, &val->name.cur, val, NULL)) {
         aws_endpoints_scope_value_destroy(val);
@@ -934,7 +948,7 @@ static int s_resolve_headers(
                 goto on_error;
             }
 
-            struct aws_string *str = aws_string_new_from_cursor(allocator, &value.v.string.cur);
+            struct aws_string *str = aws_string_new_from_cursor(allocator, &value.v.owning_cursor_string.cur);
             if (aws_array_list_push_back(resolved_headers, &str)) {
                 aws_string_destroy(str);
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to add resolved header to result.");
@@ -1003,7 +1017,7 @@ int aws_endpoints_rule_engine_resolve(
                 if (s_resolve_expr(engine->allocator, &rule->rule_data.endpoint.url, &scope, &val) ||
                     val.type != AWS_ENDPOINTS_VALUE_STRING ||
                     aws_byte_buf_init_copy_from_cursor(
-                        &endpoint->r.endpoint.url, engine->allocator, val.v.string.cur)) {
+                        &endpoint->r.endpoint.url, engine->allocator, val.v.owning_cursor_string.cur)) {
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated url.");
                     goto on_error;
                 }
@@ -1040,7 +1054,8 @@ int aws_endpoints_rule_engine_resolve(
                 struct aws_endpoints_value val;
                 if (s_resolve_expr(engine->allocator, &rule->rule_data.error.error, &scope, &val) ||
                     val.type != AWS_ENDPOINTS_VALUE_STRING ||
-                    aws_byte_buf_init_copy_from_cursor(&error->r.error, engine->allocator, val.v.string.cur)) {
+                    aws_byte_buf_init_copy_from_cursor(
+                        &error->r.error, engine->allocator, val.v.owning_cursor_string.cur)) {
                     aws_endpoints_value_clean_up(&val);
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated url.");
                     goto on_error;

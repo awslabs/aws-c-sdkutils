@@ -408,10 +408,9 @@ int aws_byte_buf_init_from_resolved_templated_string(
     bool is_json) {
     AWS_PRECONDITION(allocator);
 
-    struct aws_string *resolved_template = NULL;
+    struct aws_owning_cursor resolved_template = {0};
 
     if (aws_byte_buf_init(out_buf, allocator, string.len)) {
-        AWS_ZERO_STRUCT(out_buf);
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
     }
 
@@ -455,20 +454,17 @@ int aws_byte_buf_init_from_resolved_templated_string(
         aws_byte_cursor_advance(&after_closing, 1);
         string = after_closing;
 
-        resolved_template = resolve_callback(split, user_data);
-        if (resolved_template == NULL) {
+        if (resolve_callback(split, user_data, &resolved_template)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to resolve template.");
             goto on_error;
         }
 
-        struct aws_byte_cursor resolved_template_cur = aws_byte_cursor_from_string(resolved_template);
-        if (s_buf_append_and_update_quote_count(out_buf, resolved_template_cur, &quote_count)) {
+        if (s_buf_append_and_update_quote_count(out_buf, resolved_template.cur, &quote_count)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to append resolved value.");
             goto on_error;
         }
 
-        aws_string_destroy(resolved_template);
-        resolved_template = NULL;
+        aws_owning_cursor_clean_up(&resolved_template);
     }
 
     if (s_buf_append_and_update_quote_count(out_buf, split, &quote_count)) {
@@ -479,7 +475,8 @@ int aws_byte_buf_init_from_resolved_templated_string(
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_string_destroy(resolved_template);
+    aws_byte_buf_clean_up(out_buf);
+    aws_owning_cursor_clean_up(&resolved_template);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
@@ -544,5 +541,37 @@ on_error:
     aws_array_list_clean_up(&path_segments);
     *out_value = NULL;
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
-    ;
+}
+
+struct aws_owning_cursor aws_endpoints_owning_cursor_create(
+    struct aws_allocator *allocator,
+    const struct aws_string *str) {
+    struct aws_string *clone = aws_string_clone_or_reuse(allocator, str);
+    struct aws_owning_cursor ret = {.string = clone, .cur = aws_byte_cursor_from_string(clone)};
+    return ret;
+}
+
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str) {
+    struct aws_owning_cursor ret = {.string = str, .cur = aws_byte_cursor_from_string(str)};
+    return ret;
+}
+
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
+    struct aws_allocator *allocator,
+    const struct aws_byte_cursor cur) {
+    struct aws_string *clone = aws_string_new_from_cursor(allocator, &cur);
+    struct aws_owning_cursor ret = {.string = clone, .cur = aws_byte_cursor_from_string(clone)};
+    return ret;
+}
+
+struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur) {
+    struct aws_owning_cursor ret = {.string = NULL, .cur = cur};
+    return ret;
+}
+
+void aws_owning_cursor_clean_up(struct aws_owning_cursor *cursor) {
+    aws_string_destroy(cursor->string);
+    cursor->string = NULL;
+    cursor->cur.ptr = NULL;
+    cursor->cur.len = 0;
 }

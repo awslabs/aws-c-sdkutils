@@ -9,6 +9,7 @@
 #include <aws/common/hash_table.h>
 #include <aws/common/ref_count.h>
 #include <aws/sdkutils/endpoints_rule_engine.h>
+#include <aws/sdkutils/private/endpoints_util.h>
 
 struct aws_json_value;
 
@@ -213,19 +214,13 @@ struct aws_endpoints_request_context {
     struct aws_hash_table values;
 };
 
-/* Cursor that optionally owns underlying memory. */
-struct aws_owning_cursor {
-    struct aws_byte_cursor cur;
-    struct aws_string *string;
-};
-
 /* concrete type value */
 struct aws_endpoints_value {
     enum aws_endpoints_value_type type;
     union {
-        struct aws_owning_cursor string;
+        struct aws_owning_cursor owning_cursor_string;
         bool boolean;
-        struct aws_owning_cursor object;
+        struct aws_owning_cursor owning_cursor_object;
         double number;
         struct aws_array_list array;
     } v;
@@ -276,19 +271,6 @@ struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(
     struct aws_allocator *allocator,
     struct aws_byte_cursor name_cur);
 void aws_endpoints_scope_value_destroy(struct aws_endpoints_scope_value *scope_value);
-
-/* Clones string and wraps it in owning cursor. */
-struct aws_owning_cursor aws_endpoints_owning_cursor_create(
-    struct aws_allocator *allocator,
-    const struct aws_string *str);
-/* Creates new cursor that takes ownership of created string. */
-struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str);
-/* Clones memory pointer to by cursor and wraps in owning cursor */
-struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
-    struct aws_allocator *allocator,
-    const struct aws_byte_cursor cur);
-/* Creates owning cursor with memory pointer set to NULL */
-struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur);
 
 int aws_endpoints_deep_copy_parameter_value(
     struct aws_allocator *allocator,

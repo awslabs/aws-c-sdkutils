@@ -185,8 +185,7 @@ static int s_init_partitions_config_from_json(
     struct aws_json_value *version_node = aws_json_value_get_from_object(root, aws_byte_cursor_from_c_str("version"));
     if (version_node == NULL || aws_json_value_get_string(version_node, &version_cur)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to extract version.");
-        aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_UNSUPPORTED);
-        goto on_error;
+        return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_UNSUPPORTED);
     }
 
 #ifdef ENDPOINTS_VERSION_CHECK /* TODO: samples are currently inconsistent with versions. skip check for now */
@@ -201,14 +200,10 @@ static int s_init_partitions_config_from_json(
         aws_json_value_get_from_object(root, aws_byte_cursor_from_c_str("partitions"));
     if (partitions_node == NULL || aws_json_const_iterate_array(partitions_node, s_on_partition_element, partitions)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to parse partitions.");
-        aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
-        goto on_error;
+        return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
     }
 
     return AWS_OP_SUCCESS;
-
-on_error:
-    return AWS_OP_ERR;
 }
 
 static void s_callback_partition_info_destroy(void *data) {

@@ -169,32 +169,6 @@ void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr) {
     AWS_ZERO_STRUCT(*expr);
 }
 
-struct aws_owning_cursor aws_endpoints_owning_cursor_create(
-    struct aws_allocator *allocator,
-    const struct aws_string *str) {
-    struct aws_string *clone = aws_string_clone_or_reuse(allocator, str);
-    struct aws_owning_cursor ret = {.string = clone, .cur = aws_byte_cursor_from_string(clone)};
-    return ret;
-}
-
-struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str) {
-    struct aws_owning_cursor ret = {.string = str, .cur = aws_byte_cursor_from_string(str)};
-    return ret;
-}
-
-struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
-    struct aws_allocator *allocator,
-    const struct aws_byte_cursor cur) {
-    struct aws_string *clone = aws_string_new_from_cursor(allocator, &cur);
-    struct aws_owning_cursor ret = {.string = clone, .cur = aws_byte_cursor_from_string(clone)};
-    return ret;
-}
-
-struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur) {
-    struct aws_owning_cursor ret = {.string = NULL, .cur = cur};
-    return ret;
-}
-
 struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(
     struct aws_allocator *allocator,
     struct aws_byte_cursor name_cur) {
@@ -219,17 +193,21 @@ void aws_endpoints_scope_value_destroy(struct aws_endpoints_scope_value *scope_v
 void aws_endpoints_value_clean_up_cb(void *value);
 
 void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_value) {
+    AWS_PRECONDITION(aws_endpoints_value);
+
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_STRING) {
-        aws_string_destroy(aws_endpoints_value->v.string.string);
+        aws_string_destroy(aws_endpoints_value->v.owning_cursor_string.string);
     }
 
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_OBJECT) {
-        aws_string_destroy(aws_endpoints_value->v.object.string);
+        aws_string_destroy(aws_endpoints_value->v.owning_cursor_object.string);
     }
 
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_ARRAY) {
         aws_array_list_deep_clean_up(&aws_endpoints_value->v.array, aws_endpoints_value_clean_up_cb);
     }
+
+    AWS_ZERO_STRUCT(*aws_endpoints_value);
 }
 
 void aws_endpoints_value_clean_up_cb(void *value) {
@@ -245,7 +223,7 @@ int aws_endpoints_deep_copy_parameter_value(
     to->type = from->type;
 
     if (to->type == AWS_ENDPOINTS_VALUE_STRING) {
-        to->v.string = aws_endpoints_owning_cursor_create(allocator, from->v.string.string);
+        to->v.owning_cursor_string = aws_endpoints_owning_cursor_create(allocator, from->v.owning_cursor_string.string);
     } else if (to->type == AWS_ENDPOINTS_VALUE_BOOLEAN) {
         to->v.boolean = from->v.boolean;
     } else {

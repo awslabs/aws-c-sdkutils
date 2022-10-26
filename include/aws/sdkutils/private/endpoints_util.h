@@ -12,6 +12,28 @@ struct aws_string;
 struct aws_byte_buf;
 struct aws_json_value;
 
+/* Cursor that optionally owns underlying memory. */
+struct aws_owning_cursor {
+    struct aws_byte_cursor cur;
+    struct aws_string *string;
+};
+
+/* Clones string and wraps it in owning cursor. */
+struct aws_owning_cursor aws_endpoints_owning_cursor_create(
+    struct aws_allocator *allocator,
+    const struct aws_string *str);
+/* Creates new cursor that takes ownership of created string. */
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str);
+/* Clones memory pointer to by cursor and wraps in owning cursor */
+struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
+    struct aws_allocator *allocator,
+    const struct aws_byte_cursor cur);
+/* Creates owning cursor with memory pointer set to NULL */
+struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur);
+
+/* Cleans up memory associated with the cursor */
+void aws_owning_cursor_clean_up(struct aws_owning_cursor *cursor);
+
 /*
  * Determine whether host cursor is IPv4 string.
  */
@@ -70,8 +92,11 @@ AWS_SDKUTILS_API void aws_array_list_deep_clean_up(
     struct aws_array_list *array,
     aws_array_callback_clean_up_fn on_clean_up_element);
 
-typedef struct aws_string *(aws_endpoints_template_resolve_fn)(struct aws_byte_cursor template, void *user_data);
-
+/* Function that resolves template. */
+typedef int(aws_endpoints_template_resolve_fn)(
+    struct aws_byte_cursor template,
+    void *user_data,
+    struct aws_owning_cursor *out_resolved);
 /*
  * Resolve templated string and write it out to buf.
  * Will parse templated values (i.e. values enclosed in {}) and replace them with

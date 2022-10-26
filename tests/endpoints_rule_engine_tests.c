@@ -229,7 +229,13 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
     struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset, partitions);
 
     struct aws_byte_buf test_cases_buf;
-    ASSERT_SUCCESS(read_file_contents(&test_cases_buf, allocator, aws_byte_cursor_from_buf(&test_cases_file_path)));
+    if (read_file_contents(&test_cases_buf, allocator, aws_byte_cursor_from_buf(&test_cases_file_path))) {
+        AWS_LOGF_INFO(
+            AWS_LS_SDKUTILS_ENDPOINTS_PARSING,
+            "Ruleset has no associated test cases: " PRInSTR,
+            AWS_BYTE_CURSOR_PRI(file_name));
+        goto skip_test_cases;
+    }
     struct aws_byte_cursor test_cases_json = aws_byte_cursor_from_buf(&test_cases_buf);
 
     struct aws_json_value *test_cases = aws_json_value_new_from_string(allocator, test_cases_json);
@@ -314,14 +320,16 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
     }
 
     aws_json_value_destroy(test_cases);
+    aws_byte_buf_clean_up(&test_cases_buf);
+
+skip_test_cases:
     aws_endpoints_ruleset_release(ruleset);
     aws_partitions_config_release(partitions);
     aws_endpoints_rule_engine_release(engine);
     aws_byte_buf_clean_up(&ruleset_file_path);
-    aws_byte_buf_clean_up(&test_cases_file_path);
     aws_byte_buf_clean_up(&ruleset_buf);
     aws_byte_buf_clean_up(&partitions_buf);
-    aws_byte_buf_clean_up(&test_cases_buf);
+    aws_byte_buf_clean_up(&test_cases_file_path);
 
     return AWS_OP_SUCCESS;
 }

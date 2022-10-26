@@ -478,7 +478,10 @@ static int s_on_parameter_key(
         }
     }
 
-    aws_hash_table_put(wrapper->table, &parameter->name, parameter, NULL);
+    if (aws_hash_table_put(wrapper->table, &parameter->name, parameter, NULL)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to add parameter.");
+        goto on_error;
+    }
     return AWS_OP_SUCCESS;
 
 on_error:
