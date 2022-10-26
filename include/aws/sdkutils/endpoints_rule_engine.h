@@ -10,13 +10,14 @@
 #include <aws/sdkutils/sdkutils.h>
 
 struct aws_endpoints_ruleset;
+struct aws_partitions_config;
 struct aws_endpoints_parameter;
 struct aws_endpoints_rule_engine;
 struct aws_endpoints_resolved_endpoint;
 struct aws_endpoints_request_context;
 struct aws_hash_table;
 
-enum aws_endpoints_value_type { AWS_ENDPOINTS_PARAMETER_STRING, AWS_ENDPOINTS_PARAMETER_BOOLEAN };
+enum aws_endpoints_parameter_type { AWS_ENDPOINTS_PARAMETER_STRING, AWS_ENDPOINTS_PARAMETER_BOOLEAN };
 enum aws_endpoints_resolved_endpoint_type { AWS_ENDPOINTS_RESOLVED_ENDPOINT, AWS_ENDPOINTS_RESOLVED_ERROR };
 
 AWS_EXTERN_C_BEGIN
@@ -32,30 +33,32 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_get_supported_ruleset_vers
 /*
  * Value type of parameter.
  */
-AWS_SDKUTILS_API enum aws_endpoints_value_type aws_endpoints_parameter_get_value_type(
+AWS_SDKUTILS_API enum aws_endpoints_parameter_type aws_endpoints_parameter_get_type(
     const struct aws_endpoints_parameter *parameter);
 
 /*
  * Specifies whether parameter maps to one of SDK built ins (ex. "AWS::Region").
- * NULL return does not indicate error.
- * Owned by parameter. Can be NULL if no mapping exists.
+ * Return is a cursor specifying the name of associated built in.
+ * If there is no mapping, cursor will be empty.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_built_in(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_built_in(
     const struct aws_endpoints_parameter *parameter);
 
 /*
  * Default string value.
- * Out arg will have pointer to value if default is specified, NULL otherwise.
- * Owned by parameter.
+ * out_cursor will point to default string value if one exist and will be empty
+ * otherwise.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
  * Returns AWS_OP_ERR if parameter is not a string.
  */
 AWS_SDKUTILS_API int aws_endpoints_parameter_get_default_string(
     const struct aws_endpoints_parameter *parameter,
-    const struct aws_string **out_string);
+    struct aws_byte_cursor *out_cursor);
 
 /*
  * Default boolean value.
- * Out arg will have pointer to value if default is specified, NULL otherwise.
+ * out_bool will have pointer to value if default is specified, NULL otherwise.
  * Owned by parameter.
  * Returns AWS_OP_ERR if parameter is not a boolean.
  */
@@ -69,10 +72,11 @@ AWS_SDKUTILS_API int aws_endpoints_parameter_get_default_boolean(
 AWS_SDKUTILS_API bool aws_endpoints_parameter_get_is_required(const struct aws_endpoints_parameter *parameter);
 
 /*
- * Parameter documentation.
- * Owned by parameter. Will not be NULL as doc is required.
+ * Returns cursor to parameter documentation.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
+ * Will not be empty as doc is required.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_documentation(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_documentation(
     const struct aws_endpoints_parameter *parameter);
 
 /*
@@ -81,19 +85,17 @@ AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_documentat
 AWS_SDKUTILS_API bool aws_endpoints_parameters_get_is_deprecated(const struct aws_endpoints_parameter *parameter);
 
 /*
- * Deprecation message. Null if parameter is not deprecated.
- * NULL return does not indicate error.
- * Owned by parameter.
+ * Deprecation message. Cursor is empty if parameter is not deprecated.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_deprecated_message(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_message(
     const struct aws_endpoints_parameter *parameter);
 
 /*
- * Deprecated since. Null if parameter is not deprecated.
- * NULL return does not indicate error.
- * Owned by parameter.
+ * Deprecated since. Cursor is empty if parameter is not deprecated.
+ * Cursor is guaranteed to be valid for lifetime of paramater.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_deprecated_since(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_since(
     const struct aws_endpoints_parameter *parameter);
 
 /*
@@ -108,7 +110,7 @@ AWS_SDKUTILS_API const struct aws_string *aws_endpoints_parameter_get_deprecated
  */
 AWS_SDKUTILS_API struct aws_endpoints_ruleset *aws_endpoints_ruleset_new_from_string(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor ruleset_cur);
+    struct aws_byte_cursor ruleset_json);
 
 /*
  * Increment ref count
@@ -141,15 +143,14 @@ AWS_SDKUTILS_API const struct aws_hash_table *aws_endpoints_ruleset_get_paramete
  * Returned pointer is owned by ruleset.
  * Will not return NULL as version is a required field for ruleset.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_version(
-    const struct aws_endpoints_ruleset *ruleset);
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_ruleset_get_version(const struct aws_endpoints_ruleset *ruleset);
 
 /*
  * Ruleset service id.
  * Returned pointer is owned by ruleset.
  * Can be NULL if not specified in ruleset.
  */
-AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_service_id(
+AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_ruleset_get_service_id(
     const struct aws_endpoints_ruleset *ruleset);
 
 /*
@@ -164,7 +165,8 @@ AWS_SDKUTILS_API const struct aws_string *aws_endpoints_ruleset_get_service_id(
  */
 AWS_SDKUTILS_API struct aws_endpoints_rule_engine *aws_endpoints_rule_engine_new(
     struct aws_allocator *allocator,
-    struct aws_endpoints_ruleset *ruleset);
+    struct aws_endpoints_ruleset *ruleset,
+    struct aws_partitions_config *partitions_config);
 
 /*
  * Increment rule engine ref count.
@@ -206,20 +208,24 @@ AWS_SDKUTILS_API struct aws_endpoints_request_context *aws_endpoints_request_con
 /*
  * Add string value to request context.
  * Note: this function will make a copy of the memory backing the cursors.
- * Adding several value with the same name will result in the error.
+ * The function will override any previous value stored in the context with the
+ * same name.
  */
 AWS_SDKUTILS_API int aws_endpoints_request_context_add_string(
     struct aws_allocator *allocator,
+    struct aws_endpoints_request_context *context,
     struct aws_byte_cursor name,
     struct aws_byte_cursor value);
 
 /*
  * Add boolean value to request context.
  * Note: this function will make a copy of the memory backing the cursors.
- * Adding several value with the same name will result in the error.
+ * The function will override any previous value stored in the context with the
+ * same name.
  */
 AWS_SDKUTILS_API int aws_endpoints_request_context_add_boolean(
     struct aws_allocator *allocator,
+    struct aws_endpoints_request_context *context,
     struct aws_byte_cursor name,
     bool value);
 
@@ -282,14 +288,13 @@ AWS_SDKUTILS_API int aws_endpoints_resolved_endpoint_get_properties(
  */
 AWS_SDKUTILS_API int aws_endpoints_resolved_endpoint_get_headers(
     const struct aws_endpoints_resolved_endpoint *resolved_endpoint,
-    struct aws_hash_table **out_headers);
+    const struct aws_hash_table **out_headers);
 
 /*
  * Get error for the resolved endpoint.
  * Valid only if resolved endpoint has error type and will error otherwise.
  */
-AWS_SDKUTILS_API
-int aws_endpoints_resolved_endpoint_get_error(
+AWS_SDKUTILS_API int aws_endpoints_resolved_endpoint_get_error(
     const struct aws_endpoints_resolved_endpoint *resolved_endpoint,
     struct aws_byte_cursor *out_error);
 

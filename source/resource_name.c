@@ -35,7 +35,7 @@ int aws_resource_name_init_from_cur(struct aws_resource_name *arn, const struct 
     if (aws_array_list_get_at(&arn_part_list, &arn->region, 3)) {
         return aws_raise_error(AWS_ERROR_MALFORMED_INPUT_STRING);
     }
-    if (aws_array_list_get_at(&arn_part_list, &arn->account_id, 4) || aws_byte_cursor_eq_c_str(&arn->account_id, "")) {
+    if (aws_array_list_get_at(&arn_part_list, &arn->account_id, 4)) {
         return aws_raise_error(AWS_ERROR_MALFORMED_INPUT_STRING);
     }
     if (aws_array_list_get_at(&arn_part_list, &arn->resource_id, 5)) {
