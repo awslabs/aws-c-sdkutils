@@ -138,6 +138,8 @@ static int s_test_uri_normalize_path(struct aws_allocator *allocator, void *ctx)
 }
 
 int s_resolve_cb(struct aws_byte_cursor template, void *user_data, struct aws_owning_cursor *out_resolved) {
+    (void)template;
+    (void)user_data;
     *out_resolved = aws_endpoints_non_owning_cursor_create(aws_byte_cursor_from_c_str("test"));
     return AWS_OP_SUCCESS;
 }
@@ -146,6 +148,7 @@ AWS_TEST_CASE(
     endpoints_byte_buf_init_from_resolved_templated_string,
     s_test_byte_buf_init_from_resolved_templated_string)
 static int s_test_byte_buf_init_from_resolved_templated_string(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
 
     struct aws_byte_buf buf;
 
