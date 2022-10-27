@@ -338,8 +338,8 @@ static int s_buf_append_and_update_quote_count(
 
     /* Dont count quotes if its not json. escaped quotes will be replaced with
     regular quotes when ruleset json is parsed, which will lead to incorrect
-    results for when templates should be resolved in regular strings. 
-    Note: in json blobs escaped quotes are preserved and bellow approach works. */ 
+    results for when templates should be resolved in regular strings.
+    Note: in json blobs escaped quotes are preserved and bellow approach works. */
     if (is_json) {
         for (size_t idx = 0; idx < to_append.len; ++idx) {
             if (to_append.ptr[idx] == '"' && !(idx > 0 && to_append.ptr[idx - 1] == '\\')) {
@@ -362,7 +362,7 @@ static struct aws_byte_cursor escaped_opening_curly = AWS_BYTE_CUR_INIT_FROM_STR
 int s_append_template_prefix_to_buffer(
     struct aws_byte_buf *out_buf,
     struct aws_byte_cursor prefix,
-    size_t *quote_count, 
+    size_t *quote_count,
     bool is_json) {
 
     struct aws_byte_cursor split = {0};
