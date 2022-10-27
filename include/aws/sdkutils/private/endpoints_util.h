@@ -19,20 +19,20 @@ struct aws_owning_cursor {
 };
 
 /* Clones string and wraps it in owning cursor. */
-struct aws_owning_cursor aws_endpoints_owning_cursor_create(
+AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_create(
     struct aws_allocator *allocator,
     const struct aws_string *str);
 /* Creates new cursor that takes ownership of created string. */
-struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str);
+AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str);
 /* Clones memory pointer to by cursor and wraps in owning cursor */
-struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
+AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
     struct aws_allocator *allocator,
     const struct aws_byte_cursor cur);
 /* Creates owning cursor with memory pointer set to NULL */
-struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur);
+AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_non_owning_cursor_create(struct aws_byte_cursor cur);
 
 /* Cleans up memory associated with the cursor */
-void aws_owning_cursor_clean_up(struct aws_owning_cursor *cursor);
+AWS_SDKUTILS_API void aws_owning_cursor_clean_up(struct aws_owning_cursor *cursor);
 
 /*
  * Determine whether host cursor is IPv4 string.
