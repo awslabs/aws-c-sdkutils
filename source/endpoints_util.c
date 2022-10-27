@@ -333,10 +333,18 @@ static bool s_split_on_first_delim(
 static int s_buf_append_and_update_quote_count(
     struct aws_byte_buf *buf,
     struct aws_byte_cursor to_append,
-    size_t *quote_count) {
-    for (size_t idx = 0; idx < to_append.len; ++idx) {
-        if (to_append.ptr[idx] == '"' && !(idx > 0 && to_append.ptr[idx - 1] == '\\')) {
-            ++*quote_count;
+    size_t *quote_count,
+    bool is_json) {
+
+    /* Dont count quotes if its not json. escaped quotes will be replaced with
+    regular quotes when ruleset json is parsed, which will lead to incorrect
+    results for when templates should be resolved in regular strings.
+    Note: in json blobs escaped quotes are preserved and bellow approach works. */
+    if (is_json) {
+        for (size_t idx = 0; idx < to_append.len; ++idx) {
+            if (to_append.ptr[idx] == '"' && !(idx > 0 && to_append.ptr[idx - 1] == '\\')) {
+                ++*quote_count;
+            }
         }
     }
     return aws_byte_buf_append_dynamic(buf, &to_append);
@@ -354,12 +362,14 @@ static struct aws_byte_cursor escaped_opening_curly = AWS_BYTE_CUR_INIT_FROM_STR
 int s_append_template_prefix_to_buffer(
     struct aws_byte_buf *out_buf,
     struct aws_byte_cursor prefix,
-    size_t *quote_count) {
+    size_t *quote_count,
+    bool is_json) {
+
     struct aws_byte_cursor split = {0};
     struct aws_byte_cursor rest = {0};
 
     while (s_split_on_first_delim(prefix, '}', &split, &rest)) {
-        if (s_buf_append_and_update_quote_count(out_buf, split, quote_count)) {
+        if (s_buf_append_and_update_quote_count(out_buf, split, quote_count, is_json)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to append to resolved template buffer.");
             goto on_error;
         }
@@ -388,7 +398,7 @@ int s_append_template_prefix_to_buffer(
         prefix = rest;
     }
 
-    if (s_buf_append_and_update_quote_count(out_buf, split, quote_count)) {
+    if (s_buf_append_and_update_quote_count(out_buf, split, quote_count, is_json)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to append to resolved template buffer.");
         goto on_error;
     }
@@ -419,7 +429,7 @@ int aws_byte_buf_init_from_resolved_templated_string(
     struct aws_byte_cursor split = {0};
     struct aws_byte_cursor rest = {0};
     while (s_split_on_first_delim(string, '{', &split, &rest)) {
-        if (s_append_template_prefix_to_buffer(out_buf, split, &quote_count)) {
+        if (s_append_template_prefix_to_buffer(out_buf, split, &quote_count, is_json)) {
             AWS_LOGF_ERROR(
                 AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to append to buffer while evaluating templated sting.");
             goto on_error;
@@ -460,7 +470,7 @@ int aws_byte_buf_init_from_resolved_templated_string(
             goto on_error;
         }
 
-        if (s_buf_append_and_update_quote_count(out_buf, resolved_template.cur, &quote_count)) {
+        if (s_buf_append_and_update_quote_count(out_buf, resolved_template.cur, &quote_count, is_json)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to append resolved value.");
             goto on_error;
         }
@@ -468,7 +478,7 @@ int aws_byte_buf_init_from_resolved_templated_string(
         aws_owning_cursor_clean_up(&resolved_template);
     }
 
-    if (s_buf_append_and_update_quote_count(out_buf, split, &quote_count)) {
+    if (s_buf_append_and_update_quote_count(out_buf, split, &quote_count, is_json)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to append to resolved template buffer.");
         goto on_error;
     }
