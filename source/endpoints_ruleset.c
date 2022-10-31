@@ -342,7 +342,7 @@ static int s_parse_function(
 
     function->fn = AWS_ENDPOINTS_FN_LAST;
     uint64_t hash = aws_hash_byte_cursor_ptr(&fn_cur);
-    for (size_t idx = AWS_ENDPOINTS_FN_FIRST; idx < AWS_ENDPOINTS_FN_LAST; ++idx) {
+    for (int idx = AWS_ENDPOINTS_FN_FIRST; idx < AWS_ENDPOINTS_FN_LAST; ++idx) {
         if (aws_endpoints_fn_name_hash[idx] == hash) {
             function->fn = idx;
             break;
