@@ -46,8 +46,6 @@ AWS_TEST_CASE(parse_ruleset_from_string, s_test_parse_ruleset_from_string)
 static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
-    allocator = aws_default_allocator();
-
     aws_sdkutils_library_init(allocator);
 
     struct aws_byte_buf buf;
@@ -465,6 +463,15 @@ static int s_test_endpoints_valid_hostlabel(struct aws_allocator *allocator, voi
     (void)ctx;
 
     ASSERT_SUCCESS(eval_expected(allocator, aws_byte_cursor_from_c_str("valid-hostlabel.json")));
+
+    return AWS_OP_SUCCESS;
+}
+
+AWS_TEST_CASE(test_endpoints_condition_mem_clean_up, s_test_condition_mem_clean_up)
+static int s_test_condition_mem_clean_up(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    ASSERT_SUCCESS(eval_expected(allocator, aws_byte_cursor_from_c_str("custom_object_condition.json")));
 
     return AWS_OP_SUCCESS;
 }

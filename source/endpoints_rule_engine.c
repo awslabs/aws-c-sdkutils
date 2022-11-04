@@ -265,7 +265,6 @@ int aws_endpoints_argv_expect(
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_endpoints_value_clean_up(out_value);
     aws_endpoints_value_clean_up(&argv_value);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
@@ -281,6 +280,7 @@ static int s_resolve_expr(
     struct aws_endpoints_expr *expr,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
+
     AWS_ZERO_STRUCT(*out_value);
     switch (expr->type) {
         case AWS_ENDPOINTS_EXPR_STRING: {
@@ -351,13 +351,73 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
+static int s_resolve_one_condition(
+    struct aws_allocator *allocator,
+    struct aws_endpoints_condition *condition,
+    struct aws_endpoints_resolution_scope *scope,
+    bool *out_is_truthy) {
+
+    struct aws_endpoints_scope_value *scope_value = NULL;
+
+    struct aws_endpoints_value val;
+    if (s_resolve_expr(allocator, &condition->expr, scope, &val)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve expr.");
+        goto on_error;
+    }
+
+    *out_is_truthy = is_value_truthy(&val);
+
+    /* Note: assigning value is skipped if condition is falsy, since nothing can
+    use it and that avoids adding value and then removing it from scope right away. */
+    if (*out_is_truthy && condition->assign.len > 0) {
+        /* If condition assigns a value, push it to scope and let scope
+        handle value memory. */
+        scope_value = aws_endpoints_scope_value_new(allocator, condition->assign);
+        scope_value->value = val;
+
+        if (aws_array_list_push_back(&scope->added_keys, &scope_value->name.cur)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to update key at given scope.");
+            goto on_error;
+        }
+
+        int was_created = 1;
+        if (aws_hash_table_put(&scope->values, &scope_value->name.cur, scope_value, &was_created)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to set assigned variable.");
+            goto on_error;
+        }
+
+        /* Shadowing existing values is prohibited. */
+        if (!was_created) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Assigned variable shadows existing one.");
+            goto on_error;
+        }
+    } else {
+        /* Otherwise clean up temp value */
+        aws_endpoints_value_clean_up(&val);
+    }
+
+    return AWS_OP_SUCCESS;
+
+on_error:
+    aws_endpoints_scope_value_destroy(scope_value);
+    /* Only cleanup value if mem ownership was not transferred to scope value. */
+    if (scope_value == NULL) {
+        aws_endpoints_value_clean_up(&val);
+    }
+
+    *out_is_truthy = false;
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+}
+
 static int s_resolve_conditions(
     struct aws_allocator *allocator,
     const struct aws_array_list *conditions,
     struct aws_endpoints_resolution_scope *scope,
     bool *out_is_truthy) {
 
-    *out_is_truthy = false;
+    /* Note: spec defines empty conditions list as truthy. */
+    *out_is_truthy = true;
+
     for (size_t idx = 0; idx < aws_array_list_length(conditions); ++idx) {
         struct aws_endpoints_condition *condition = NULL;
         if (aws_array_list_get_at_ptr(conditions, (void **)&condition, idx)) {
@@ -365,49 +425,22 @@ static int s_resolve_conditions(
             goto on_error;
         }
 
-        struct aws_endpoints_value val;
-        if (s_resolve_expr(allocator, &condition->expr, scope, &val)) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve expr.");
+        if (s_resolve_one_condition(allocator, condition, scope, out_is_truthy)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve condition.");
             goto on_error;
         }
 
-        /* truthiness of all conditions is and of each condition truthiness,
-            hence first false one short circuits */
-        if (!is_value_truthy(&val)) {
-            goto on_short_circuit;
-        }
-
-        if (condition->assign.len > 0) {
-            struct aws_endpoints_scope_value *aws_endpoints_scope_value =
-                aws_endpoints_scope_value_new(allocator, condition->assign);
-            aws_endpoints_scope_value->value = val;
-
-            if (aws_array_list_push_back(&scope->added_keys, &aws_endpoints_scope_value->name.cur)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to update key at given scope.");
-                goto on_error;
-            }
-
-            int was_created = 1;
-            if (aws_hash_table_put(
-                    &scope->values, &aws_endpoints_scope_value->name.cur, aws_endpoints_scope_value, &was_created)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to set assigned variable.");
-                goto on_error;
-            }
-
-            /* Shadowing existing values is prohibited in sep. */
-            if (!was_created) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Assigned variable shadows existing one.");
-                goto on_error;
-            }
+        /* truthiness of all conditions is an AND of truthiness for each condition,
+            hence first false one short circuits resolution */
+        if (!*out_is_truthy) {
+            break;
         }
     }
 
-    *out_is_truthy = true;
-
-on_short_circuit:
     return AWS_OP_SUCCESS;
 
 on_error:
+    *out_is_truthy = false;
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 

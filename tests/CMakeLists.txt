@@ -82,6 +82,7 @@ add_test_case(test_endpoints_partition_fn)
 add_test_case(test_endpoints_substring)
 add_test_case(test_endpoints_uri_encode)
 add_test_case(test_endpoints_valid_hostlabel)
+add_test_case(test_endpoints_condition_mem_clean_up)
 
 add_test_case(endpoints_eval_util_is_ipv4)
 add_test_case(endpoints_eval_util_is_ipv6)
