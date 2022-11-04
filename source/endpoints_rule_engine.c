@@ -280,7 +280,7 @@ static int s_resolve_expr(
     struct aws_endpoints_expr *expr,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
-        
+
     AWS_ZERO_STRUCT(*out_value);
     switch (expr->type) {
         case AWS_ENDPOINTS_EXPR_STRING: {
