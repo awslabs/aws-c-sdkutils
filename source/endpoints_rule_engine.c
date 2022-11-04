@@ -265,7 +265,6 @@ int aws_endpoints_argv_expect(
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_endpoints_value_clean_up(out_value);
     aws_endpoints_value_clean_up(&argv_value);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
@@ -281,6 +280,7 @@ static int s_resolve_expr(
     struct aws_endpoints_expr *expr,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
+        
     AWS_ZERO_STRUCT(*out_value);
     switch (expr->type) {
         case AWS_ENDPOINTS_EXPR_STRING: {
@@ -372,7 +372,7 @@ static int s_resolve_one_condition(
     if (*out_is_truthy && condition->assign.len > 0) {
         /* If condition assigns a value, push it to scope and let scope
         handle value memory. */
-        struct aws_endpoints_scope_value *scope_value = aws_endpoints_scope_value_new(allocator, condition->assign);
+        scope_value = aws_endpoints_scope_value_new(allocator, condition->assign);
         scope_value->value = val;
 
         if (aws_array_list_push_back(&scope->added_keys, &scope_value->name.cur)) {
