@@ -351,13 +351,14 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
-static int s_resolve_one_condition(struct aws_allocator *allocator,
+static int s_resolve_one_condition(
+    struct aws_allocator *allocator,
     struct aws_endpoints_condition *condition,
     struct aws_endpoints_resolution_scope *scope,
     bool *out_is_truthy) {
 
     struct aws_endpoints_scope_value *scope_value = NULL;
-    
+
     struct aws_endpoints_value val;
     if (s_resolve_expr(allocator, &condition->expr, scope, &val)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve expr.");
@@ -370,7 +371,7 @@ static int s_resolve_one_condition(struct aws_allocator *allocator,
     use it and that avoids adding value and then removing it from scope right away. */
     if (*out_is_truthy && condition->assign.len > 0) {
         /* If condition assigns a value, push it to scope and let scope
-        handle value memory. */ 
+        handle value memory. */
         struct aws_endpoints_scope_value *scope_value = aws_endpoints_scope_value_new(allocator, condition->assign);
         scope_value->value = val;
 
@@ -380,8 +381,7 @@ static int s_resolve_one_condition(struct aws_allocator *allocator,
         }
 
         int was_created = 1;
-        if (aws_hash_table_put(
-                &scope->values, &scope_value->name.cur, scope_value, &was_created)) {
+        if (aws_hash_table_put(&scope->values, &scope_value->name.cur, scope_value, &was_created)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to set assigned variable.");
             goto on_error;
         }
@@ -404,7 +404,7 @@ on_error:
     if (scope_value == NULL) {
         aws_endpoints_value_clean_up(&val);
     }
-    
+
     *out_is_truthy = false;
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }

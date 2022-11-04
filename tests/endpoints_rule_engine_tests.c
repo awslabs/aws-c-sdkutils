@@ -135,7 +135,9 @@ static int s_test_condition_mem_clean_up(struct aws_allocator *allocator, void *
 
     struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
-        allocator, context, aws_byte_cursor_from_c_str("Arn"),
+        allocator,
+        context,
+        aws_byte_cursor_from_c_str("Arn"),
         aws_byte_cursor_from_c_str("arn:aws:s3::123456789012:accesspoint:mfzwi23gnjvgw.mrap")));
 
     struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
