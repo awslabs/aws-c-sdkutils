@@ -46,8 +46,6 @@ AWS_TEST_CASE(parse_ruleset_from_string, s_test_parse_ruleset_from_string)
 static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
-    allocator = aws_default_allocator();
-
     aws_sdkutils_library_init(allocator);
 
     struct aws_byte_buf buf;
@@ -99,6 +97,51 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
 
     ASSERT_CURSOR_VALUE_CSTRING_EQUALS(url_cur, "https://example.us-west-2.amazonaws.com");
+
+    aws_endpoints_ruleset_release(ruleset);
+    aws_partitions_config_release(partitions);
+    aws_endpoints_rule_engine_release(engine);
+    aws_endpoints_resolved_endpoint_release(resolved_endpoint);
+    aws_endpoints_request_context_release(context);
+    aws_byte_buf_clean_up(&buf);
+    aws_byte_buf_clean_up(&partitions_buf);
+    aws_sdkutils_library_clean_up();
+    return AWS_OP_SUCCESS;
+}
+
+AWS_TEST_CASE(test_endpoints_condition_mem_clean_up, s_test_condition_mem_clean_up)
+static int s_test_condition_mem_clean_up(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    aws_sdkutils_library_init(allocator);
+
+    struct aws_byte_buf buf;
+    ASSERT_SUCCESS(read_file_contents(&buf, allocator, aws_byte_cursor_from_c_str("object_condition_ruleset.json")));
+    struct aws_byte_cursor ruleset_json = aws_byte_cursor_from_buf(&buf);
+
+    struct aws_endpoints_ruleset *ruleset = aws_endpoints_ruleset_new_from_string(allocator, ruleset_json);
+
+    ASSERT_NOT_NULL(ruleset);
+
+    struct aws_byte_buf partitions_buf;
+    ASSERT_SUCCESS(
+        read_file_contents(&partitions_buf, allocator, aws_byte_cursor_from_c_str("sample_partitions.json")));
+    struct aws_byte_cursor partitions_json = aws_byte_cursor_from_buf(&partitions_buf);
+    struct aws_partitions_config *partitions = aws_partitions_config_new_from_string(allocator, partitions_json);
+
+    ASSERT_NOT_NULL(partitions);
+
+    struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset, partitions);
+
+    struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
+    ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
+        allocator, context, aws_byte_cursor_from_c_str("Arn"),
+        aws_byte_cursor_from_c_str("arn:aws:s3::123456789012:accesspoint:mfzwi23gnjvgw.mrap")));
+
+    struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
+    ASSERT_SUCCESS(aws_endpoints_rule_engine_resolve(engine, context, &resolved_endpoint));
+
+    ASSERT_INT_EQUALS(aws_endpoints_resolved_endpoint_get_type(resolved_endpoint), AWS_ENDPOINTS_RESOLVED_ERROR);
 
     aws_endpoints_ruleset_release(ruleset);
     aws_partitions_config_release(partitions);
