@@ -46,11 +46,31 @@ static int s_on_region_merge(
 
     struct region_merge_wrapper *merge = user_data;
 
+    /*
+    * Note: latest partitions file includes description on every region.
+    * This results in a separate record created for every region, since any
+    * overrides on region create a new record that is a merge of partition
+    * default and override.
+    * Description is not used by endpoints rule engine, hence lets ignore it
+    * during merge for now to avoid creating numerous records that all have the
+    * same data.
+    * This decision can be revisited lated if we decide to extend partitions
+    * parsing for any other use cases.
+    */
+    if (aws_byte_cursor_eq_c_str(key, "description")) {
+        return AWS_OP_SUCCESS;
+    }
+
     if (merge->merge_node == NULL) {
         merge->merge_node = aws_json_value_duplicate(merge->outputs_node);
     }
 
-    if (aws_json_value_remove_from_object(merge->merge_node, *key)) {
+    /*
+    * Note: Its valid for region to add new field to default partition outputs
+    * instead of overriding existing one. So only delete previous value if it exists.
+    */
+    if (aws_json_value_has_key(merge->merge_node, *key) &&
+        aws_json_value_remove_from_object(merge->merge_node, *key)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to remove previous partition value.");
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
     }
