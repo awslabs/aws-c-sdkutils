@@ -279,7 +279,7 @@ AWS_SDKUTILS_API int aws_endpoints_resolved_endpoint_get_properties(
 
 /*
  * Get headers for the resolved endpoint.
- * out_headers type is aws_hash_table with (aws_byte_cursor *) as key
+ * out_headers type is aws_hash_table with (aws_string *) as key
  * and (aws_array_list * of aws_string *) as value.
  * Note on usage in bindings:
  * - this is a map to a list of strings and can be implemented as such in the
