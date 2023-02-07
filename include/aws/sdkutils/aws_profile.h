@@ -42,7 +42,21 @@ AWS_EXTERN_C_BEGIN
  *************************/
 
 /**
- * Clean up everything associated with a profile collection
+ * Increments the reference count on the profile collection, allowing the caller to take a reference to it.
+ *
+ * Returns the same profile collection passed in.
+ */
+AWS_SDKUTILS_API
+struct aws_profile_collection *aws_profile_collection_acquire(struct aws_profile_collection *collection);
+
+/**
+ * Decrements a profile collection's ref count.  When the ref count drops to zero, the collection will be destroyed.
+ */
+AWS_SDKUTILS_API
+void aws_profile_collection_release(struct aws_profile_collection *collection);
+
+/**
+ * @Deprecated This is equivalent to aws_profile_collection_release.
  */
 AWS_SDKUTILS_API
 void aws_profile_collection_destroy(struct aws_profile_collection *profile_collection);
