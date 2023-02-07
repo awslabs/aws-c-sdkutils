@@ -598,12 +598,7 @@ void aws_profile_collection_destroy(struct aws_profile_collection *profile_colle
 }
 
 void aws_profile_collection_destroy_internal(struct aws_profile_collection *profile_collection) {
-    if (profile_collection == NULL) {
-        return;
-    }
-
     aws_hash_table_clean_up(&profile_collection->profiles);
-
     aws_mem_release(profile_collection->allocator, profile_collection);
 }
 
