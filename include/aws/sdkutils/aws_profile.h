@@ -51,7 +51,7 @@ struct aws_profile_collection *aws_profile_collection_acquire(struct aws_profile
 
 /**
  * Decrements a profile collection's ref count.  When the ref count drops to zero, the collection will be destroyed.
- * This function will always return NULL.
+ * Returns NULL.
  */
 AWS_SDKUTILS_API
 struct aws_profile_collection *aws_profile_collection_release(struct aws_profile_collection *collection);
