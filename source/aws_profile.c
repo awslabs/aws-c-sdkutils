@@ -597,7 +597,7 @@ void aws_profile_collection_destroy(struct aws_profile_collection *profile_colle
     aws_profile_collection_release(profile_collection);
 }
 
-void aws_profile_collection_destroy_internal(struct aws_profile_collection *profile_collection) {
+static void aws_profile_collection_destroy_internal(struct aws_profile_collection *profile_collection) {
     aws_hash_table_clean_up(&profile_collection->profiles);
     aws_mem_release(profile_collection->allocator, profile_collection);
 }
@@ -784,7 +784,7 @@ struct aws_profile_collection *aws_profile_collection_new_from_merge(
     return merged;
 
 cleanup:
-    aws_profile_collection_release(merged);
+    aws_profile_collection_destroy_internal(merged);
 
     return NULL;
 }
@@ -1246,7 +1246,7 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
     return profile_collection;
 
 cleanup:
-    aws_profile_collection_release(profile_collection);
+    aws_profile_collection_destroy_internal(profile_collection);
 
     return NULL;
 }
@@ -1259,10 +1259,12 @@ struct aws_profile_collection *aws_profile_collection_acquire(struct aws_profile
     return collection;
 }
 
-void aws_profile_collection_release(struct aws_profile_collection *collection) {
+struct aws_profile_collection *aws_profile_collection_release(struct aws_profile_collection *collection) {
     if (collection != NULL) {
         aws_ref_count_release(&collection->ref_count);
     }
+
+    return NULL;
 }
 
 struct aws_profile_collection *aws_profile_collection_new_from_file(
