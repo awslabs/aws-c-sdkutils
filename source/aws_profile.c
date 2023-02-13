@@ -8,6 +8,7 @@
 #include <aws/common/file.h>
 #include <aws/common/hash_table.h>
 #include <aws/common/logging.h>
+#include <aws/common/ref_count.h>
 #include <aws/common/string.h>
 #include <aws/sdkutils/aws_profile.h>
 
@@ -33,6 +34,7 @@ struct aws_profile_collection {
     struct aws_allocator *allocator;
     enum aws_profile_source_type profile_source;
     struct aws_hash_table profiles;
+    struct aws_ref_count ref_count;
 };
 
 /*
@@ -592,12 +594,11 @@ static void s_profile_hash_table_value_destroy(void *value) {
  */
 
 void aws_profile_collection_destroy(struct aws_profile_collection *profile_collection) {
-    if (profile_collection == NULL) {
-        return;
-    }
+    aws_profile_collection_release(profile_collection);
+}
 
+static void s_aws_profile_collection_destroy_internal(struct aws_profile_collection *profile_collection) {
     aws_hash_table_clean_up(&profile_collection->profiles);
-
     aws_mem_release(profile_collection->allocator, profile_collection);
 }
 
@@ -741,6 +742,8 @@ struct aws_profile_collection *aws_profile_collection_new_from_merge(
     }
 
     AWS_ZERO_STRUCT(*merged);
+    aws_ref_count_init(
+        &merged->ref_count, merged, (aws_simple_completion_callback *)s_aws_profile_collection_destroy_internal);
 
     size_t max_profiles = 0;
     if (config_profiles != NULL) {
@@ -781,7 +784,7 @@ struct aws_profile_collection *aws_profile_collection_new_from_merge(
     return merged;
 
 cleanup:
-    aws_profile_collection_destroy(merged);
+    s_aws_profile_collection_destroy_internal(merged);
 
     return NULL;
 }
@@ -1198,6 +1201,11 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
     profile_collection->profile_source = source;
     profile_collection->allocator = allocator;
 
+    aws_ref_count_init(
+        &profile_collection->ref_count,
+        profile_collection,
+        (aws_simple_completion_callback *)s_aws_profile_collection_destroy_internal);
+
     if (aws_hash_table_init(
             &profile_collection->profiles,
             allocator,
@@ -1238,7 +1246,23 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
     return profile_collection;
 
 cleanup:
-    aws_profile_collection_destroy(profile_collection);
+    s_aws_profile_collection_destroy_internal(profile_collection);
+
+    return NULL;
+}
+
+struct aws_profile_collection *aws_profile_collection_acquire(struct aws_profile_collection *collection) {
+    if (collection != NULL) {
+        aws_ref_count_acquire(&collection->ref_count);
+    }
+
+    return collection;
+}
+
+struct aws_profile_collection *aws_profile_collection_release(struct aws_profile_collection *collection) {
+    if (collection != NULL) {
+        aws_ref_count_release(&collection->ref_count);
+    }
 
     return NULL;
 }
