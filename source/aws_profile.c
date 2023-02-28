@@ -32,13 +32,13 @@ struct aws_profile {
 
 struct aws_section_collection {
     struct aws_allocator *allocator;
-    struct aws_hash_table section_collection;
+    struct aws_hash_table sections;
 };
 
 struct aws_profile_collection {
     struct aws_allocator *allocator;
-    struct aws_hash_table collections;
     enum aws_profile_source_type profile_source;
+    struct aws_hash_table profiles;
     struct aws_ref_count ref_count;
 };
 
@@ -597,7 +597,7 @@ void aws_profile_collection_destroy(struct aws_profile_collection *profile_colle
 }
 
 static void s_aws_profile_collection_destroy_internal(struct aws_profile_collection *profile_collection) {
-    aws_hash_table_clean_up(&profile_collection->collections);
+    aws_hash_table_clean_up(&profile_collection->profiles);
     aws_mem_release(profile_collection->allocator, profile_collection);
 }
 AWS_STATIC_STRING_FROM_LITERAL(s_profile_token, "profile");
@@ -607,13 +607,13 @@ const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name) {
     struct aws_hash_element *element = NULL;
-    if (aws_hash_table_find(&profile_collection->collections, s_profile_token, &element) || element == NULL) {
+    if (aws_hash_table_find(&profile_collection->profiles, s_profile_token, &element) || element == NULL) {
         return NULL;
     }
     struct aws_section_collection *collection = element->value;
 
     struct aws_hash_element *profile = NULL;
-    aws_hash_table_find(&collection->section_collection, profile_name, &profile);
+    aws_hash_table_find(&collection->sections, profile_name, &profile);
 
     if (profile == NULL) {
         return NULL;
@@ -626,13 +626,13 @@ const struct aws_profile *aws_profile_collection_get_session(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name) {
     struct aws_hash_element *element = NULL;
-    if (aws_hash_table_find(&profile_collection->collections, s_sso_session_token, &element) || element == NULL) {
+    if (aws_hash_table_find(&profile_collection->profiles, s_sso_session_token, &element) || element == NULL) {
         return NULL;
     }
     struct aws_section_collection *collection = element->value;
 
     struct aws_hash_element *profile = NULL;
-    aws_hash_table_find(&collection->section_collection, profile_name, &profile);
+    aws_hash_table_find(&collection->sections, profile_name, &profile);
 
     if (profile == NULL) {
         return NULL;
@@ -643,7 +643,7 @@ const struct aws_profile *aws_profile_collection_get_session(
 
 void aws_section_collection_destroy(void *section_collection) {
     struct aws_section_collection *collection = section_collection;
-    aws_hash_table_clean_up(&collection->section_collection);
+    aws_hash_table_clean_up(&collection->sections);
     aws_mem_release(collection->allocator, collection);
 }
 
@@ -667,7 +667,7 @@ static struct aws_section_collection *aws_section_collection_new(struct aws_allo
     struct aws_section_collection *aws_section_collection =
         aws_mem_calloc(allocator, 1, sizeof(struct aws_section_collection));
     aws_section_collection->allocator = allocator;
-    aws_section_collection->section_collection = collection;
+    aws_section_collection->sections = collection;
     return aws_section_collection;
 }
 
@@ -683,14 +683,14 @@ static int s_profile_collection_add_profile(
 
     struct aws_hash_element *table_elem = NULL;
     int was_created = 0;
-    if (aws_hash_table_create(&profile_collection->collections, collection_name, &table_elem, &was_created)) {
+    if (aws_hash_table_create(&profile_collection->profiles, collection_name, &table_elem, &was_created)) {
         return AWS_OP_ERR;
     }
     if (was_created) {
         table_elem->value = aws_section_collection_new(profile_collection->allocator);
     }
     struct aws_section_collection *section_collection = table_elem->value;
-    struct aws_hash_table *collection = &section_collection->section_collection;
+    struct aws_hash_table *collection = &section_collection->sections;
 
     struct aws_string *key =
         aws_string_new_from_array(profile_collection->allocator, profile_name->ptr, profile_name->len);
@@ -770,18 +770,18 @@ static int s_profile_collection_merge(
     const struct aws_profile_collection *source_collection) {
 
     AWS_ASSERT(dest_collection != NULL && source_collection);
-    struct aws_hash_iter source_top_iter = aws_hash_iter_begin(&source_collection->collections);
+    struct aws_hash_iter source_top_iter = aws_hash_iter_begin(&source_collection->profiles);
 
     while (!aws_hash_iter_done(&source_top_iter)) {
         struct aws_section_collection *source_table = (struct aws_section_collection *)source_top_iter.element.value;
 
         struct aws_hash_iter source_iter =
-            aws_hash_iter_begin((struct aws_hash_table *)&source_table->section_collection);
+            aws_hash_iter_begin((struct aws_hash_table *)&source_table->sections);
 
         struct aws_hash_element *table_elem = NULL;
         int was_created = 0;
         if (aws_hash_table_create(
-                &dest_collection->collections,
+                &dest_collection->profiles,
                 (struct aws_string *)source_top_iter.element.key,
                 &table_elem,
                 &was_created)) {
@@ -791,7 +791,7 @@ static int s_profile_collection_merge(
             table_elem->value = aws_section_collection_new(dest_collection->allocator);
         }
         struct aws_section_collection *section_collection = table_elem->value;
-        struct aws_hash_table *collection = &section_collection->section_collection;
+        struct aws_hash_table *collection = &section_collection->sections;
 
         while (!aws_hash_iter_done(&source_iter)) {
 
@@ -845,17 +845,17 @@ struct aws_profile_collection *aws_profile_collection_new_from_merge(
 
     size_t max_profiles = 0;
     if (config_profiles != NULL) {
-        max_profiles += aws_hash_table_get_entry_count(&config_profiles->collections);
+        max_profiles += aws_hash_table_get_entry_count(&config_profiles->profiles);
     }
     if (credentials_profiles != NULL) {
-        max_profiles += aws_hash_table_get_entry_count(&credentials_profiles->collections);
+        max_profiles += aws_hash_table_get_entry_count(&credentials_profiles->profiles);
     }
 
     merged->allocator = allocator;
     merged->profile_source = AWS_PST_NONE;
 
     if (aws_hash_table_init(
-            &merged->collections,
+            &merged->profiles,
             allocator,
             max_profiles,
             aws_hash_string,
@@ -1320,7 +1320,7 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
         (aws_simple_completion_callback *)s_aws_profile_collection_destroy_internal);
 
     if (aws_hash_table_init(
-            &profile_collection->collections,
+            &profile_collection->profiles,
             allocator,
             PROFILE_TABLE_DEFAULT_SIZE,
             aws_hash_string,
@@ -1637,11 +1637,11 @@ size_t aws_profile_get_property_count(const struct aws_profile *profile) {
 
 size_t aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection) {
     struct aws_hash_element *element = NULL;
-    if (aws_hash_table_find(&profile_collection->collections, s_profile_token, &element) || element == NULL) {
+    if (aws_hash_table_find(&profile_collection->profiles, s_profile_token, &element) || element == NULL) {
         return 0;
     }
     struct aws_section_collection *collection = element->value;
-    return aws_hash_table_get_entry_count(&collection->section_collection);
+    return aws_hash_table_get_entry_count(&collection->sections);
 }
 
 size_t aws_profile_property_get_sub_property_count(const struct aws_profile_property *property) {
