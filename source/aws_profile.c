@@ -643,6 +643,10 @@ const struct aws_profile *aws_profile_collection_get_session(
     return profile->value;
 }
 
+void aws_collection_value_destroy(void *table) {
+    aws_hash_table_clean_up(table);
+}
+
 static int s_profile_collection_add_profile(
     const struct aws_string *collection_name,
     struct aws_profile_collection *profile_collection,
@@ -670,8 +674,8 @@ static int s_profile_collection_add_profile(
             0,
             aws_hash_string,
             aws_hash_callback_string_eq,
-            aws_hash_callback_string_destroy,
-            aws_hash_callback_string_destroy);
+            NULL,
+                aws_collection_value_destroy);
         if (aws_hash_table_put(&profile_collection->collections, collection_name, collection, NULL)) {
             goto on_aws_profile_new_failure;
         }
@@ -1575,7 +1579,7 @@ size_t aws_profile_collection_get_profile_count(const struct aws_profile_collect
     if (aws_hash_table_find(&profile_collection->collections, s_profile_token, &element) || element == NULL) {
         return 0;
     }
-    return aws_hash_table_get_entry_count((struct aws_hash_table *)element->key);
+    return aws_hash_table_get_entry_count((struct aws_hash_table *)element->value);
 }
 
 size_t aws_profile_property_get_sub_property_count(const struct aws_profile_property *property) {
