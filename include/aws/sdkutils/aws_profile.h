@@ -84,6 +84,12 @@ const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name);
 
+AWS_SDKUTILS_API
+const struct aws_profile *aws_profile_collection_get_session(
+        const struct aws_profile_collection *profile_collection,
+        const struct aws_string *profile_name);
+
+
 /**
  * Returns how many profiles a collection holds
  */
