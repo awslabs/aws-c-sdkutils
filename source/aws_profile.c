@@ -588,7 +588,6 @@ static int s_profile_merge(struct aws_profile *dest_profile, const struct aws_pr
     return AWS_OP_SUCCESS;
 }
 
-
 /*
  * aws_profile_collection APIs
  */
@@ -632,7 +631,6 @@ const struct aws_profile *aws_profile_collection_get_session(
     }
     struct aws_collection *collection = element->value;
 
-
     struct aws_hash_element *profile = NULL;
     aws_hash_table_find(&collection->collections, profile_name, &profile);
 
@@ -673,23 +671,28 @@ static int s_profile_collection_add_profile(
     aws_hash_table_find(&profile_collection->collections, collection_name, &table_elem);
     struct aws_hash_table *collection = NULL;
     if (table_elem) {
-        collection = table_elem->value;
+        struct aws_collection *awsCollection = table_elem->value;
+        collection = &awsCollection->collections;
     } else {
-        collection = aws_mem_calloc(profile_collection->allocator, 1, sizeof(struct aws_hash_table));
+        struct aws_hash_table *new_collection =
+            aws_mem_calloc(profile_collection->allocator, 1, sizeof(struct aws_hash_table));
         aws_hash_table_init(
-            collection,
+            new_collection,
             profile_collection->allocator,
-            0,
+            2,
             aws_hash_string,
             aws_hash_callback_string_eq,
             NULL,
-                s_profile_hash_table_value_destroy);
-        struct aws_collection *awsCollection = aws_mem_calloc(profile_collection->allocator, 1, sizeof(struct aws_collection));
+            s_profile_hash_table_value_destroy);
+        struct aws_collection *awsCollection =
+            aws_mem_calloc(profile_collection->allocator, 1, sizeof(struct aws_collection));
         awsCollection->allocator = profile_collection->allocator;
-        awsCollection->collections = *collection;
+        awsCollection->collections = *new_collection;
         if (aws_hash_table_put(&profile_collection->collections, collection_name, awsCollection, NULL)) {
             goto on_aws_profile_new_failure;
         }
+        aws_mem_release(profile_collection->allocator, new_collection);
+        collection = &awsCollection->collections;
     }
     struct aws_profile *existing_profile = NULL;
     struct aws_hash_element *element = NULL;
@@ -734,6 +737,7 @@ static int s_profile_collection_add_profile(
 
     if (existing_profile) {
         *current_profile_out = existing_profile;
+
         return AWS_OP_SUCCESS;
     }
 
@@ -747,6 +751,7 @@ static int s_profile_collection_add_profile(
     }
 
     *current_profile_out = new_profile;
+
     return AWS_OP_SUCCESS;
 
 on_hash_table_put_failure:
@@ -762,16 +767,47 @@ static int s_profile_collection_merge(
 
     AWS_ASSERT(dest_collection != NULL && source_collection);
     struct aws_hash_iter source_top_iter = aws_hash_iter_begin(&source_collection->collections);
-    struct aws_hash_iter dest_top_iter = aws_hash_iter_begin(&source_collection->collections);
 
     while (!aws_hash_iter_done(&source_top_iter)) {
+        struct aws_collection *source_table = (struct aws_collection *)source_top_iter.element.value;
 
-        struct aws_hash_iter source_iter = aws_hash_iter_begin((struct aws_hash_table *)source_top_iter.element.value);
-        struct aws_collection *dest_table = (struct aws_collection *)source_top_iter.element.value;
+        struct aws_hash_iter source_iter = aws_hash_iter_begin((struct aws_hash_table *)&source_table->collections);
+
+        struct aws_hash_element *table_elem = NULL;
+        aws_hash_table_find(
+            &dest_collection->collections, (struct aws_string *)source_top_iter.element.key, &table_elem);
+        struct aws_hash_table *collection = NULL;
+        if (table_elem) {
+            struct aws_collection *awsCollection = table_elem->value;
+            collection = &awsCollection->collections;
+        } else {
+            struct aws_hash_table *new_collection =
+                aws_mem_calloc(dest_collection->allocator, 1, sizeof(struct aws_hash_table));
+            aws_hash_table_init(
+                new_collection,
+                dest_collection->allocator,
+                2,
+                aws_hash_string,
+                aws_hash_callback_string_eq,
+                NULL,
+                s_profile_hash_table_value_destroy);
+            struct aws_collection *awsCollection =
+                aws_mem_calloc(dest_collection->allocator, 1, sizeof(struct aws_collection));
+            awsCollection->allocator = dest_collection->allocator;
+            awsCollection->collections = *new_collection;
+            aws_hash_table_put(
+                &dest_collection->collections, (struct aws_string *)source_top_iter.element.key, awsCollection, NULL);
+            aws_mem_release(dest_collection->allocator, new_collection);
+            collection = &awsCollection->collections;
+        }
+
         while (!aws_hash_iter_done(&source_iter)) {
+
             struct aws_profile *source_profile = (struct aws_profile *)source_iter.element.value;
-            struct aws_profile *dest_profile = (struct aws_profile *)aws_profile_collection_get_profile(
-                dest_collection, (struct aws_string *)source_iter.element.key);
+            struct aws_hash_element *dest_elem = NULL;
+            aws_hash_table_find(collection, (struct aws_string *)source_iter.element.key, &dest_elem);
+
+            struct aws_profile *dest_profile = dest_elem ? dest_elem->value : NULL;
 
             if (dest_profile == NULL) {
 
@@ -782,7 +818,7 @@ static int s_profile_collection_merge(
                     return AWS_OP_ERR;
                 }
 
-                if (aws_hash_table_put(&dest_table->collections, dest_profile->name, dest_profile, NULL)) {
+                if (aws_hash_table_put(collection, dest_profile->name, dest_profile, NULL)) {
                     aws_profile_destroy(dest_profile);
                     return AWS_OP_ERR;
                 }
@@ -796,7 +832,6 @@ static int s_profile_collection_merge(
         }
 
         aws_hash_iter_next(&source_top_iter);
-        aws_hash_iter_next(&dest_top_iter);
     }
     return AWS_OP_SUCCESS;
 }
