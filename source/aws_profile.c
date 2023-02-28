@@ -589,6 +589,13 @@ static int s_profile_merge(struct aws_profile *dest_profile, const struct aws_pr
 }
 
 /*
+ * Hash table destroy helper for profile collection's profiles member
+ */
+static void s_profile_hash_table_value_destroy(void *value) {
+    aws_profile_destroy((struct aws_profile *)value);
+}
+
+/*
  * aws_profile_collection APIs
  */
 
@@ -645,13 +652,6 @@ void aws_section_collection_destroy(void *section_collection) {
     struct aws_section_collection *collection = section_collection;
     aws_hash_table_clean_up(&collection->sections);
     aws_mem_release(collection->allocator, collection);
-}
-
-/*
- * Hash table destroy helper for profile collection's profiles member
- */
-static void s_profile_hash_table_value_destroy(void *value) {
-    aws_profile_destroy((struct aws_profile *)value);
 }
 
 static struct aws_section_collection *aws_section_collection_new(struct aws_allocator *allocator) {
