@@ -654,18 +654,18 @@ static void s_profile_hash_table_value_destroy(void *value) {
     aws_profile_destroy((struct aws_profile *)value);
 }
 
-static struct aws_section_collection* aws_section_collection_new(struct aws_allocator *allocator) {
+static struct aws_section_collection *aws_section_collection_new(struct aws_allocator *allocator) {
     struct aws_hash_table collection;
     aws_hash_table_init(
-            &collection,
-            allocator,
-            2,
-            aws_hash_string,
-            aws_hash_callback_string_eq,
-            NULL,
-            s_profile_hash_table_value_destroy);
+        &collection,
+        allocator,
+        2,
+        aws_hash_string,
+        aws_hash_callback_string_eq,
+        NULL,
+        s_profile_hash_table_value_destroy);
     struct aws_section_collection *aws_section_collection =
-            aws_mem_calloc(allocator, 1, sizeof(struct aws_section_collection));
+        aws_mem_calloc(allocator, 1, sizeof(struct aws_section_collection));
     aws_section_collection->allocator = allocator;
     aws_section_collection->section_collection = collection;
     return aws_section_collection;
@@ -683,10 +683,10 @@ static int s_profile_collection_add_profile(
 
     struct aws_hash_element *table_elem = NULL;
     int was_created = 0;
-    if(aws_hash_table_create(&profile_collection->collections, collection_name, &table_elem, &was_created)){
+    if (aws_hash_table_create(&profile_collection->collections, collection_name, &table_elem, &was_created)) {
         return AWS_OP_ERR;
     }
-    if(was_created) {
+    if (was_created) {
         table_elem->value = aws_section_collection_new(profile_collection->allocator);
     }
     struct aws_section_collection *section_collection = table_elem->value;
@@ -775,14 +775,19 @@ static int s_profile_collection_merge(
     while (!aws_hash_iter_done(&source_top_iter)) {
         struct aws_section_collection *source_table = (struct aws_section_collection *)source_top_iter.element.value;
 
-        struct aws_hash_iter source_iter = aws_hash_iter_begin((struct aws_hash_table *)&source_table->section_collection);
+        struct aws_hash_iter source_iter =
+            aws_hash_iter_begin((struct aws_hash_table *)&source_table->section_collection);
 
         struct aws_hash_element *table_elem = NULL;
         int was_created = 0;
-        if(aws_hash_table_create(&dest_collection->collections, (struct aws_string *)source_top_iter.element.key, &table_elem, &was_created)){
+        if (aws_hash_table_create(
+                &dest_collection->collections,
+                (struct aws_string *)source_top_iter.element.key,
+                &table_elem,
+                &was_created)) {
             return AWS_OP_ERR;
         }
-        if(was_created) {
+        if (was_created) {
             table_elem->value = aws_section_collection_new(dest_collection->allocator);
         }
         struct aws_section_collection *section_collection = table_elem->value;
