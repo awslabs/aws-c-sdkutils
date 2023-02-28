@@ -32,7 +32,7 @@ struct aws_profile {
 
 struct aws_collection {
     struct aws_allocator *allocator;
-    struct aws_hash_table profiles;
+    struct aws_hash_table collections;
 };
 
 struct aws_profile_collection {
@@ -588,12 +588,6 @@ static int s_profile_merge(struct aws_profile *dest_profile, const struct aws_pr
     return AWS_OP_SUCCESS;
 }
 
-/*
- * Hash table destroy helper for profile collection's profiles member
- */
-static void s_profile_hash_table_value_destroy(void *value) {
-    aws_profile_destroy((struct aws_profile *)value);
-}
 
 /*
  * aws_profile_collection APIs
@@ -617,8 +611,10 @@ const struct aws_profile *aws_profile_collection_get_profile(
     if (aws_hash_table_find(&profile_collection->collections, s_profile_token, &element) || element == NULL) {
         return NULL;
     }
+    struct aws_collection *collection = element->value;
+
     struct aws_hash_element *profile = NULL;
-    aws_hash_table_find(element->value, profile_name, &profile);
+    aws_hash_table_find(&collection->collections, profile_name, &profile);
 
     if (profile == NULL) {
         return NULL;
@@ -634,9 +630,11 @@ const struct aws_profile *aws_profile_collection_get_session(
     if (aws_hash_table_find(&profile_collection->collections, s_sso_session_token, &element) || element == NULL) {
         return NULL;
     }
+    struct aws_collection *collection = element->value;
+
 
     struct aws_hash_element *profile = NULL;
-    aws_hash_table_find(element->value, profile_name, &profile);
+    aws_hash_table_find(&collection->collections, profile_name, &profile);
 
     if (profile == NULL) {
         return NULL;
@@ -646,9 +644,17 @@ const struct aws_profile *aws_profile_collection_get_session(
 }
 
 void aws_collection_value_destroy(void *table) {
-    aws_hash_table_clean_up(table);
+    struct aws_collection *collection = table;
+    aws_hash_table_clean_up(&collection->collections);
+    aws_mem_release(collection->allocator, collection);
 }
 
+/*
+ * Hash table destroy helper for profile collection's profiles member
+ */
+static void s_profile_hash_table_value_destroy(void *value) {
+    aws_profile_destroy((struct aws_profile *)value);
+}
 static int s_profile_collection_add_profile(
     const struct aws_string *collection_name,
     struct aws_profile_collection *profile_collection,
@@ -677,8 +683,11 @@ static int s_profile_collection_add_profile(
             aws_hash_string,
             aws_hash_callback_string_eq,
             NULL,
-                aws_collection_value_destroy);
-        if (aws_hash_table_put(&profile_collection->collections, collection_name, collection, NULL)) {
+                s_profile_hash_table_value_destroy);
+        struct aws_collection *awsCollection = aws_mem_calloc(profile_collection->allocator, 1, sizeof(struct aws_collection));
+        awsCollection->allocator = profile_collection->allocator;
+        awsCollection->collections = *collection;
+        if (aws_hash_table_put(&profile_collection->collections, collection_name, awsCollection, NULL)) {
             goto on_aws_profile_new_failure;
         }
     }
@@ -758,7 +767,7 @@ static int s_profile_collection_merge(
     while (!aws_hash_iter_done(&source_top_iter)) {
 
         struct aws_hash_iter source_iter = aws_hash_iter_begin((struct aws_hash_table *)source_top_iter.element.value);
-        struct aws_hash_table *dest_table = (struct aws_hash_table *)source_top_iter.element.value;
+        struct aws_collection *dest_table = (struct aws_collection *)source_top_iter.element.value;
         while (!aws_hash_iter_done(&source_iter)) {
             struct aws_profile *source_profile = (struct aws_profile *)source_iter.element.value;
             struct aws_profile *dest_profile = (struct aws_profile *)aws_profile_collection_get_profile(
@@ -773,7 +782,7 @@ static int s_profile_collection_merge(
                     return AWS_OP_ERR;
                 }
 
-                if (aws_hash_table_put(dest_table, dest_profile->name, dest_profile, NULL)) {
+                if (aws_hash_table_put(&dest_table->collections, dest_profile->name, dest_profile, NULL)) {
                     aws_profile_destroy(dest_profile);
                     return AWS_OP_ERR;
                 }
@@ -825,7 +834,7 @@ struct aws_profile_collection *aws_profile_collection_new_from_merge(
             aws_hash_string,
             aws_hash_callback_string_eq,
             NULL,
-            s_profile_hash_table_value_destroy)) {
+            aws_collection_value_destroy)) {
         goto cleanup;
     }
 
@@ -1290,7 +1299,7 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
             aws_hash_string,
             aws_hash_callback_string_eq,
             NULL, /* The key is owned by the value (and destroy cleans it up), so we don't have to */
-            s_profile_hash_table_value_destroy)) {
+            aws_collection_value_destroy)) {
         goto cleanup;
     }
 
@@ -1604,7 +1613,8 @@ size_t aws_profile_collection_get_profile_count(const struct aws_profile_collect
     if (aws_hash_table_find(&profile_collection->collections, s_profile_token, &element) || element == NULL) {
         return 0;
     }
-    return aws_hash_table_get_entry_count((struct aws_hash_table *)element->value);
+    struct aws_collection *collection = element->value;
+    return aws_hash_table_get_entry_count(&collection->collections);
 }
 
 size_t aws_profile_property_get_sub_property_count(const struct aws_profile_property *property) {
