@@ -994,7 +994,7 @@ static bool s_parse_profile_declaration(
         s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
     } else if (has_sso_session_prefix) {
         if (context->profile_collection->profile_source == AWS_PST_CREDENTIALS) {
-            AWS_LOGF_WARN(AWS_LS_SDKUTILS_PROFILE, "SSO-Session declarations in credentials files are not allowed");
+            AWS_LOGF_WARN(AWS_LS_SDKUTILS_PROFILE, "sso-session declarations in credentials files are not allowed");
             s_log_parse_context(AWS_LL_WARN, context);
 
             context->parse_error = AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE;

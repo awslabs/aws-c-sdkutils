@@ -483,7 +483,7 @@ AWS_TEST_CASE(aws_profile_multiple_profile_test, s_aws_profile_multiple_profile_
  * Multiple profiles with properties and sso-session
  */
 AWS_STATIC_STRING_FROM_LITERAL(
-    s_multiple_profile_with_sso_session,
+    s_credentials_sso_session,
     "[profile foo]\nname = value\n[profile bar]\nname2 = value2\n[sso-session session]\nname3 = value3\ns3 =\n name4 = "
     "value4");
 
@@ -491,9 +491,9 @@ static int s_aws_profile_multiple_profile_with_sso_session_test(struct aws_alloc
     (void)ctx;
 
     struct aws_profile_collection *profile_collection =
-        aws_prepare_profile_test(allocator, s_multiple_profile_with_sso_session, AWS_PST_CONFIG);
+        aws_prepare_profile_test(allocator, s_credentials_sso_session, AWS_PST_CONFIG);
 
-    ASSERT_TRUE(profile_collection != NULL);
+    ASSERT_NOT_NULL(profile_collection);
     EXPECT_PROFILE_COUNT(profile_collection, 2);
     EXPECT_PROFILE(profile_collection, "foo");
     EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
@@ -514,6 +514,29 @@ static int s_aws_profile_multiple_profile_with_sso_session_test(struct aws_alloc
 }
 
 AWS_TEST_CASE(aws_profile_multiple_profile_with_sso_session_test, s_aws_profile_multiple_profile_with_sso_session_test);
+
+/*
+ * SSO-Session in credentials file is ignored
+ */
+AWS_STATIC_STRING_FROM_LITERAL(
+    s_sso_session_in_credentials,
+    "[foo]\nname = value\n[sso-session session]\nname3 = value3");
+
+static int s_aws_profile_sso_session_in_credentials_test(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    struct aws_profile_collection *profile_collection =
+        aws_prepare_profile_test(allocator, s_sso_session_in_credentials, AWS_PST_CREDENTIALS);
+
+    ASSERT_NOT_NULL(profile_collection);
+    EXPECT_PROFILE_COUNT(profile_collection, 1);
+    EXPECT_SSO_SESSION_COUNT(profile_collection, 0);
+    aws_profile_collection_destroy(profile_collection);
+
+    return 0;
+}
+
+AWS_TEST_CASE(aws_profile_sso_session_in_credentials_test, s_aws_profile_sso_session_in_credentials_test);
 
 /*
  * Blank lines are ignored
@@ -838,7 +861,8 @@ AWS_TEST_CASE(
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_duplicate_profiles_merge_profile,
-    "[profile foo]\nname = value\n[profile foo]\nname2 = value2");
+    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n[sso-session foo]\n name3 = value3 \n [sso-session "
+    "foo]\n name4 = value4");
 
 static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
@@ -852,6 +876,12 @@ static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *all
     EXPECT_PROPERTY_COUNT(profile_collection, "foo", 2);
     EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
     EXPECT_PROPERTY(profile_collection, "foo", "name2", "value2");
+
+    EXPECT_SSO_SESSION_COUNT(profile_collection, 1);
+    EXPECT_SSO_SESSION(profile_collection, "foo");
+    EXPECT_SSO_SESSION_PROPERTY_COUNT(profile_collection, "foo", 2);
+    EXPECT_SSO_SESSION_PROPERTY(profile_collection, "foo", "name3", "value3");
+    EXPECT_SSO_SESSION_PROPERTY(profile_collection, "foo", "name4", "value4");
 
     aws_profile_collection_destroy(profile_collection);
 
