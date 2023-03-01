@@ -539,6 +539,30 @@ static int s_aws_profile_sso_session_in_credentials_test(struct aws_allocator *a
 AWS_TEST_CASE(aws_profile_sso_session_in_credentials_test, s_aws_profile_sso_session_in_credentials_test);
 
 /*
+ * sso-session without name is ignored
+ */
+AWS_STATIC_STRING_FROM_LITERAL(s_sso_session_without_name, "[sso-session session]\nname = value\n[sso-session ]");
+//"[profile foo]\nname = value\n[sso-session session]\nname3 = value3");
+static int s_aws_profile_sso_session_without_name_test(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    struct aws_profile_collection *profile_collection =
+        aws_prepare_profile_test(allocator, s_sso_session_without_name, AWS_PST_CONFIG);
+
+    ASSERT_NOT_NULL(profile_collection);
+    EXPECT_PROFILE_COUNT(profile_collection, 0);
+    EXPECT_SSO_SESSION_COUNT(profile_collection, 1);
+    EXPECT_SSO_SESSION(profile_collection, "session");
+    EXPECT_SSO_SESSION_PROPERTY_COUNT(profile_collection, "session", 1);
+    EXPECT_SSO_SESSION_PROPERTY(profile_collection, "session", "name", "value");
+    aws_profile_collection_destroy(profile_collection);
+
+    return 0;
+}
+
+AWS_TEST_CASE(aws_profile_sso_session_without_name_test, s_aws_profile_sso_session_without_name_test);
+
+/*
  * Blank lines are ignored
  */
 AWS_STATIC_STRING_FROM_LITERAL(
@@ -857,12 +881,12 @@ AWS_TEST_CASE(
     s_aws_profile_continued_property_value_semicolon_comment_test);
 
 /*
- * duplicate profiles merge properties
+ * duplicate profiles and sso-session merge properties
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_duplicate_profiles_merge_profile,
-    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n[sso-session foo]\n name3 = value3 \n [sso-session "
-    "foo]\n name4 = value4");
+    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n[sso-session foo]\n name3 = value-3 \n [sso-session "
+    "foo]\n name3 = value3\n name4 = value4");
 
 static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
