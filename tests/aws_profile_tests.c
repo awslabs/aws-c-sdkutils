@@ -885,8 +885,8 @@ AWS_TEST_CASE(
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_duplicate_profiles_merge_profile,
-    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n[sso-session foo]\n name3 = value-3 \n [sso-session "
-    "foo]\n name3 = value3\n name4 = value4");
+    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n[sso-session foo]\nname3 = value-3\n[sso-session "
+    "foo]\nname3 = value3\nname4 = value4");
 
 static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
