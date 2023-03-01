@@ -105,13 +105,13 @@ const struct aws_profile *aws_profile_collection_get_sso_session(
     const struct aws_string *profile_name);
 
 /**
- * Returns how many profiles a collection holds
+ * Returns the number of profiles in a collection
  */
 AWS_SDKUTILS_API
 size_t aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection);
 
 /**
- * Returns how many sso-sessions a collection holds
+ * Returns the number of sso-sessions in a collection
  */
 AWS_SDKUTILS_API
 size_t aws_profile_collection_get_sso_session_count(const struct aws_profile_collection *profile_collection);
