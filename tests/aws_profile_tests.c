@@ -68,6 +68,70 @@
         ASSERT_TRUE(strcmp(expected_sub_property_value, aws_string_c_str(sub_property_value)) == 0);                   \
     }
 
+#define EXPECT_SSO_SESSION_COUNT(profile_collection, sso_session_count)                                                \
+    { ASSERT_TRUE(aws_profile_collection_get_sso_session_count(profile_collection) == (sso_session_count)); }
+
+#define EXPECT_SSO_SESSION(profile_collection, sso_session_name)                                                       \
+    {                                                                                                                  \
+        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
+        const struct aws_profile *sso_session =                                                                        \
+            aws_profile_collection_get_sso_session(profile_collection, sso_session_name_str);                          \
+        aws_string_destroy(sso_session_name_str);                                                                      \
+        ASSERT_TRUE(sso_session != NULL);                                                                              \
+    }
+#define EXPECT_SSO_SESSION_PROPERTY_COUNT(profile_collection, sso_session_name, expected_sso_session_count)            \
+    {                                                                                                                  \
+        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
+        const struct aws_profile *sso_session =                                                                        \
+            aws_profile_collection_get_sso_session(profile_collection, sso_session_name_str);                          \
+        aws_string_destroy(sso_session_name_str);                                                                      \
+        ASSERT_TRUE(aws_profile_get_property_count(sso_session) == (expected_sso_session_count));                      \
+    }
+
+#define EXPECT_SSO_SESSION_PROPERTY(profile_collection, sso_session_name, property_name, expected_property_value)      \
+    {                                                                                                                  \
+        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
+        const struct aws_profile *sso_session =                                                                        \
+            aws_profile_collection_get_sso_session(profile_collection, sso_session_name_str);                          \
+        struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
+        const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
+        aws_string_destroy(property_name_str);                                                                         \
+        aws_string_destroy(sso_session_name_str);                                                                      \
+        ASSERT_TRUE(                                                                                                   \
+            property != NULL &&                                                                                        \
+            strcmp(expected_property_value, aws_string_c_str(aws_profile_property_get_value(property))) == 0);         \
+    }
+
+#define EXPECT_SSO_SESSION_SUB_PROPERTY_COUNT(                                                                         \
+    profile_collection, sso_session_name, property_name, expected_sub_property_count)                                  \
+    {                                                                                                                  \
+        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
+        const struct aws_profile *sso_session =                                                                        \
+            aws_profile_collection_get_sso_session(profile_collection, sso_session_name_str);                          \
+        struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
+        const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
+        aws_string_destroy(property_name_str);                                                                         \
+        aws_string_destroy(sso_session_name_str);                                                                      \
+        ASSERT_UINT_EQUALS((expected_sub_property_count), aws_profile_property_get_sub_property_count(property));      \
+    }
+
+#define EXPECT_SSO_SESSION_SUB_PROPERTY(                                                                               \
+    profile_collection, sso_session_name, property_name, sub_property_name, expected_sub_property_value)               \
+    {                                                                                                                  \
+        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
+        const struct aws_profile *sso_session =                                                                        \
+            aws_profile_collection_get_sso_session(profile_collection, sso_session_name_str);                          \
+        struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
+        const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
+        struct aws_string *sub_property_name_str = aws_string_new_from_c_str(allocator, sub_property_name);            \
+        const struct aws_string *sub_property_value =                                                                  \
+            aws_profile_property_get_sub_property(property, sub_property_name_str);                                    \
+        aws_string_destroy(sub_property_name_str);                                                                     \
+        aws_string_destroy(property_name_str);                                                                         \
+        aws_string_destroy(sso_session_name_str);                                                                      \
+        ASSERT_TRUE(strcmp(expected_sub_property_value, aws_string_c_str(sub_property_value)) == 0);                   \
+    }
+
 /*
  * profile collection setup
  */
@@ -414,6 +478,42 @@ static int s_aws_profile_multiple_profile_test(struct aws_allocator *allocator, 
 }
 
 AWS_TEST_CASE(aws_profile_multiple_profile_test, s_aws_profile_multiple_profile_test);
+
+/*
+ * Multiple profiles with properties and sso-session
+ */
+AWS_STATIC_STRING_FROM_LITERAL(
+    s_multiple_profile_with_sso_session,
+    "[profile foo]\nname = value\n[profile bar]\nname2 = value2\n[sso-session session]\nname3 = value3\ns3 =\n name4 = "
+    "value4");
+
+static int s_aws_profile_multiple_profile_with_sso_session_test(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    struct aws_profile_collection *profile_collection =
+        aws_prepare_profile_test(allocator, s_multiple_profile_with_sso_session, AWS_PST_CONFIG);
+
+    ASSERT_TRUE(profile_collection != NULL);
+    EXPECT_PROFILE_COUNT(profile_collection, 2);
+    EXPECT_PROFILE(profile_collection, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
+    EXPECT_PROFILE(profile_collection, "bar");
+    EXPECT_PROPERTY_COUNT(profile_collection, "bar", 1);
+    EXPECT_PROPERTY(profile_collection, "bar", "name2", "value2");
+
+    EXPECT_SSO_SESSION_COUNT(profile_collection, 1);
+    EXPECT_SSO_SESSION(profile_collection, "session");
+    EXPECT_SSO_SESSION_PROPERTY_COUNT(profile_collection, "session", 2);
+    EXPECT_SSO_SESSION_PROPERTY(profile_collection, "session", "name3", "value3");
+    EXPECT_SSO_SESSION_SUB_PROPERTY_COUNT(profile_collection, "session", "s3", 1);
+    EXPECT_SSO_SESSION_SUB_PROPERTY(profile_collection, "session", "s3", "name4", "value4");
+    aws_profile_collection_destroy(profile_collection);
+
+    return 0;
+}
+
+AWS_TEST_CASE(aws_profile_multiple_profile_with_sso_session_test, s_aws_profile_multiple_profile_with_sso_session_test);
 
 /*
  * Blank lines are ignored

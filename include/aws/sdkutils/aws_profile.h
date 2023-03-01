@@ -100,7 +100,7 @@ const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_string *profile_name);
 
 AWS_SDKUTILS_API
-const struct aws_profile *aws_profile_collection_get_session(
+const struct aws_profile *aws_profile_collection_get_sso_session(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name);
 
@@ -109,6 +109,12 @@ const struct aws_profile *aws_profile_collection_get_session(
  */
 AWS_SDKUTILS_API
 size_t aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection);
+
+/**
+ * Returns how many sso-sessions a collection holds
+ */
+AWS_SDKUTILS_API
+size_t aws_profile_collection_get_sso_session_count(const struct aws_profile_collection *profile_collection);
 
 /**
  * Returns a reference to the name of the provided profile

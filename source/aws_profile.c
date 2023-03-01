@@ -629,7 +629,7 @@ const struct aws_profile *aws_profile_collection_get_profile(
     return profile->value;
 }
 
-const struct aws_profile *aws_profile_collection_get_session(
+const struct aws_profile *aws_profile_collection_get_sso_session(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name) {
     struct aws_hash_element *element = NULL;
@@ -1636,6 +1636,15 @@ size_t aws_profile_get_property_count(const struct aws_profile *profile) {
 size_t aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection) {
     struct aws_hash_element *element = NULL;
     if (aws_hash_table_find(&profile_collection->profiles, s_profile_token, &element) || element == NULL) {
+        return 0;
+    }
+    struct aws_section_collection *collection = element->value;
+    return aws_hash_table_get_entry_count(&collection->sections);
+}
+
+size_t aws_profile_collection_get_sso_session_count(const struct aws_profile_collection *profile_collection) {
+    struct aws_hash_element *element = NULL;
+    if (aws_hash_table_find(&profile_collection->profiles, s_sso_session_token, &element) || element == NULL) {
         return 0;
     }
     struct aws_section_collection *collection = element->value;
