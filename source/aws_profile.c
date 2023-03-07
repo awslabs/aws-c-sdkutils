@@ -708,7 +708,6 @@ static int s_profile_collection_add_profile(
     }
 
     *current_profile_out = new_profile;
-
     return AWS_OP_SUCCESS;
 
 on_hash_table_put_failure:
@@ -900,6 +899,7 @@ static bool s_parse_profile_declaration(
 
     s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
     enum aws_profile_section_type section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
+
     /*
      * Check if the profile name starts with the 'profile' keyword.  We need to check for
      * "profile" and at least one whitespace character.  A partial match
@@ -910,6 +910,7 @@ static bool s_parse_profile_declaration(
                               s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 1);
     bool has_sso_session_prefix = !has_profile_prefix && s_parse_by_token(&profile_cursor, s_sso_session_token, NULL) &&
                                   s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 1);
+
     if (has_profile_prefix) {
         if (context->profile_collection->profile_source == AWS_PST_CREDENTIALS) {
             AWS_LOGF_WARN(
