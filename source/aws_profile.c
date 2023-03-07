@@ -33,6 +33,12 @@ struct aws_profile {
 struct aws_profile_collection {
     struct aws_allocator *allocator;
     enum aws_profile_source_type profile_source;
+    /*
+     * Array of aws_hash_table for each section type.
+     * Each table is a map from section identifier to aws_profile.
+     * key: struct aws_string*
+     * value: struct aws_profile*
+     */
     struct aws_hash_table sections[AWS_PROFILE_SECTION_TYPE_COUNT];
     struct aws_ref_count ref_count;
 };
