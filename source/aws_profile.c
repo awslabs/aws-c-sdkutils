@@ -694,7 +694,6 @@ static int s_profile_collection_add_profile(
 
     if (existing_profile) {
         *current_profile_out = existing_profile;
-
         return AWS_OP_SUCCESS;
     }
 
