@@ -102,7 +102,7 @@ const struct aws_profile *aws_profile_collection_get_profile(
 AWS_SDKUTILS_API
 const struct aws_profile *aws_profile_collection_get_sso_session(
     const struct aws_profile_collection *profile_collection,
-    const struct aws_string *profile_name);
+    const struct aws_string *sso_session_name);
 
 /**
  * Returns the number of profiles in a collection
