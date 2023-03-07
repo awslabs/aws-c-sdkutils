@@ -15,13 +15,6 @@
 #define PROPERTIES_TABLE_DEFAULT_SIZE 4
 #define PROFILE_TABLE_DEFAULT_SIZE 5
 
-enum aws_profile_section_type {
-    AWS_PROFILE_SECTION_TYPE_PROFILE,
-    AWS_PROFILE_SECTION_TYPE_SSO_SESSION,
-
-    AWS_PROFILE_SECTION_TYPE_COUNT,
-};
-
 struct aws_profile_property {
     struct aws_allocator *allocator;
     struct aws_string *name;
@@ -625,12 +618,12 @@ const struct aws_profile *aws_profile_collection_get_profile(
     return element->value;
 }
 
-const struct aws_profile *aws_profile_collection_get_sso_session(
+const struct aws_profile *aws_profile_collection_get_section(
     const struct aws_profile_collection *profile_collection,
-    const struct aws_string *sso_session_name) {
+    const struct aws_string *section_name,
+    const enum aws_profile_section_type section_type) {
     struct aws_hash_element *element = NULL;
-    aws_hash_table_find(
-        &profile_collection->sections[AWS_PROFILE_SECTION_TYPE_SSO_SESSION], sso_session_name, &element);
+    aws_hash_table_find(&profile_collection->sections[section_type], section_name, &element);
     if (element == NULL) {
         return NULL;
     }
@@ -638,12 +631,12 @@ const struct aws_profile *aws_profile_collection_get_sso_session(
 }
 
 static int s_profile_collection_add_profile(
-    const enum aws_profile_section_type section_type,
     struct aws_profile_collection *profile_collection,
     const struct aws_byte_cursor *profile_name,
     bool has_prefix,
     const struct profile_file_parse_context *context,
-    struct aws_profile **current_profile_out) {
+    struct aws_profile **current_profile_out,
+    const enum aws_profile_section_type section_type) {
 
     *current_profile_out = NULL;
     struct aws_string *key =
@@ -992,12 +985,12 @@ static bool s_parse_profile_declaration(
      * Apply to the profile collection
      */
     if (s_profile_collection_add_profile(
-            section_type,
             context->profile_collection,
             &profile_name,
             has_profile_prefix,
             context,
-            &context->current_profile)) {
+            &context->current_profile,
+            section_type)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PROFILE, "Failed to add profile to profile collection");
         s_log_parse_context(AWS_LL_ERROR, context);
 
@@ -1570,8 +1563,10 @@ size_t aws_profile_collection_get_profile_count(const struct aws_profile_collect
     return aws_hash_table_get_entry_count(&profile_collection->sections[AWS_PROFILE_SECTION_TYPE_PROFILE]);
 }
 
-size_t aws_profile_collection_get_sso_session_count(const struct aws_profile_collection *profile_collection) {
-    return aws_hash_table_get_entry_count(&profile_collection->sections[AWS_PROFILE_SECTION_TYPE_SSO_SESSION]);
+size_t aws_profile_collection_get_section_count(
+    const struct aws_profile_collection *profile_collection,
+    const enum aws_profile_section_type section_type) {
+    return aws_hash_table_get_entry_count(&profile_collection->sections[section_type]);
 }
 
 size_t aws_profile_property_get_sub_property_count(const struct aws_profile_property *property) {
