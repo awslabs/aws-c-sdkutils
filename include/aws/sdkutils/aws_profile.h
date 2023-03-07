@@ -125,7 +125,7 @@ AWS_SDKUTILS_API size_t
     aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection);
 
 /**
- * Returns the number of sso-sessions in a collection
+ * Returns the number of elements of the specified section in a collection.
  */
 AWS_SDKUTILS_API
 size_t aws_profile_collection_get_section_count(
