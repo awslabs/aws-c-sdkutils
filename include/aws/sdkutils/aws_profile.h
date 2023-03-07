@@ -121,8 +121,8 @@ const struct aws_profile *aws_profile_collection_get_section(
 /**
  * Returns the number of profiles in a collection
  */
-AWS_SDKUTILS_API size_t
-    aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection);
+AWS_SDKUTILS_API
+size_t aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection);
 
 /**
  * Returns the number of elements of the specified section in a collection.
