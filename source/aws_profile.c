@@ -616,7 +616,6 @@ AWS_STATIC_STRING_FROM_LITERAL(s_sso_session_token, "sso-session");
 const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name) {
-    struct aws_hash_element *element = NULL;
     return aws_profile_collection_get_section(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, profile_name);
 }
 
