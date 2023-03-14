@@ -617,11 +617,7 @@ const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name) {
     struct aws_hash_element *element = NULL;
-    aws_hash_table_find(&profile_collection->sections[AWS_PROFILE_SECTION_TYPE_PROFILE], profile_name, &element);
-    if (element == NULL) {
-        return NULL;
-    }
-    return element->value;
+    return aws_profile_collection_get_section(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, profile_name);
 }
 
 const struct aws_profile *aws_profile_collection_get_section(
