@@ -622,8 +622,8 @@ const struct aws_profile *aws_profile_collection_get_profile(
 
 const struct aws_profile *aws_profile_collection_get_section(
     const struct aws_profile_collection *profile_collection,
-    const struct aws_string *section_name,
-    const enum aws_profile_section_type section_type) {
+    const enum aws_profile_section_type section_type,
+    const struct aws_string *section_name) {
     struct aws_hash_element *element = NULL;
     aws_hash_table_find(&profile_collection->sections[section_type], section_name, &element);
     if (element == NULL) {
@@ -634,11 +634,11 @@ const struct aws_profile *aws_profile_collection_get_section(
 
 static int s_profile_collection_add_profile(
     struct aws_profile_collection *profile_collection,
+    const enum aws_profile_section_type section_type,
     const struct aws_byte_cursor *profile_name,
     bool has_prefix,
     const struct profile_file_parse_context *context,
-    struct aws_profile **current_profile_out,
-    const enum aws_profile_section_type section_type) {
+    struct aws_profile **current_profile_out) {
 
     *current_profile_out = NULL;
     struct aws_string *key =
@@ -988,11 +988,11 @@ static bool s_parse_profile_declaration(
      */
     if (s_profile_collection_add_profile(
             context->profile_collection,
+            section_type,
             &profile_name,
             has_profile_prefix,
             context,
-            &context->current_profile,
-            section_type)) {
+            &context->current_profile)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PROFILE, "Failed to add profile to profile collection");
         s_log_parse_context(AWS_LL_ERROR, context);
 

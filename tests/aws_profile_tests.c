@@ -79,7 +79,7 @@
     {                                                                                                                  \
         struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
         const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, sso_session_name_str, AWS_PROFILE_SECTION_TYPE_SSO_SESSION);                           \
+            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
         aws_string_destroy(sso_session_name_str);                                                                      \
         ASSERT_TRUE(sso_session != NULL);                                                                              \
     }
@@ -87,7 +87,7 @@
     {                                                                                                                  \
         struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
         const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, sso_session_name_str, AWS_PROFILE_SECTION_TYPE_SSO_SESSION);                           \
+            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
         aws_string_destroy(sso_session_name_str);                                                                      \
         ASSERT_TRUE(aws_profile_get_property_count(sso_session) == (expected_sso_session_count));                      \
     }
@@ -96,7 +96,7 @@
     {                                                                                                                  \
         struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
         const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, sso_session_name_str, AWS_PROFILE_SECTION_TYPE_SSO_SESSION);                           \
+            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
         const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
         aws_string_destroy(property_name_str);                                                                         \
@@ -111,7 +111,7 @@
     {                                                                                                                  \
         struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
         const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, sso_session_name_str, AWS_PROFILE_SECTION_TYPE_SSO_SESSION);                           \
+            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
         const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
         aws_string_destroy(property_name_str);                                                                         \
@@ -124,7 +124,7 @@
     {                                                                                                                  \
         struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
         const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, sso_session_name_str, AWS_PROFILE_SECTION_TYPE_SSO_SESSION);                           \
+            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
         const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
         struct aws_string *sub_property_name_str = aws_string_new_from_c_str(allocator, sub_property_name);            \

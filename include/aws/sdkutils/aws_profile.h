@@ -111,12 +111,13 @@ const struct aws_profile *aws_profile_collection_get_profile(
 
 /*
  * Retrieves a reference to a section with the specified name and type, if it exists, from the profile collection.
+ * You can get the "default" profile or credentials file sections by passing `AWS_PROFILE_SECTION_TYPE_PROFILE`
  */
 AWS_SDKUTILS_API
 const struct aws_profile *aws_profile_collection_get_section(
     const struct aws_profile_collection *profile_collection,
-    const struct aws_string *section_name,
-    const enum aws_profile_section_type section_type);
+    const enum aws_profile_section_type section_type,
+    const struct aws_string *section_name);
 
 /**
  * Returns the number of profiles in a collection
