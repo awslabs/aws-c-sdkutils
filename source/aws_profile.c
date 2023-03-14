@@ -33,7 +33,13 @@ struct aws_profile {
 struct aws_profile_collection {
     struct aws_allocator *allocator;
     enum aws_profile_source_type profile_source;
-    struct aws_hash_table profiles;
+    /*
+     * Array of aws_hash_table for each section type.
+     * Each table is a map from section identifier to aws_profile.
+     * key: struct aws_string*
+     * value: struct aws_profile*
+     */
+    struct aws_hash_table sections[AWS_PROFILE_SECTION_TYPE_COUNT];
     struct aws_ref_count ref_count;
 };
 
@@ -598,25 +604,36 @@ void aws_profile_collection_destroy(struct aws_profile_collection *profile_colle
 }
 
 static void s_aws_profile_collection_destroy_internal(struct aws_profile_collection *profile_collection) {
-    aws_hash_table_clean_up(&profile_collection->profiles);
+    for (int i = 0; i < AWS_PROFILE_SECTION_TYPE_COUNT; i++) {
+        aws_hash_table_clean_up(&profile_collection->sections[i]);
+    }
     aws_mem_release(profile_collection->allocator, profile_collection);
 }
+
+AWS_STATIC_STRING_FROM_LITERAL(s_profile_token, "profile");
+AWS_STATIC_STRING_FROM_LITERAL(s_sso_session_token, "sso-session");
 
 const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name) {
-    struct aws_hash_element *element = NULL;
-    aws_hash_table_find(&profile_collection->profiles, profile_name, &element);
+    return aws_profile_collection_get_section(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, profile_name);
+}
 
+const struct aws_profile *aws_profile_collection_get_section(
+    const struct aws_profile_collection *profile_collection,
+    const enum aws_profile_section_type section_type,
+    const struct aws_string *section_name) {
+    struct aws_hash_element *element = NULL;
+    aws_hash_table_find(&profile_collection->sections[section_type], section_name, &element);
     if (element == NULL) {
         return NULL;
     }
-
     return element->value;
 }
 
 static int s_profile_collection_add_profile(
     struct aws_profile_collection *profile_collection,
+    const enum aws_profile_section_type section_type,
     const struct aws_byte_cursor *profile_name,
     bool has_prefix,
     const struct profile_file_parse_context *context,
@@ -631,14 +648,15 @@ static int s_profile_collection_add_profile(
 
     struct aws_profile *existing_profile = NULL;
     struct aws_hash_element *element = NULL;
-    aws_hash_table_find(&profile_collection->profiles, key, &element);
+    aws_hash_table_find(&profile_collection->sections[section_type], key, &element);
     if (element != NULL) {
         existing_profile = element->value;
     }
 
     aws_string_destroy(key);
 
-    if (profile_collection->profile_source == AWS_PST_CONFIG && s_is_default_profile_name(profile_name)) {
+    if (section_type == AWS_PROFILE_SECTION_TYPE_PROFILE && profile_collection->profile_source == AWS_PST_CONFIG &&
+        s_is_default_profile_name(profile_name)) {
         /*
          *  In a config file, "profile default" always supercedes "default"
          */
@@ -664,7 +682,7 @@ static int s_profile_collection_add_profile(
                 AWS_LS_SDKUTILS_PROFILE, "Prefixed default config profile replacing unprefixed default profile");
             s_log_parse_context(AWS_LL_WARN, context);
 
-            aws_hash_table_remove(&profile_collection->profiles, element->key, NULL, NULL);
+            aws_hash_table_remove(&profile_collection->sections[section_type], element->key, NULL, NULL);
             existing_profile = NULL;
         }
     }
@@ -679,7 +697,7 @@ static int s_profile_collection_add_profile(
         goto on_aws_profile_new_failure;
     }
 
-    if (aws_hash_table_put(&profile_collection->profiles, new_profile->name, new_profile, NULL)) {
+    if (aws_hash_table_put(&profile_collection->sections[section_type], new_profile->name, new_profile, NULL)) {
         goto on_hash_table_put_failure;
     }
 
@@ -698,33 +716,34 @@ static int s_profile_collection_merge(
     const struct aws_profile_collection *source_collection) {
 
     AWS_ASSERT(dest_collection != NULL && source_collection);
+    for (int i = 0; i < AWS_PROFILE_SECTION_TYPE_COUNT; i++) {
+        struct aws_hash_iter source_iter = aws_hash_iter_begin(&source_collection->sections[i]);
+        while (!aws_hash_iter_done(&source_iter)) {
+            struct aws_profile *source_profile = (struct aws_profile *)source_iter.element.value;
+            struct aws_profile *dest_profile = (struct aws_profile *)aws_profile_collection_get_profile(
+                dest_collection, (struct aws_string *)source_iter.element.key);
 
-    struct aws_hash_iter source_iter = aws_hash_iter_begin(&source_collection->profiles);
-    while (!aws_hash_iter_done(&source_iter)) {
-        struct aws_profile *source_profile = (struct aws_profile *)source_iter.element.value;
-        struct aws_profile *dest_profile = (struct aws_profile *)aws_profile_collection_get_profile(
-            dest_collection, (struct aws_string *)source_iter.element.key);
-
-        if (dest_profile == NULL) {
-
-            struct aws_byte_cursor name_cursor = aws_byte_cursor_from_string(source_iter.element.key);
-            dest_profile =
-                aws_profile_new(dest_collection->allocator, &name_cursor, source_profile->has_profile_prefix);
             if (dest_profile == NULL) {
+
+                struct aws_byte_cursor name_cursor = aws_byte_cursor_from_string(source_iter.element.key);
+                dest_profile =
+                    aws_profile_new(dest_collection->allocator, &name_cursor, source_profile->has_profile_prefix);
+                if (dest_profile == NULL) {
+                    return AWS_OP_ERR;
+                }
+
+                if (aws_hash_table_put(&dest_collection->sections[i], dest_profile->name, dest_profile, NULL)) {
+                    aws_profile_destroy(dest_profile);
+                    return AWS_OP_ERR;
+                }
+            }
+
+            if (s_profile_merge(dest_profile, source_profile)) {
                 return AWS_OP_ERR;
             }
 
-            if (aws_hash_table_put(&dest_collection->profiles, dest_profile->name, dest_profile, NULL)) {
-                aws_profile_destroy(dest_profile);
-                return AWS_OP_ERR;
-            }
+            aws_hash_iter_next(&source_iter);
         }
-
-        if (s_profile_merge(dest_profile, source_profile)) {
-            return AWS_OP_ERR;
-        }
-
-        aws_hash_iter_next(&source_iter);
     }
 
     return AWS_OP_SUCCESS;
@@ -744,27 +763,28 @@ struct aws_profile_collection *aws_profile_collection_new_from_merge(
     AWS_ZERO_STRUCT(*merged);
     aws_ref_count_init(
         &merged->ref_count, merged, (aws_simple_completion_callback *)s_aws_profile_collection_destroy_internal);
+    for (int i = 0; i < AWS_PROFILE_SECTION_TYPE_COUNT; i++) {
+        size_t max_profiles = 0;
+        if (config_profiles != NULL) {
+            max_profiles += aws_hash_table_get_entry_count(&config_profiles->sections[i]);
+        }
+        if (credentials_profiles != NULL) {
+            max_profiles += aws_hash_table_get_entry_count(&credentials_profiles->sections[i]);
+        }
 
-    size_t max_profiles = 0;
-    if (config_profiles != NULL) {
-        max_profiles += aws_hash_table_get_entry_count(&config_profiles->profiles);
-    }
-    if (credentials_profiles != NULL) {
-        max_profiles += aws_hash_table_get_entry_count(&credentials_profiles->profiles);
-    }
+        merged->allocator = allocator;
+        merged->profile_source = AWS_PST_NONE;
 
-    merged->allocator = allocator;
-    merged->profile_source = AWS_PST_NONE;
-
-    if (aws_hash_table_init(
-            &merged->profiles,
-            allocator,
-            max_profiles,
-            aws_hash_string,
-            aws_hash_callback_string_eq,
-            NULL,
-            s_profile_hash_table_value_destroy)) {
-        goto cleanup;
+        if (aws_hash_table_init(
+                &merged->sections[i],
+                allocator,
+                max_profiles,
+                aws_hash_string,
+                aws_hash_callback_string_eq,
+                NULL,
+                s_profile_hash_table_value_destroy)) {
+            goto cleanup;
+        }
     }
 
     if (config_profiles != NULL) {
@@ -842,8 +862,6 @@ static struct aws_byte_cursor s_trim_trailing_whitespace_comment(const struct aw
     return trimmed;
 }
 
-AWS_STATIC_STRING_FROM_LITERAL(s_profile_token, "profile");
-
 /**
  * Attempts to parse profile declaration lines
  *
@@ -874,6 +892,7 @@ static bool s_parse_profile_declaration(
     context->current_property = NULL;
 
     s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
+    enum aws_profile_section_type section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
 
     /*
      * Check if the profile name starts with the 'profile' keyword.  We need to check for
@@ -883,6 +902,8 @@ static bool s_parse_profile_declaration(
     struct aws_byte_cursor backtrack_cursor = profile_cursor;
     bool has_profile_prefix = s_parse_by_token(&profile_cursor, s_profile_token, NULL) &&
                               s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 1);
+    bool has_sso_session_prefix = !has_profile_prefix && s_parse_by_token(&profile_cursor, s_sso_session_token, NULL) &&
+                                  s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 1);
 
     if (has_profile_prefix) {
         if (context->profile_collection->profile_source == AWS_PST_CREDENTIALS) {
@@ -895,6 +916,16 @@ static bool s_parse_profile_declaration(
             return true;
         }
 
+        s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
+    } else if (has_sso_session_prefix) {
+        if (context->profile_collection->profile_source == AWS_PST_CREDENTIALS) {
+            AWS_LOGF_WARN(AWS_LS_SDKUTILS_PROFILE, "sso-session declarations in credentials files are not allowed");
+            s_log_parse_context(AWS_LL_WARN, context);
+
+            context->parse_error = AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE;
+            return true;
+        }
+        section_type = AWS_PROFILE_SECTION_TYPE_SSO_SESSION;
         s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
     } else {
         profile_cursor = backtrack_cursor;
@@ -910,7 +941,7 @@ static bool s_parse_profile_declaration(
     }
 
     if (context->profile_collection->profile_source == AWS_PST_CONFIG && !has_profile_prefix &&
-        !s_is_default_profile_name(&profile_name)) {
+        !s_is_default_profile_name(&profile_name) && !has_sso_session_prefix) {
         AWS_LOGF_WARN(
             AWS_LS_SDKUTILS_PROFILE,
             "Non-default profile declarations in config files must use the \"profile\" keyword");
@@ -955,7 +986,12 @@ static bool s_parse_profile_declaration(
      * Apply to the profile collection
      */
     if (s_profile_collection_add_profile(
-            context->profile_collection, &profile_name, has_profile_prefix, context, &context->current_profile)) {
+            context->profile_collection,
+            section_type,
+            &profile_name,
+            has_profile_prefix,
+            context,
+            &context->current_profile)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PROFILE, "Failed to add profile to profile collection");
         s_log_parse_context(AWS_LL_ERROR, context);
 
@@ -1206,15 +1242,17 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
         profile_collection,
         (aws_simple_completion_callback *)s_aws_profile_collection_destroy_internal);
 
-    if (aws_hash_table_init(
-            &profile_collection->profiles,
-            allocator,
-            PROFILE_TABLE_DEFAULT_SIZE,
-            aws_hash_string,
-            aws_hash_callback_string_eq,
-            NULL, /* The key is owned by the value (and destroy cleans it up), so we don't have to */
-            s_profile_hash_table_value_destroy)) {
-        goto cleanup;
+    for (int i = 0; i < AWS_PROFILE_SECTION_TYPE_COUNT; i++) {
+        if (aws_hash_table_init(
+                &profile_collection->sections[i],
+                allocator,
+                PROFILE_TABLE_DEFAULT_SIZE,
+                aws_hash_string,
+                aws_hash_callback_string_eq,
+                NULL, /* The key is owned by the value (and destroy cleans it up), so we don't have to */
+                s_profile_hash_table_value_destroy)) {
+            goto cleanup;
+        }
     }
 
     struct aws_byte_cursor current_position = aws_byte_cursor_from_buf(buffer);
@@ -1523,7 +1561,13 @@ size_t aws_profile_get_property_count(const struct aws_profile *profile) {
 }
 
 size_t aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection) {
-    return aws_hash_table_get_entry_count(&profile_collection->profiles);
+    return aws_hash_table_get_entry_count(&profile_collection->sections[AWS_PROFILE_SECTION_TYPE_PROFILE]);
+}
+
+size_t aws_profile_collection_get_section_count(
+    const struct aws_profile_collection *profile_collection,
+    const enum aws_profile_section_type section_type) {
+    return aws_hash_table_get_entry_count(&profile_collection->sections[section_type]);
 }
 
 size_t aws_profile_property_get_sub_property_count(const struct aws_profile_property *property) {

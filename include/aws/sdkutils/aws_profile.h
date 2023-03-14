@@ -35,6 +35,16 @@ struct aws_profile_collection;
  */
 enum aws_profile_source_type { AWS_PST_NONE, AWS_PST_CONFIG, AWS_PST_CREDENTIALS };
 
+/*
+ * The collection can hold different types of sections.
+ */
+enum aws_profile_section_type {
+    AWS_PROFILE_SECTION_TYPE_PROFILE,
+    AWS_PROFILE_SECTION_TYPE_SSO_SESSION,
+
+    AWS_PROFILE_SECTION_TYPE_COUNT,
+};
+
 AWS_EXTERN_C_BEGIN
 
 /*************************
@@ -99,11 +109,29 @@ const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
     const struct aws_string *profile_name);
 
+/*
+ * Retrieves a reference to a section with the specified name and type, if it exists, from the profile collection.
+ * You can get the "default" profile or credentials file sections by passing `AWS_PROFILE_SECTION_TYPE_PROFILE`
+ */
+AWS_SDKUTILS_API
+const struct aws_profile *aws_profile_collection_get_section(
+    const struct aws_profile_collection *profile_collection,
+    const enum aws_profile_section_type section_type,
+    const struct aws_string *section_name);
+
 /**
- * Returns how many profiles a collection holds
+ * Returns the number of profiles in a collection
  */
 AWS_SDKUTILS_API
 size_t aws_profile_collection_get_profile_count(const struct aws_profile_collection *profile_collection);
+
+/**
+ * Returns the number of elements of the specified section in a collection.
+ */
+AWS_SDKUTILS_API
+size_t aws_profile_collection_get_section_count(
+    const struct aws_profile_collection *profile_collection,
+    const enum aws_profile_section_type section_type);
 
 /**
  * Returns a reference to the name of the provided profile
