@@ -12,7 +12,7 @@
 
 uint64_t aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_LAST];
 
-void aws_endpoints_rule_engine_init() {
+void aws_endpoints_rule_engine_init(void) {
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_IS_SET] = aws_hash_c_string("isSet");
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_NOT] = aws_hash_c_string("not");
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_GET_ATTR] = aws_hash_c_string("getAttr");
