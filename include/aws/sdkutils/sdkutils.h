@@ -10,6 +10,8 @@
 
 #include <aws/sdkutils/exports.h>
 
+AWS_PUSH_SANE_WARNING_LEVEL
+
 struct aws_allocator;
 
 #define AWS_C_SDKUTILS_PACKAGE_ID 15
@@ -47,5 +49,6 @@ AWS_SDKUTILS_API void aws_sdkutils_library_init(struct aws_allocator *allocator)
 AWS_SDKUTILS_API void aws_sdkutils_library_clean_up(void);
 
 AWS_EXTERN_C_END
+AWS_POP_SANE_WARNING_LEVEL
 
 #endif /* AWS_SDKUTILS_SDKUTILS_H */
