@@ -1541,14 +1541,17 @@ struct aws_string *aws_get_config_file_path(
 AWS_STATIC_STRING_FROM_LITERAL(s_default_profile_env_variable_name, "AWS_PROFILE");
 
 struct aws_string *aws_get_profile_name(struct aws_allocator *allocator, const struct aws_byte_cursor *override_name) {
-
+    /**
+     * The default profile must be used if the user does NOT specify a profile.
+     * the default profile can be overridden using the AWS_PROFILE environment variable.
+     */
     struct aws_string *profile_name = NULL;
-
-    if (aws_get_environment_value(allocator, s_default_profile_env_variable_name, &profile_name) ||
-        profile_name == NULL) {
-        if (override_name != NULL && override_name->ptr != NULL) {
-            profile_name = aws_string_new_from_array(allocator, override_name->ptr, override_name->len);
-        } else {
+    if (override_name != NULL && override_name->ptr != NULL) {
+        profile_name = aws_string_new_from_array(allocator, override_name->ptr, override_name->len);
+    } else {
+        /* Use the default profile. Override the default profile with AWS_PROFILE environment variable if exist */
+        if (aws_get_environment_value(allocator, s_default_profile_env_variable_name, &profile_name) ||
+            profile_name == NULL) {
             profile_name = aws_string_new_from_string(allocator, s_default_profile_name);
         }
     }

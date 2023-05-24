@@ -1447,9 +1447,8 @@ AWS_STATIC_STRING_FROM_LITERAL(s_profile_override, "NotTheDefault");
 
 static int s_profile_override_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
-
-    /* Make sure the environment doesn't affect this test */
-    aws_unset_environment_value(s_profile_env_var);
+    /* The envrionment value should only override the default when user not set one */
+    aws_set_environment_value(s_profile_env_var, s_profile_override);
 
     struct aws_byte_cursor override_cursor = aws_byte_cursor_from_string(s_profile_override);
     struct aws_string *profile_name = aws_get_profile_name(allocator, &override_cursor);
