@@ -1541,14 +1541,19 @@ struct aws_string *aws_get_config_file_path(
 AWS_STATIC_STRING_FROM_LITERAL(s_default_profile_env_variable_name, "AWS_PROFILE");
 
 struct aws_string *aws_get_profile_name(struct aws_allocator *allocator, const struct aws_byte_cursor *override_name) {
-
+    /**
+     * Profile name is resolved in the following order.
+     * 1. If the override_path variable is provided.
+     * 2. Check `AWS_PROFILE` environment variable and use the value if it is not empty.
+     * 3. Use "default". */
     struct aws_string *profile_name = NULL;
-
-    if (aws_get_environment_value(allocator, s_default_profile_env_variable_name, &profile_name) ||
-        profile_name == NULL) {
-        if (override_name != NULL && override_name->ptr != NULL) {
-            profile_name = aws_string_new_from_array(allocator, override_name->ptr, override_name->len);
-        } else {
+    if (override_name != NULL && override_name->ptr != NULL) {
+        profile_name = aws_string_new_from_array(allocator, override_name->ptr, override_name->len);
+    } else {
+        /* Try to fetch profile from AWS_PROFILE environment variable */
+        aws_get_environment_value(allocator, s_default_profile_env_variable_name, &profile_name);
+        /* Use default profile if it doesn't exist. */
+        if (profile_name == NULL) {
             profile_name = aws_string_new_from_string(allocator, s_default_profile_name);
         }
     }
