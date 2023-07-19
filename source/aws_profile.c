@@ -1155,7 +1155,7 @@ static bool s_parse_property(const struct aws_byte_cursor *line_cursor, struct p
         context->current_property =
             s_profile_add_property(context->current_profile, &trimmed_key_cursor, &property_cursor);
         if (context->current_property == NULL) {
-            AWS_LOGF_DEBUG(
+            AWS_LOGF_ERROR(
                 AWS_LS_SDKUTILS_PROFILE,
                 "Failed to add property \"" PRInSTR "\" to current profile \"%s\"",
                 AWS_BYTE_CURSOR_PRI(trimmed_key_cursor),
@@ -1214,7 +1214,7 @@ static void s_parse_and_apply_line_to_profile_collection(
         return;
     }
 
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_PROFILE, "Unidentifiable line type encountered while parsing profile file");
+    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PROFILE, "Unidentifiable line type encountered while parsing profile file");
     s_log_parse_context(AWS_LL_WARN, context);
 
     context->parse_error = AWS_ERROR_SDKUTILS_PARSE_FATAL;
