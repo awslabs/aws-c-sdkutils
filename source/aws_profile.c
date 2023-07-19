@@ -1039,7 +1039,7 @@ static bool s_parse_property_continuation(
      * A continuation without a current property is bad
      */
     if (context->current_profile == NULL || context->current_property == NULL) {
-        AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_PROFILE, "Property continuation seen outside of a current property");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PROFILE, "Property continuation seen outside of a current property");
         s_log_parse_context(AWS_LL_WARN, context);
 
         context->parse_error = AWS_ERROR_SDKUTILS_PARSE_FATAL;
