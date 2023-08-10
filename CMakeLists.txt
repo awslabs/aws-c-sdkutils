@@ -68,7 +68,7 @@ aws_prepare_symbol_visibility_args(${PROJECT_NAME} "AWS_SDKUTILS")
 aws_add_sanitizers(${PROJECT_NAME})
 
 aws_use_package(aws-c-common)
-target_link_libraries(${PROJECT_NAME} PUBLIC ${DEP_AWS_LIBS} ${PLATFORM_LIBS})
+target_link_libraries(${PROJECT_NAME} PUBLIC ${DEP_AWS_LIBS})
 
 # Our ABI is not yet stable
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION 1.0.0)
