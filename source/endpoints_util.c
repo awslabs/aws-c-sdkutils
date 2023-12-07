@@ -134,7 +134,7 @@ bool aws_is_ipv6(struct aws_byte_cursor host, bool is_uri_encoded) {
     return has_double_colon ? group_count < 7 : group_count == 8;
 }
 
-static char s_known_countries[][3] = {{"us"}, {"eu"}, {"ap"}, {"sa"}, {"ca"}, {"me"}, {"af"}};
+static char s_known_countries[][3] = {{"us"}, {"eu"}, {"ap"}, {"sa"}, {"ca"}, {"me"}, {"af"}, {"il"}};
 
 struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region) {
     if (region.len > AWS_REGION_LEN - 1) {
@@ -177,6 +177,18 @@ struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region
     if (2 == sscanf(copy, "us-isob-%30[^-]-%03" SCNu8, location, &num)) {
         if (location[0] != 0 && num > 0) {
             return aws_byte_cursor_from_c_str("aws-iso-b");
+        }
+    }
+
+    if (2 == sscanf(copy, "eu-isoe-%30[^-]-%03" SCNu8, location, &num)) {
+        if (location[0] != 0 && num > 0) {
+            return aws_byte_cursor_from_c_str("aws-iso-e");
+        }
+    }
+
+    if (2 == sscanf(copy, "us-isof-%30[^-]-%03" SCNu8, location, &num)) {
+        if (location[0] != 0 && num > 0) {
+            return aws_byte_cursor_from_c_str("aws-iso-f");
         }
     }
 
