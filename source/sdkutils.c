@@ -19,6 +19,8 @@ static struct aws_error_info s_errors[] = {
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_RULESET_EXHAUSTED, "Ruleset was exhausted before finding a matching rule", "aws-c-sdkutils"),
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARTITIONS_UNSUPPORTED, "Partitions version not supported.", "aws-c-sdkutils"),
     AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED, "Partitions parsing failed.", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX, "Unsupported regex feature.", "aws-c-sdkutils"),
+    AWS_DEFINE_ERROR_INFO(AWS_ERROR_SDKUTILS_ENDPOINTS_REGEX_NO_MATCH, "Text does not match specified regex", "aws-c-sdkutils"),
 };
 /* clang-format on */
 

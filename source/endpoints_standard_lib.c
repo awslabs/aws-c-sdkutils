@@ -7,6 +7,7 @@
 #include <aws/common/string.h>
 #include <aws/common/uri.h>
 
+#include <aws/sdkutils/private/endpoints_regex.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/private/endpoints_util.h>
 #include <aws/sdkutils/resource_name.h>
@@ -449,13 +450,24 @@ static int s_resolve_fn_aws_partition(
         goto on_done;
     }
 
-    key = aws_map_region_to_partition(key);
+    struct aws_byte_cursor partition_cur = {0};
+    for (struct aws_hash_iter iter = aws_hash_iter_begin(&scope->partitions->base_partitions);
+         !aws_hash_iter_done(&iter);
+         aws_hash_iter_next(&iter)) {
 
-    if (key.len == 0) {
-        key = aws_byte_cursor_from_c_str("aws");
+        struct aws_partition_info *partition = (struct aws_partition_info *)iter.element.value;
+
+        if (partition->region_regex && aws_endpoint_regex_match(partition->region_regex, key) == AWS_OP_SUCCESS) {
+            partition_cur = partition->name;
+            break;
+        }
     }
 
-    if (aws_hash_table_find(&scope->partitions->region_to_partition_info, &key, &element) || element == NULL) {
+    if (partition_cur.len == 0) {
+        partition_cur = aws_byte_cursor_from_c_str("aws");
+    }
+
+    if (aws_hash_table_find(&scope->partitions->base_partitions, &partition_cur, &element) || element == NULL) {
         AWS_LOGF_ERROR(
             AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to find partition info. " PRInSTR, AWS_BYTE_CURSOR_PRI(key));
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
