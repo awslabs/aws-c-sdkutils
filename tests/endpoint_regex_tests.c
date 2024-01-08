@@ -79,5 +79,40 @@ static int s_test_misc_regex_validation(struct aws_allocator *allocator, void *c
     ASSERT_NULL(regex);
     ASSERT_INT_EQUALS(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX, aws_last_error());
 
+    regex = aws_endpoint_regex_new_from_string(allocator, aws_byte_cursor_from_c_str(""));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_INVALID_ARGUMENT, aws_last_error());
+
+    regex = aws_endpoint_regex_new_from_string(
+        allocator, aws_byte_cursor_from_c_str("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_INVALID_ARGUMENT, aws_last_error());
+
+    regex = aws_endpoint_regex_new_from_string(allocator, aws_byte_cursor_from_c_str("aaaaa"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX, aws_last_error());
+
+    regex = aws_endpoint_regex_new_from_string(allocator, aws_byte_cursor_from_c_str("^aaa(aa$"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_INVALID_ARGUMENT, aws_last_error());
+
+    regex = aws_endpoint_regex_new_from_string(allocator, aws_byte_cursor_from_c_str("^aaaaa($"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_INVALID_ARGUMENT, aws_last_error());
+
+    regex = aws_endpoint_regex_new_from_string(allocator, aws_byte_cursor_from_c_str("^aaa()aa$"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_INVALID_ARGUMENT, aws_last_error());
+
+    regex = aws_endpoint_regex_new_from_string(allocator, aws_byte_cursor_from_c_str("^aaaaa$"));
+    ASSERT_NOT_NULL(regex);
+
+    ASSERT_ERROR(
+        AWS_ERROR_INVALID_ARGUMENT,
+        aws_endpoint_regex_match(
+            regex, aws_byte_cursor_from_c_str("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
+
+    aws_endpoint_regex_destroy(regex);
+
     return AWS_OP_SUCCESS;
 }

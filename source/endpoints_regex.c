@@ -144,6 +144,21 @@ struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
                     goto on_error;
                 }
 
+                aws_byte_cursor_advance(&regex_pattern, group.len);
+                if (regex_pattern.len == 0 || regex_pattern.ptr[0] != ')') {
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Missing closing parenthesis.");
+                    aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+                    goto on_error;
+                }
+                aws_byte_cursor_advance(&regex_pattern, 1);
+
+                if (group.len == 0) {
+                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Empty group.");
+                    aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+                    goto on_error;
+                }
+
                 /* Verify that group is only used for alternation. */
                 for (size_t i = 0; i < group.len; ++i) {
                     if (!aws_isalnum(group.ptr[i]) && group.ptr[i] != '|') {
@@ -157,7 +172,6 @@ struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
 
                 symbol.type = AWS_ENDPOINTS_REGEX_SYMBOL_ALTERNATION_GROUP;
                 symbol.info.alternation = aws_string_new_from_cursor(allocator, &group);
-                aws_byte_cursor_advance(&regex_pattern, group.len + 1);
                 break;
             }
 
