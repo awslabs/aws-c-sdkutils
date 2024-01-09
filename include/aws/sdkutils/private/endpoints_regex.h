@@ -14,7 +14,7 @@
  * for endpoint resolution and it is missing a lot of regex features.
  * Please reconsider if you are planning to use below functions in any other
  * context than endpoint resolution.
- * Refer to implementation file for limitations.
+ * Refer to source/endpoints_regex.c for limitations.
  */
 
 struct aws_endpoints_regex;

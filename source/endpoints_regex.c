@@ -23,9 +23,10 @@
  * just implement our own.
  *
  * What is supported?
+ * - ascii only matching (no unicode or other encoding support)
  * - multithread safe iterative matching (stack friendly, since this is
  *   typically called deep in call stack)
- * - char matching (plain chars, alpha/digit wildcards)
+ * - char matching (plain ascii chars, alpha/digit wildcards)
  * - star and plus (refer to limitations sections for limitations on how they work)
  * - alternation groups
  *
@@ -37,6 +38,19 @@
  * - grouping using ( and ) is only supported for alternations.
  * - regex must match the whole text, i.e. start with ^ and end with $
  * - features not called out above are not supported
+ * - alternations pick first occurrence that matches and do not backtrack to see
+ *   if there are any other occurrences
+ * 
+ * Examples
+ * current implementation is targeted towards matching typical aws region
+ * patterns like "^(us|eu|ap|sa|ca|me|af|il)\\-\\w+\\-\\d+$" (aws partition) or 
+ * "^us\\-gov\\-\\w+\\-\\d+$" (aws gov partition). 
+ * All current regions follow 
+ * "country code(2 chars)-meta(like gov or iso, optional)-direction-digit"
+ * and implementation should provide enough features to match those regions.
+ * Patterns that would not match correctly are things like "a*a" (star will
+ * exhaustively match a and will not give last a back) or (ab|abc), which will
+ * not match abc because alternation will lock into ab.
  */
 
 enum regex_symbol_type {
@@ -139,7 +153,7 @@ struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
                 struct aws_byte_cursor group = {0};
                 if (!aws_byte_cursor_next_split(&regex_pattern, ')', &group)) {
                     AWS_LOGF_ERROR(
-                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Missing closing parenthesis.");
+                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Invalid group syntax.");
                     aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
                     goto on_error;
                 }
