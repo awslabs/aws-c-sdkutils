@@ -40,12 +40,12 @@
  * - features not called out above are not supported
  * - alternations pick first occurrence that matches and do not backtrack to see
  *   if there are any other occurrences
- * 
+ *
  * Examples
  * current implementation is targeted towards matching typical aws region
- * patterns like "^(us|eu|ap|sa|ca|me|af|il)\\-\\w+\\-\\d+$" (aws partition) or 
- * "^us\\-gov\\-\\w+\\-\\d+$" (aws gov partition). 
- * All current regions follow 
+ * patterns like "^(us|eu|ap|sa|ca|me|af|il)\\-\\w+\\-\\d+$" (aws partition) or
+ * "^us\\-gov\\-\\w+\\-\\d+$" (aws gov partition).
+ * All current regions follow
  * "country code(2 chars)-meta(like gov or iso, optional)-direction-digit"
  * and implementation should provide enough features to match those regions.
  * Patterns that would not match correctly are things like "a*a" (star will
@@ -152,8 +152,7 @@ struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
             case '(': {
                 struct aws_byte_cursor group = {0};
                 if (!aws_byte_cursor_next_split(&regex_pattern, ')', &group)) {
-                    AWS_LOGF_ERROR(
-                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Invalid group syntax.");
+                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Invalid group syntax.");
                     aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
                     goto on_error;
                 }
