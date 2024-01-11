@@ -160,7 +160,7 @@ int s_validate_regex(const struct aws_endpoints_regex *regex) {
             /* alternation elements are unique and not subsets of each other */
             struct aws_byte_cursor elements[s_max_elements_per_alteration];
             size_t num_elements = 0;
-            struct aws_byte_cursor split;
+            struct aws_byte_cursor split = {0};
             while (aws_byte_cursor_next_split(&alternation, '|', &split)) {
                 if (num_elements == s_max_elements_per_alteration) {
                     AWS_LOGF_ERROR(

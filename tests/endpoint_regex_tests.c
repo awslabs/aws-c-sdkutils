@@ -104,6 +104,26 @@ static int s_test_misc_regex_validation(struct aws_allocator *allocator, void *c
     ASSERT_NULL(regex);
     ASSERT_INT_EQUALS(AWS_ERROR_INVALID_ARGUMENT, aws_last_error());
 
+    regex = aws_endpoints_regex_new(allocator, aws_byte_cursor_from_c_str("^aaa*aa$"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX, aws_last_error());
+
+    regex = aws_endpoints_regex_new(allocator, aws_byte_cursor_from_c_str("^aaa+aa$"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX, aws_last_error());
+
+    regex = aws_endpoints_regex_new(allocator, aws_byte_cursor_from_c_str("^aaa(a|ab)aa$"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX, aws_last_error());
+
+    regex = aws_endpoints_regex_new(allocator, aws_byte_cursor_from_c_str("^aaa(a||b)aa$"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_INVALID_ARGUMENT, aws_last_error());
+
+    regex = aws_endpoints_regex_new(allocator, aws_byte_cursor_from_c_str("^aaa*+aa$"));
+    ASSERT_NULL(regex);
+    ASSERT_INT_EQUALS(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX, aws_last_error());
+
     regex = aws_endpoints_regex_new(allocator, aws_byte_cursor_from_c_str("^aaaaa$"));
     ASSERT_NOT_NULL(regex);
 
