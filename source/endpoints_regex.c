@@ -328,8 +328,6 @@ void aws_endpoints_regex_destroy(struct aws_endpoints_regex *regex) {
         return;
     }
 
-    struct aws_array_list *symbols = regex;
-
     struct aws_allocator *allocator = regex->symbols.alloc;
     s_clean_up_symbols(&regex->symbols);
     aws_array_list_clean_up(&regex->symbols);
