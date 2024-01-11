@@ -98,21 +98,21 @@ static void s_clean_up_symbols(struct aws_array_list *symbols) {
 int s_validate_regex(const struct aws_endpoints_regex *regex) {
     AWS_FATAL_PRECONDITION(regex != NULL);
 
-    for (size_t i = 0; i < aws_array_list_length(&regex->symbols); ++i) {
+    for (size_t sym_idx = 0; sym_idx < aws_array_list_length(&regex->symbols); ++sym_idx) {
         struct aws_endpoints_regex_symbol *symbol = NULL;
-        aws_array_list_get_at_ptr(&regex->symbols, (void **)&symbol, i);
+        aws_array_list_get_at_ptr(&regex->symbols, (void **)&symbol, sym_idx);
 
         if (symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_PLUS || symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_STAR) {
 
             /* first symbol */
-            if (i == 0) {
+            if (sym_idx == 0) {
                 AWS_LOGF_ERROR(
                     AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Regex cannot start with star or plus.");
                 return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
             }
 
             struct aws_endpoints_regex_symbol *prev_symbol = NULL;
-            aws_array_list_get_at_ptr(&regex->symbols, (void **)&prev_symbol, i - 1);
+            aws_array_list_get_at_ptr(&regex->symbols, (void **)&prev_symbol, sym_idx - 1);
 
             /* reasonable symbol before */
             enum regex_symbol_type prev_type = prev_symbol->type;
@@ -126,9 +126,9 @@ int s_validate_regex(const struct aws_endpoints_regex *regex) {
             }
 
             /* ends with - delimiter */
-            if (i != aws_array_list_length(&regex->symbols) - 1) {
+            if (sym_idx != aws_array_list_length(&regex->symbols) - 1) {
                 struct aws_endpoints_regex_symbol *next_symbol = NULL;
-                aws_array_list_get_at_ptr(&regex->symbols, (void **)&next_symbol, i + 1);
+                aws_array_list_get_at_ptr(&regex->symbols, (void **)&next_symbol, sym_idx + 1);
 
                 if (next_symbol->type != AWS_ENDPOINTS_REGEX_SYMBOL_CHAR || next_symbol->info.ch != '-') {
                     AWS_LOGF_ERROR(
