@@ -63,7 +63,7 @@ enum regex_symbol_type {
     AWS_ENDPOINTS_REGEX_SYMBOL_ALTERNATION_GROUP,
 };
 
-struct aws_endpoint_regex_symbol {
+struct aws_endpoints_regex_symbol {
     enum regex_symbol_type type;
 
     union {
@@ -72,14 +72,21 @@ struct aws_endpoint_regex_symbol {
     } info;
 };
 
+struct aws_endpoints_regex {
+    struct aws_array_list symbols;
+};
+
 /* Somewhat arbitrary limits on size of regex and text to avoid overly large
  * inputs. */
-static size_t s_max_regex_length = 60;
-static size_t s_max_text_length = 50;
+enum {
+    s_max_regex_length = 60,
+    s_max_text_length = 50,
+    s_max_elements_per_alteration = 20,
+};
 
 static void s_clean_up_symbols(struct aws_array_list *symbols) {
     for (size_t i = 0; i < aws_array_list_length(symbols); ++i) {
-        struct aws_endpoint_regex_symbol *element = NULL;
+        struct aws_endpoints_regex_symbol *element = NULL;
         aws_array_list_get_at_ptr(symbols, (void **)&element, i);
 
         if (element->type == AWS_ENDPOINTS_REGEX_SYMBOL_ALTERNATION_GROUP) {
@@ -88,14 +95,125 @@ static void s_clean_up_symbols(struct aws_array_list *symbols) {
     }
 }
 
-struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
+int s_validate_regex(const struct aws_endpoints_regex *regex) {
+    AWS_FATAL_PRECONDITION(regex != NULL);
+
+    for (size_t i = 0; i < aws_array_list_length(&regex->symbols); ++i) {
+        struct aws_endpoints_regex_symbol *symbol = NULL;
+        aws_array_list_get_at_ptr(&regex->symbols, (void **)&symbol, i);
+
+        if (symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_PLUS || symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_STAR) {
+
+            /* first symbol */
+            if (i == 0) {
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Regex cannot start with star or plus.");
+                return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+            }
+
+            struct aws_endpoints_regex_symbol *prev_symbol = NULL;
+            aws_array_list_get_at_ptr(&regex->symbols, (void **)&prev_symbol, i - 1);
+
+            /* reasonable symbol before */
+            enum regex_symbol_type prev_type = prev_symbol->type;
+            if (!(prev_type == AWS_ENDPOINTS_REGEX_SYMBOL_DOT || prev_type == AWS_ENDPOINTS_REGEX_SYMBOL_DIGIT ||
+                  prev_type == AWS_ENDPOINTS_REGEX_SYMBOL_ALPHA || prev_type == AWS_ENDPOINTS_REGEX_SYMBOL_CHAR ||
+                  prev_type == AWS_ENDPOINTS_REGEX_SYMBOL_ALTERNATION_GROUP)) {
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_REGEX,
+                    "Unsupported regex pattern. Star or plus after unsupported character.");
+                return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX);
+            }
+
+            /* ends with - delimiter */
+            if (i != aws_array_list_length(&regex->symbols) - 1) {
+                struct aws_endpoints_regex_symbol *next_symbol = NULL;
+                aws_array_list_get_at_ptr(&regex->symbols, (void **)&next_symbol, i + 1);
+
+                if (next_symbol->type != AWS_ENDPOINTS_REGEX_SYMBOL_CHAR || next_symbol->info.ch != '-') {
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX,
+                        "Unsupported regex pattern. Star or plus must be followed by - delimiter.");
+                    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX);
+                }
+            }
+        } else if (symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_ALTERNATION_GROUP) {
+
+            struct aws_byte_cursor alternation = aws_byte_cursor_from_string(symbol->info.alternation);
+
+            /* Not empty */
+            if (alternation.len == 0) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Empty group.");
+                return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+            }
+
+            /* Verify that group is only used for alternation. */
+            for (size_t i = 0; i < alternation.len; ++i) {
+                if (!aws_isalnum(alternation.ptr[i]) && alternation.ptr[i] != '|') {
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX,
+                        "Unsupported regex pattern. Only alternation groups are supported.");
+                    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX);
+                }
+            }
+
+            /* alternation elements are unique and not subsets of each other */
+            struct aws_byte_cursor elements[s_max_elements_per_alteration];
+            size_t num_elements = 0;
+            struct aws_byte_cursor split;
+            while (aws_byte_cursor_next_split(&alternation, '|', &split)) {
+                if (num_elements == s_max_elements_per_alteration) {
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Unsupported regex pattern. Too many element in alternation");
+                    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX);
+                }
+
+                if (split.len == 0) {
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Alternation element cannot be empty");
+                    return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+                }
+
+                elements[num_elements] = split;
+                ++num_elements;
+            }
+
+            struct aws_byte_cursor input;
+            struct aws_byte_cursor prefix;
+            for (size_t i = 0; i < num_elements; ++i) {
+                for (size_t j = i + 1; j < num_elements; ++j) {
+
+                    if (elements[i].len <= elements[j].len) {
+                        input = elements[j];
+                        prefix = elements[i];
+                    } else {
+                        input = elements[i];
+                        prefix = elements[j];
+                    }
+
+                    if (aws_byte_cursor_starts_with(&input, &prefix)) {
+                        AWS_LOGF_ERROR(
+                            AWS_LS_SDKUTILS_ENDPOINTS_REGEX,
+                            "Unsupported regex pattern. One alternation element cannot be a prefix of another "
+                            "element.");
+                        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX);
+                    }
+                }
+            }
+        }
+    }
+
+    return AWS_OP_SUCCESS;
+}
+
+struct aws_endpoints_regex *aws_endpoints_regex_new(
     struct aws_allocator *allocator,
     struct aws_byte_cursor regex_pattern) {
 
     if (regex_pattern.len == 0 || regex_pattern.len > s_max_regex_length) {
         AWS_LOGF_ERROR(
             AWS_LS_SDKUTILS_ENDPOINTS_REGEX,
-            "Invalid regex pattern size. Must be between 1 and %zu",
+            "Invalid regex pattern size. Must be between 1 and %d",
             s_max_regex_length);
         aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
         return NULL;
@@ -113,14 +231,14 @@ struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
     aws_byte_cursor_advance(&regex_pattern, 1);
     --regex_pattern.len;
 
-    struct aws_array_list *symbols = aws_mem_calloc(allocator, 1, sizeof(struct aws_array_list));
-    aws_array_list_init_dynamic(symbols, allocator, regex_pattern.len, sizeof(struct aws_endpoint_regex_symbol));
+    struct aws_endpoints_regex *re = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_regex));
+    aws_array_list_init_dynamic(&re->symbols, allocator, regex_pattern.len, sizeof(struct aws_endpoints_regex_symbol));
 
     while (regex_pattern.len > 0) {
         uint8_t ch = regex_pattern.ptr[0];
         aws_byte_cursor_advance(&regex_pattern, 1);
 
-        struct aws_endpoint_regex_symbol symbol;
+        struct aws_endpoints_regex_symbol symbol;
         switch (ch) {
             case '.':
                 symbol.type = AWS_ENDPOINTS_REGEX_SYMBOL_DOT;
@@ -132,6 +250,12 @@ struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
                 symbol.type = AWS_ENDPOINTS_REGEX_SYMBOL_PLUS;
                 break;
             case '\\':
+                if (regex_pattern.len == 0) {
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Pattern ends with escape character.");
+                    aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+                    goto on_error;
+                }
                 switch (regex_pattern.ptr[0]) {
                     /* Predefined patterns */
                     case 'd':
@@ -166,23 +290,6 @@ struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
                 }
                 aws_byte_cursor_advance(&regex_pattern, 1);
 
-                if (group.len == 0) {
-                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid regex pattern. Empty group.");
-                    aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
-                    goto on_error;
-                }
-
-                /* Verify that group is only used for alternation. */
-                for (size_t i = 0; i < group.len; ++i) {
-                    if (!aws_isalnum(group.ptr[i]) && group.ptr[i] != '|') {
-                        AWS_LOGF_ERROR(
-                            AWS_LS_SDKUTILS_ENDPOINTS_REGEX,
-                            "Unsupported regex pattern. Only alternation groups are supported.");
-                        aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX);
-                        goto on_error;
-                    }
-                }
-
                 symbol.type = AWS_ENDPOINTS_REGEX_SYMBOL_ALTERNATION_GROUP;
                 symbol.info.alternation = aws_string_new_from_cursor(allocator, &group);
                 break;
@@ -202,19 +309,21 @@ struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
             }
         }
 
-        aws_array_list_push_back(symbols, &symbol);
+        aws_array_list_push_back(&re->symbols, &symbol);
     }
 
-    return (struct aws_endpoint_regex *)symbols;
+    if (s_validate_regex(re)) {
+        goto on_error;
+    }
+
+    return re;
 
 on_error:
-    s_clean_up_symbols(symbols);
-    aws_array_list_clean_up(symbols);
-    aws_mem_release(allocator, symbols);
+    aws_endpoints_regex_destroy(re);
     return NULL;
 }
 
-void aws_endpoint_regex_destroy(struct aws_endpoint_regex *regex) {
+void aws_endpoints_regex_destroy(struct aws_endpoints_regex *regex) {
     if (regex == NULL) {
         return;
     }
@@ -227,7 +336,11 @@ void aws_endpoint_regex_destroy(struct aws_endpoint_regex *regex) {
     aws_mem_release(allocator, symbols);
 }
 
-static bool s_match_one(struct aws_endpoint_regex_symbol *symbol, struct aws_byte_cursor *text) {
+static bool s_match_one(const struct aws_endpoints_regex_symbol *symbol, struct aws_byte_cursor *text) {
+    if (text->len == 0) {
+        return false;
+    }
+
     uint8_t ch = text->ptr[0];
     switch (symbol->type) {
         case AWS_ENDPOINTS_REGEX_SYMBOL_ALPHA:
@@ -245,49 +358,48 @@ static bool s_match_one(struct aws_endpoint_regex_symbol *symbol, struct aws_byt
     return false;
 }
 
-static bool s_match_star(struct aws_endpoint_regex_symbol *symbol, struct aws_byte_cursor *text) {
+static void s_match_star(const struct aws_endpoints_regex_symbol *symbol, struct aws_byte_cursor *text) {
     while (s_match_one(symbol, text)) {
         aws_byte_cursor_advance(text, 1);
     }
-
-    return true;
 }
 
-static bool s_match_plus(struct aws_endpoint_regex_symbol *symbol, struct aws_byte_cursor *text) {
+static bool s_match_plus(const struct aws_endpoints_regex_symbol *symbol, struct aws_byte_cursor *text) {
     if (!s_match_one(symbol, text)) {
         return false;
     }
 
     aws_byte_cursor_advance(text, 1);
-    return s_match_star(symbol, text);
+    s_match_star(symbol, text);
+    return true;
 }
 
-int aws_endpoint_regex_match(struct aws_endpoint_regex *regex, struct aws_byte_cursor text) {
+int aws_endpoints_regex_match(const struct aws_endpoints_regex *regex, struct aws_byte_cursor text) {
     AWS_PRECONDITION(regex);
 
     if (text.len == 0 || text.len > s_max_text_length) {
         AWS_LOGF_ERROR(
-            AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid text size. Must be between 1 and %zu", s_max_text_length);
+            AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Invalid text size. Must be between 1 and %d", s_max_text_length);
         return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
-    struct aws_array_list *symbols = (struct aws_array_list *)regex;
-
-    for (size_t i = 0; i < aws_array_list_length(symbols); ++i) {
-        struct aws_endpoint_regex_symbol *symbol = NULL;
-        aws_array_list_get_at_ptr(symbols, (void **)&symbol, i);
+    for (size_t i = 0; i < aws_array_list_length(&regex->symbols); ++i) {
+        struct aws_endpoints_regex_symbol *symbol = NULL;
+        aws_array_list_get_at_ptr(&regex->symbols, (void **)&symbol, i);
 
         /* looks forward to check if symbol has * or + modifier */
-        if (i + 1 < aws_array_list_length(symbols)) {
-            struct aws_endpoint_regex_symbol *next_symbol = NULL;
-            aws_array_list_get_at_ptr(symbols, (void **)&next_symbol, i + 1);
+        if (i + 1 < aws_array_list_length(&regex->symbols)) {
+            struct aws_endpoints_regex_symbol *next_symbol = NULL;
+            aws_array_list_get_at_ptr(&regex->symbols, (void **)&next_symbol, i + 1);
 
             if (next_symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_STAR ||
                 next_symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_PLUS) {
-                if (next_symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_STAR && !s_match_star(symbol, &text)) {
-                    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_REGEX_NO_MATCH);
-                } else if (next_symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_PLUS && !s_match_plus(symbol, &text)) {
-                    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_REGEX_NO_MATCH);
+                if (next_symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_STAR) {
+                    s_match_star(symbol, &text);
+                } else if (next_symbol->type == AWS_ENDPOINTS_REGEX_SYMBOL_PLUS) {
+                    if (!s_match_plus(symbol, &text)) {
+                        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_REGEX_NO_MATCH);
+                    }
                 }
                 ++i;
                 continue;

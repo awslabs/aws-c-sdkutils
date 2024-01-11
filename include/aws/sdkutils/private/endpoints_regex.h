@@ -26,14 +26,14 @@ struct aws_endpoints_regex;
  * - AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX - regex is valid, but
  *   implementation does not support some of regex features
  */
-AWS_SDKUTILS_API struct aws_endpoint_regex *aws_endpoint_regex_new_from_string(
+AWS_SDKUTILS_API struct aws_endpoints_regex *aws_endpoints_regex_new(
     struct aws_allocator *allocator,
     struct aws_byte_cursor regex_pattern);
 
 /*
  * Destroys compiled regex.
  */
-AWS_SDKUTILS_API void aws_endpoint_regex_destroy(struct aws_endpoint_regex *regex);
+AWS_SDKUTILS_API void aws_endpoints_regex_destroy(struct aws_endpoints_regex *regex);
 
 /*
  * Matches text against regex.
@@ -42,6 +42,6 @@ AWS_SDKUTILS_API void aws_endpoint_regex_destroy(struct aws_endpoint_regex *rege
  * AWS_ERROR_INVALID_ARGUMENT if inputs are invalid.
  *
  */
-AWS_SDKUTILS_API int aws_endpoint_regex_match(struct aws_endpoint_regex *regex, struct aws_byte_cursor text);
+AWS_SDKUTILS_API int aws_endpoints_regex_match(const struct aws_endpoints_regex *regex, struct aws_byte_cursor text);
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_REGEX_H */

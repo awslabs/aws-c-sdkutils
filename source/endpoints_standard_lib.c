@@ -457,7 +457,7 @@ static int s_resolve_fn_aws_partition(
 
         struct aws_partition_info *partition = (struct aws_partition_info *)iter.element.value;
 
-        if (partition->region_regex && aws_endpoint_regex_match(partition->region_regex, key) == AWS_OP_SUCCESS) {
+        if (partition->region_regex && aws_endpoints_regex_match(partition->region_regex, key) == AWS_OP_SUCCESS) {
             partition_cur = partition->name;
             break;
         }

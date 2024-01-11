@@ -35,6 +35,20 @@ static struct aws_log_subject_info s_log_subject_infos[] = {
         "SDKUtils",
         "Subject for SDK utility logging that defies categorization."),
     DEFINE_LOG_SUBJECT_INFO(AWS_LS_SDKUTILS_PROFILE, "AWSProfile", "Subject for AWS Profile parser and utilities"),
+    DEFINE_LOG_SUBJECT_INFO(
+        AWS_LS_SDKUTILS_ENDPOINTS_PARSING,
+        "AWSEndpointsParsing",
+        "Subject for AWS Endpoints ruleset parser"),
+    DEFINE_LOG_SUBJECT_INFO(
+        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+        "AWSEndpointsResolution",
+        "Subject for AWS Endpoints Engine resolution"),
+    DEFINE_LOG_SUBJECT_INFO(
+        AWS_LS_SDKUTILS_ENDPOINTS_GENERAL,
+        "AWSEndpoints",
+        "Subject for AWS Endpoints Engine general messages"),
+    DEFINE_LOG_SUBJECT_INFO(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "AWSEndpoints", "Subject for AWS Partitions parsing"),
+    DEFINE_LOG_SUBJECT_INFO(AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "AWSEndpoints", "Subject for AWS Endpoints Regex engine"),
 };
 
 static struct aws_log_subject_info_list s_sdkutils_log_subjects = {

@@ -173,7 +173,7 @@ struct aws_partition_info {
     bool is_copy;
     struct aws_string *info;
 
-    struct aws_endpoint_regex *region_regex;
+    struct aws_endpoints_regex *region_regex;
 };
 
 /*

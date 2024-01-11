@@ -63,7 +63,7 @@ void aws_partition_info_destroy(struct aws_partition_info *partition_info) {
         aws_string_destroy(partition_info->info);
     }
 
-    aws_endpoint_regex_destroy(partition_info->region_regex);
+    aws_endpoints_regex_destroy(partition_info->region_regex);
 
     aws_mem_release(partition_info->allocator, partition_info);
 }
