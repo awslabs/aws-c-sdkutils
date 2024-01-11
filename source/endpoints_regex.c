@@ -328,12 +328,12 @@ void aws_endpoints_regex_destroy(struct aws_endpoints_regex *regex) {
         return;
     }
 
-    struct aws_array_list *symbols = (struct aws_array_list *)regex;
+    struct aws_array_list *symbols = regex;
 
-    struct aws_allocator *allocator = symbols->alloc;
-    s_clean_up_symbols(symbols);
-    aws_array_list_clean_up(symbols);
-    aws_mem_release(allocator, symbols);
+    struct aws_allocator *allocator = regex->symbols.alloc;
+    s_clean_up_symbols(&regex->symbols);
+    aws_array_list_clean_up(&regex->symbols);
+    aws_mem_release(allocator, &regex->symbols);
 }
 
 static bool s_match_one(const struct aws_endpoints_regex_symbol *symbol, struct aws_byte_cursor *text) {
