@@ -51,15 +51,6 @@ AWS_SDKUTILS_API bool aws_is_ipv6(struct aws_byte_cursor host, bool is_uri_encod
 AWS_SDKUTILS_API bool aws_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains);
 
 /*
- * Determines partition from region name.
- * Note: this basically implements regex-less alternative to regexes specified in
- * partitions file.
- * Returns cursor indicating which partition region maps to or empty cursor if
- * region cannot be mapped.
- */
-AWS_SDKUTILS_API struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region);
-
-/*
  * Normalize uri path - make sure it starts and ends with /
  * Will initialize out_normalized_path.
  * In cases of error out_normalized_path will be uninitialized.

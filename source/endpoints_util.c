@@ -134,67 +134,6 @@ bool aws_is_ipv6(struct aws_byte_cursor host, bool is_uri_encoded) {
     return has_double_colon ? group_count < 7 : group_count == 8;
 }
 
-static char s_known_countries[][3] = {{"us"}, {"eu"}, {"ap"}, {"sa"}, {"ca"}, {"me"}, {"af"}, {"il"}};
-
-struct aws_byte_cursor aws_map_region_to_partition(struct aws_byte_cursor region) {
-    if (region.len > AWS_REGION_LEN - 1) {
-        return aws_byte_cursor_from_c_str("");
-    }
-
-    char copy[AWS_REGION_LEN] = {0};
-    memcpy(copy, region.ptr, region.len);
-
-    char country[3] = {0};
-    char location[31] = {0};
-    uint8_t num = 0;
-
-    if (3 == sscanf(copy, "%2[^-]-%30[^-]-%03" SCNu8, country, location, &num)) {
-        if (location[0] != 0 && num > 0) {
-            for (size_t i = 0; i < sizeof(s_known_countries) / sizeof(s_known_countries[0]); ++i) {
-                if (0 == strncmp(s_known_countries[i], country, 3)) {
-                    return aws_byte_cursor_from_c_str("aws");
-                }
-            }
-
-            if (0 == strncmp("cn", country, 3)) {
-                return aws_byte_cursor_from_c_str("aws-cn");
-            }
-        }
-    }
-
-    if (2 == sscanf(copy, "us-gov-%30[^-]-%03" SCNu8, location, &num)) {
-        if (location[0] != 0 && num > 0) {
-            return aws_byte_cursor_from_c_str("aws-us-gov");
-        }
-    }
-
-    if (2 == sscanf(copy, "us-iso-%30[^-]-%03" SCNu8, location, &num)) {
-        if (location[0] != 0 && num > 0) {
-            return aws_byte_cursor_from_c_str("aws-iso");
-        }
-    }
-
-    if (2 == sscanf(copy, "us-isob-%30[^-]-%03" SCNu8, location, &num)) {
-        if (location[0] != 0 && num > 0) {
-            return aws_byte_cursor_from_c_str("aws-iso-b");
-        }
-    }
-
-    if (2 == sscanf(copy, "eu-isoe-%30[^-]-%03" SCNu8, location, &num)) {
-        if (location[0] != 0 && num > 0) {
-            return aws_byte_cursor_from_c_str("aws-iso-e");
-        }
-    }
-
-    if (2 == sscanf(copy, "us-isof-%30[^-]-%03" SCNu8, location, &num)) {
-        if (location[0] != 0 && num > 0) {
-            return aws_byte_cursor_from_c_str("aws-iso-f");
-        }
-    }
-
-    return aws_byte_cursor_from_c_str("");
-}
-
 bool aws_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains) {
     bool next_must_be_alnum = true;
     size_t subdomain_count = 0;

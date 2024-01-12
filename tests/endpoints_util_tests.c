@@ -67,44 +67,6 @@ static int s_test_is_ipv6(struct aws_allocator *allocator, void *ctx) {
     return AWS_OP_SUCCESS;
 }
 
-AWS_TEST_CASE(endpoints_map_region_to_partition, s_test_map_region_to_partition)
-static int s_test_map_region_to_partition(struct aws_allocator *allocator, void *ctx) {
-    (void)allocator;
-    (void)ctx;
-
-    struct aws_byte_cursor partition1 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("us-west-2"));
-    ASSERT_TRUE(aws_byte_cursor_eq_c_str(&partition1, "aws"));
-
-    struct aws_byte_cursor partition2 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("us-gov-west-1"));
-    ASSERT_TRUE(aws_byte_cursor_eq_c_str(&partition2, "aws-us-gov"));
-
-    struct aws_byte_cursor partition3 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("cn-north-1"));
-    ASSERT_TRUE(aws_byte_cursor_eq_c_str(&partition3, "aws-cn"));
-
-    struct aws_byte_cursor partition4 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("us-iso-rand-1"));
-    ASSERT_TRUE(aws_byte_cursor_eq_c_str(&partition4, "aws-iso"));
-
-    struct aws_byte_cursor partition5 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("us-isob-rand-1"));
-    ASSERT_TRUE(aws_byte_cursor_eq_c_str(&partition5, "aws-iso-b"));
-
-    struct aws_byte_cursor partition6 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("af-west-1"));
-    ASSERT_TRUE(aws_byte_cursor_eq_c_str(&partition6, "aws"));
-
-    struct aws_byte_cursor partition7 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("us-west"));
-    ASSERT_TRUE(partition7.len == 0);
-
-    struct aws_byte_cursor partition8 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("us-west-a"));
-    ASSERT_TRUE(partition8.len == 0);
-
-    struct aws_byte_cursor partition9 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("zz-west-1"));
-    ASSERT_TRUE(partition9.len == 0);
-
-    struct aws_byte_cursor partition10 = aws_map_region_to_partition(aws_byte_cursor_from_c_str("us-"));
-    ASSERT_TRUE(partition10.len == 0);
-
-    return AWS_OP_SUCCESS;
-}
-
 AWS_TEST_CASE(endpoints_uri_normalize_path, s_test_uri_normalize_path)
 static int s_test_uri_normalize_path(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
