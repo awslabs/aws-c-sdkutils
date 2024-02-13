@@ -214,7 +214,7 @@ int aws_byte_buf_init_from_normalized_uri_path(
 
 on_error:
     aws_byte_buf_clean_up(out_normalized_path);
-    return AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED;
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
 struct aws_string *aws_string_new_from_json(struct aws_allocator *allocator, const struct aws_json_value *value) {
