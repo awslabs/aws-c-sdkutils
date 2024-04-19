@@ -88,8 +88,6 @@ add_test_case(test_endpoints_valid_hostlabel)
 add_test_case(test_endpoints_condition_mem_clean_up)
 add_test_case(test_endpoints_custom)
 
-add_test_case(endpoints_eval_util_is_ipv4)
-add_test_case(endpoints_eval_util_is_ipv6)
 add_test_case(endpoints_uri_normalize_path)
 add_test_case(endpoints_byte_buf_init_from_resolved_templated_string)
 

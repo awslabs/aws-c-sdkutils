@@ -35,17 +35,6 @@ AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_non_owning_cursor_create
 AWS_SDKUTILS_API void aws_owning_cursor_clean_up(struct aws_owning_cursor *cursor);
 
 /*
- * Determine whether host cursor is IPv4 string.
- */
-AWS_SDKUTILS_API bool aws_is_ipv4(struct aws_byte_cursor host);
-
-/*
- * Determine whether host cursor is IPv6 string.
- * Supports checking for uri encoded strings and scoped literals.
- */
-AWS_SDKUTILS_API bool aws_is_ipv6(struct aws_byte_cursor host, bool is_uri_encoded);
-
-/*
  * Determine whether label is a valid host label.
  */
 AWS_SDKUTILS_API bool aws_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains);
