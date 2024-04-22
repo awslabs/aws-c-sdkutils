@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0.
  */
 
+#include <aws/common/host_utils.h>
 #include <aws/common/json.h>
 #include <aws/common/string.h>
 #include <aws/common/uri.h>
@@ -261,7 +262,7 @@ on_done:
 }
 
 static bool s_is_uri_ip(struct aws_byte_cursor host, bool is_uri_encoded) {
-    return aws_is_ipv4(host) || aws_is_ipv6(host, is_uri_encoded);
+    return aws_host_utils_is_ipv4(host) || aws_host_utils_is_ipv6(host, is_uri_encoded);
 }
 
 static int s_resolve_fn_parse_url(
@@ -612,7 +613,7 @@ static int s_resolve_is_virtual_hostable_s3_bucket(
     out_value->type = AWS_ENDPOINTS_VALUE_BOOLEAN;
     out_value->v.boolean = (label_cur.len >= 3 && label_cur.len <= 63) && !has_uppercase_chars &&
                            aws_is_valid_host_label(label_cur, argv_allow_subdomains.v.boolean) &&
-                           !aws_is_ipv4(label_cur);
+                           !aws_host_utils_is_ipv4(label_cur);
 
 on_done:
     aws_endpoints_value_clean_up(&argv_value);
