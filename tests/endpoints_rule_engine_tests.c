@@ -114,6 +114,11 @@ struct iteration_wrapper {
     struct aws_endpoints_request_context *context;
 };
 
+enum {
+    /* something is really wrong if there is more than 4 elems during the test */
+    MAX_STRING_ARRAY_ELEMENTS = 4
+};
+
 static int s_on_parameter_key(
     const struct aws_byte_cursor *key,
     const struct aws_json_value *value,
@@ -125,23 +130,27 @@ static int s_on_parameter_key(
 
     if (aws_json_value_is_string(value)) {
         struct aws_byte_cursor cur;
-        if (aws_json_value_get_string(value, &cur) ||
-            aws_endpoints_request_context_add_string(wrapper->allocator, wrapper->context, *key, cur)) {
-            goto on_error;
-        }
+        ASSERT_SUCCESS(aws_json_value_get_string(value, &cur));
+        ASSERT_SUCCESS(aws_endpoints_request_context_add_string(wrapper->allocator, wrapper->context, *key, cur));
         return AWS_OP_SUCCESS;
     } else if (aws_json_value_is_boolean(value)) {
         bool b;
-        if (aws_json_value_get_boolean(value, &b) ||
-            aws_endpoints_request_context_add_boolean(wrapper->allocator, wrapper->context, *key, b)) {
-            goto on_error;
-        }
+        ASSERT_SUCCESS(aws_json_value_get_boolean(value, &b));
+        ASSERT_SUCCESS(aws_endpoints_request_context_add_boolean(wrapper->allocator, wrapper->context, *key, b));
         return AWS_OP_SUCCESS;
-    } else {
-        goto on_error;
+    } else if (aws_json_value_is_array(value)) {
+        struct aws_byte_cursor strings[MAX_STRING_ARRAY_ELEMENTS];
+        size_t len = aws_json_get_array_size(value);
+        ASSERT_TRUE(len < MAX_STRING_ARRAY_ELEMENTS);
+        for (size_t i = 0; i < len; ++i) {
+            struct aws_json_value *str = aws_json_get_array_element(value, i);
+            ASSERT_SUCCESS(aws_json_value_get_string(str, &strings[i]));
+        }
+        ASSERT_SUCCESS(aws_endpoints_request_context_add_string_array(wrapper->allocator, 
+            wrapper->context, *key, strings, len));
     }
 
-on_error:
+    AWS_LOGF_DEBUG(0, "bar");
     return AWS_OP_ERR;
 }
 
@@ -482,6 +491,15 @@ static int s_test_endpoints_custom(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     ASSERT_SUCCESS(eval_expected(allocator, aws_byte_cursor_from_c_str("custom_partition.json")));
+
+    return AWS_OP_SUCCESS;
+}
+
+AWS_TEST_CASE(test_endpoints_string_array, s_test_endpoints_string_array)
+static int s_test_endpoints_string_array(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    ASSERT_SUCCESS(eval_expected(allocator, aws_byte_cursor_from_c_str("string_array.json")));
 
     return AWS_OP_SUCCESS;
 }

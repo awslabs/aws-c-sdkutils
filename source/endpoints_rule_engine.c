@@ -87,6 +87,7 @@ static bool is_value_truthy(const struct aws_endpoints_value *value) {
 
 void s_scope_value_destroy_cb(void *data) {
     struct aws_endpoints_scope_value *value = data;
+    AWS_LOGF_DEBUG(0, "here");
     aws_endpoints_scope_value_destroy(value);
 }
 
@@ -186,14 +187,21 @@ static int s_init_top_level_scope(
 
             switch (value->type) {
                 case AWS_ENDPOINTS_PARAMETER_STRING:
-                    val->value.type = AWS_ENDPOINTS_VALUE_STRING;
-                    val->value.v.owning_cursor_string =
-                        aws_endpoints_non_owning_cursor_create(value->default_value.string);
-                    break;
                 case AWS_ENDPOINTS_PARAMETER_BOOLEAN:
-                    val->value.type = AWS_ENDPOINTS_VALUE_BOOLEAN;
-                    val->value.v.boolean = value->default_value.boolean;
+                    val->value = value->default_value;
                     break;
+                case AWS_ENDPOINTS_PARAMETER_STRING_ARRAY: 
+                {
+                    size_t len = aws_array_list_length(&value->default_value.v.array);
+                    aws_array_list_init_dynamic(&val->value.v.array, allocator, len, sizeof(struct aws_endpoints_value));
+                    for (int i = 0; i < len; ++i) {
+                        struct aws_endpoints_value *elem;
+                        aws_array_list_get_at_ptr(&value->default_value.v.array, (void**)&elem, i);
+                        aws_array_list_set_at(&val->value.v.array, elem, i);
+                    }
+                    val->value.type = AWS_ENDPOINTS_VALUE_ARRAY;
+                } 
+                break;
                 default:
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected parameter type.");
                     goto on_error;
@@ -246,6 +254,8 @@ int aws_endpoints_argv_expect(
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to parse argv");
         goto on_error;
     }
+
+    AWS_LOGF_DEBUG(0, "foo expr type: %d", argv_expr.type);
 
     if (s_resolve_expr(allocator, &argv_expr, scope, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve argv.");
@@ -310,8 +320,21 @@ static int s_resolve_expr(
         }
         case AWS_ENDPOINTS_EXPR_ARRAY: {
             out_value->type = AWS_ENDPOINTS_VALUE_ARRAY;
-            /* TODO: deep copy */
-            out_value->v.array = expr->e.array;
+            {
+                size_t len = aws_array_list_length(&expr->e.array);
+                aws_array_list_init_dynamic(&out_value->v.array, allocator, len, sizeof(struct aws_endpoints_value));
+                for (size_t i = 0; i < len; ++i) {
+                    struct aws_endpoints_expr elem;
+                    aws_array_list_get_at(&expr->e.array, &elem, i);
+                    struct aws_endpoints_value val;
+                    if (s_resolve_expr(allocator, &elem, scope, &val)) {
+                        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to array element.");
+                        /* todo: cleanup */
+                        goto on_error;
+                    }
+                    aws_array_list_set_at(&out_value->v.array, &val, i);
+                }   
+            }
             break;
         }
         case AWS_ENDPOINTS_EXPR_REFERENCE: {
@@ -325,14 +348,9 @@ static int s_resolve_expr(
                 out_value->type = AWS_ENDPOINTS_VALUE_NONE;
             } else {
                 struct aws_endpoints_scope_value *aws_endpoints_scope_value = element->value;
+                
                 *out_value = aws_endpoints_scope_value->value;
-                if (aws_endpoints_scope_value->value.type == AWS_ENDPOINTS_VALUE_STRING) {
-                    /* Value will not own underlying mem and instead its owned
-                    by the scope, so set it to NULL. */
-                    out_value->v.owning_cursor_string.string = NULL;
-                } else if (aws_endpoints_scope_value->value.type == AWS_ENDPOINTS_VALUE_OBJECT) {
-                    out_value->v.owning_cursor_object.string = NULL;
-                }
+                out_value->is_shallow = true;
             }
             break;
         }
@@ -461,25 +479,19 @@ int aws_endpoints_path_through_array(
         goto on_error;
     }
 
-    if (index < aws_array_list_length(&value->v.array)) {
+    if (index >= aws_array_list_length(&value->v.array)) {
         out_value->type = AWS_ENDPOINTS_VALUE_NONE;
         return AWS_OP_SUCCESS;
     }
 
-    struct aws_endpoints_expr *expr = NULL;
-    if (aws_array_list_get_at_ptr(&value->v.array, (void **)&expr, (size_t)index)) {
+    struct aws_endpoints_value *val = NULL;
+    if (aws_array_list_get_at_ptr(&value->v.array, (void **)&val, (size_t)index)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to index into resolved value");
         goto on_error;
     }
 
-    struct aws_endpoints_value val;
-    if (s_resolve_expr(allocator, expr, scope, &val)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve val.");
-        aws_endpoints_value_clean_up(&val);
-        goto on_error;
-    }
+    *out_value = *val;
 
-    *out_value = val;
     return AWS_OP_SUCCESS;
 
 on_error:
@@ -597,7 +609,7 @@ static int s_resolve_templated_value_with_pathing(
             goto on_error;
         }
     } else {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Invalid value type for pathing through.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Invalid value type for pathing through. type %d", scope_value->value.type);
         goto on_error;
     }
 
@@ -734,6 +746,35 @@ int aws_endpoints_request_context_add_boolean(
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
     };
 
+    return AWS_OP_SUCCESS;
+}
+
+int aws_endpoints_request_context_add_string_array(
+    struct aws_allocator *allocator,
+    struct aws_endpoints_request_context *context,
+    struct aws_byte_cursor name,
+    struct aws_byte_cursor *values,
+    size_t len) {
+
+    struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name);
+    val->value.type = AWS_ENDPOINTS_VALUE_ARRAY;
+    aws_array_list_init_dynamic(&val->value.v.array, allocator, len, sizeof(struct aws_endpoints_value));
+    
+    for (size_t i = 0; i < len; ++i) {
+        struct aws_endpoints_value elem = {
+            .type = AWS_ENDPOINTS_VALUE_STRING,
+            .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, values[i])
+        };
+
+        aws_array_list_set_at(&val->value.v.array, &elem, i);
+    }
+
+    if (aws_hash_table_put(&context->values, &val->name.cur, val, NULL)) {
+        aws_endpoints_scope_value_destroy(val);
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+    };
+
+    AWS_LOGF_DEBUG(0, "foo");
     return AWS_OP_SUCCESS;
 }
 

@@ -85,6 +85,11 @@ void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter) 
         return;
     }
 
+    if (parameter->has_default_value && parameter->type == AWS_ENDPOINTS_PARAMETER_STRING_ARRAY) {
+        /* TODO */
+        aws_array_list_clean_up(&parameter->default_value.v.array);
+    }
+
     aws_mem_release(parameter->allocator, parameter);
 }
 
@@ -198,6 +203,10 @@ void aws_endpoints_value_clean_up_cb(void *value);
 void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_value) {
     AWS_PRECONDITION(aws_endpoints_value);
 
+    if (aws_endpoints_value->is_shallow) {
+        return;
+    }
+
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_STRING) {
         aws_string_destroy(aws_endpoints_value->v.owning_cursor_string.string);
     }
@@ -215,6 +224,7 @@ void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_valu
 
 void aws_endpoints_value_clean_up_cb(void *value) {
     struct aws_endpoints_value *aws_endpoints_value = value;
+    AWS_LOGF_DEBUG(0, "haha");
     aws_endpoints_value_clean_up(aws_endpoints_value);
 }
 

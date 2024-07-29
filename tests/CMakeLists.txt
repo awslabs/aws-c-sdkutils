@@ -87,6 +87,7 @@ add_test_case(test_endpoints_uri_encode)
 add_test_case(test_endpoints_valid_hostlabel)
 add_test_case(test_endpoints_condition_mem_clean_up)
 add_test_case(test_endpoints_custom)
+add_test_case(test_endpoints_string_array)
 
 add_test_case(endpoints_uri_normalize_path)
 add_test_case(endpoints_byte_buf_init_from_resolved_templated_string)
