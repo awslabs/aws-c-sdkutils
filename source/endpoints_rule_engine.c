@@ -456,6 +456,7 @@ int aws_endpoints_path_through_array(
     struct aws_endpoints_value *value,
     struct aws_byte_cursor path_cur,
     struct aws_endpoints_value *out_value) {
+    (void)allocator;
     (void)scope;
 
     AWS_PRECONDITION(value->type == AWS_ENDPOINTS_VALUE_ARRAY);
