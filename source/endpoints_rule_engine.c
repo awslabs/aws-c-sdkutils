@@ -188,20 +188,12 @@ static int s_init_top_level_scope(
             switch (value->type) {
                 case AWS_ENDPOINTS_PARAMETER_STRING:
                 case AWS_ENDPOINTS_PARAMETER_BOOLEAN:
+                case AWS_ENDPOINTS_PARAMETER_STRING_ARRAY:
                     val->value = value->default_value;
+                    val->value.is_shallow = true;
+                    AWS_LOGF_DEBUG(0, "assigned default");
                     break;
-                case AWS_ENDPOINTS_PARAMETER_STRING_ARRAY: 
-                {
-                    size_t len = aws_array_list_length(&value->default_value.v.array);
-                    aws_array_list_init_dynamic(&val->value.v.array, allocator, len, sizeof(struct aws_endpoints_value));
-                    for (int i = 0; i < len; ++i) {
-                        struct aws_endpoints_value *elem;
-                        aws_array_list_get_at_ptr(&value->default_value.v.array, (void**)&elem, i);
-                        aws_array_list_set_at(&val->value.v.array, elem, i);
-                    }
-                    val->value.type = AWS_ENDPOINTS_VALUE_ARRAY;
-                } 
-                break;
+                    break;
                 default:
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected parameter type.");
                     goto on_error;
@@ -333,7 +325,7 @@ static int s_resolve_expr(
                         goto on_error;
                     }
                     aws_array_list_set_at(&out_value->v.array, &val, i);
-                }   
+                }
             }
             break;
         }
@@ -348,7 +340,7 @@ static int s_resolve_expr(
                 out_value->type = AWS_ENDPOINTS_VALUE_NONE;
             } else {
                 struct aws_endpoints_scope_value *aws_endpoints_scope_value = element->value;
-                
+
                 *out_value = aws_endpoints_scope_value->value;
                 out_value->is_shallow = true;
             }
@@ -491,6 +483,7 @@ int aws_endpoints_path_through_array(
     }
 
     *out_value = *val;
+    out_value->is_shallow = true;
 
     return AWS_OP_SUCCESS;
 
@@ -609,7 +602,10 @@ static int s_resolve_templated_value_with_pathing(
             goto on_error;
         }
     } else {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Invalid value type for pathing through. type %d", scope_value->value.type);
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+            "Invalid value type for pathing through. type %d",
+            scope_value->value.type);
         goto on_error;
     }
 
@@ -759,12 +755,11 @@ int aws_endpoints_request_context_add_string_array(
     struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name);
     val->value.type = AWS_ENDPOINTS_VALUE_ARRAY;
     aws_array_list_init_dynamic(&val->value.v.array, allocator, len, sizeof(struct aws_endpoints_value));
-    
+
     for (size_t i = 0; i < len; ++i) {
         struct aws_endpoints_value elem = {
             .type = AWS_ENDPOINTS_VALUE_STRING,
-            .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, values[i])
-        };
+            .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, values[i])};
 
         aws_array_list_set_at(&val->value.v.array, &elem, i);
     }

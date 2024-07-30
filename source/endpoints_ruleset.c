@@ -454,19 +454,21 @@ static int s_on_parameter_key(
             aws_json_value_get_string(default_node, &cur);
             parameter->default_value.type = AWS_ENDPOINTS_VALUE_STRING;
             parameter->default_value.v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(cur);
-            AWS_LOGF_DEBUG(0, "foo " PRInSTR, AWS_BYTE_CURSOR_PRI(cur)); 
         } else if (type == AWS_ENDPOINTS_PARAMETER_BOOLEAN && aws_json_value_is_boolean(default_node)) {
-            parameter->default_value.type = AWS_ENDPOINTS_VALUE_BOOLEAN;     
+            parameter->default_value.type = AWS_ENDPOINTS_VALUE_BOOLEAN;
             aws_json_value_get_boolean(default_node, &parameter->default_value.v.boolean);
-            AWS_LOGF_DEBUG(0, "bar %d", parameter->default_value.v.boolean);
         } else if (type == AWS_ENDPOINTS_PARAMETER_STRING_ARRAY && aws_json_value_is_array(default_node)) {
+            parameter->default_value.type = AWS_ENDPOINTS_VALUE_ARRAY;
             size_t len = aws_json_get_array_size(default_node);
-            aws_array_list_init_dynamic(&parameter->default_value.v.array, wrapper->allocator, len, sizeof(struct aws_endpoints_value));
+            aws_array_list_init_dynamic(
+                &parameter->default_value.v.array, wrapper->allocator, len, sizeof(struct aws_endpoints_value));
             for (size_t i = 0; i < len; ++i) {
                 struct aws_json_value *element = aws_json_get_array_element(default_node, i);
                 if (!aws_json_value_is_string(element)) {
-                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, 
-                        "Unexpected type for default parameter value. String array parameter must have string elements");
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_PARSING,
+                        "Unexpected type for default parameter value. String array parameter must have string "
+                        "elements");
                     goto on_error;
                 }
 
@@ -475,8 +477,7 @@ static int s_on_parameter_key(
 
                 struct aws_endpoints_value val = {
                     .type = AWS_ENDPOINTS_VALUE_STRING,
-                    .v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(cur)
-                };
+                    .v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(cur)};
 
                 aws_array_list_set_at(&parameter->default_value.v.array, &val, i);
             }

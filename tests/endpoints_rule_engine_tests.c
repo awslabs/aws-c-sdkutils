@@ -141,13 +141,14 @@ static int s_on_parameter_key(
     } else if (aws_json_value_is_array(value)) {
         struct aws_byte_cursor strings[MAX_STRING_ARRAY_ELEMENTS];
         size_t len = aws_json_get_array_size(value);
-        ASSERT_TRUE(len < MAX_STRING_ARRAY_ELEMENTS);
+        ASSERT_TRUE(len <= MAX_STRING_ARRAY_ELEMENTS);
         for (size_t i = 0; i < len; ++i) {
             struct aws_json_value *str = aws_json_get_array_element(value, i);
             ASSERT_SUCCESS(aws_json_value_get_string(str, &strings[i]));
         }
-        ASSERT_SUCCESS(aws_endpoints_request_context_add_string_array(wrapper->allocator, 
-            wrapper->context, *key, strings, len));
+        ASSERT_SUCCESS(
+            aws_endpoints_request_context_add_string_array(wrapper->allocator, wrapper->context, *key, strings, len));
+        return AWS_OP_SUCCESS;
     }
 
     AWS_LOGF_DEBUG(0, "bar");

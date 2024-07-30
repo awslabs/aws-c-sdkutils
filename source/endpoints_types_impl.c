@@ -204,10 +204,12 @@ void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_valu
     AWS_PRECONDITION(aws_endpoints_value);
 
     if (aws_endpoints_value->is_shallow) {
-        return;
+        goto on_done;
     }
 
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_STRING) {
+        AWS_LOGF_DEBUG(
+            0, "aaaa " PRInSTR " bbbb", AWS_BYTE_CURSOR_PRI(aws_endpoints_value->v.owning_cursor_string.cur));
         aws_string_destroy(aws_endpoints_value->v.owning_cursor_string.string);
     }
 
@@ -216,15 +218,17 @@ void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_valu
     }
 
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_ARRAY) {
+        AWS_LOGF_DEBUG(0, "foo %d ", aws_array_list_length(&aws_endpoints_value->v.array));
         aws_array_list_deep_clean_up(&aws_endpoints_value->v.array, aws_endpoints_value_clean_up_cb);
     }
 
+on_done:
     AWS_ZERO_STRUCT(*aws_endpoints_value);
 }
 
 void aws_endpoints_value_clean_up_cb(void *value) {
     struct aws_endpoints_value *aws_endpoints_value = value;
-    AWS_LOGF_DEBUG(0, "haha");
+    AWS_LOGF_DEBUG(0, "haha %d", aws_endpoints_value->is_shallow);
     aws_endpoints_value_clean_up(aws_endpoints_value);
 }
 
@@ -234,11 +238,24 @@ int aws_endpoints_deep_copy_parameter_value(
     struct aws_endpoints_value *to) {
 
     to->type = from->type;
+    AWS_LOGF_DEBUG(0, "haha boo %d", from->type);
 
     if (to->type == AWS_ENDPOINTS_VALUE_STRING) {
-        to->v.owning_cursor_string = aws_endpoints_owning_cursor_create(allocator, from->v.owning_cursor_string.string);
+        to->v.owning_cursor_string =
+            aws_endpoints_owning_cursor_from_cursor(allocator, from->v.owning_cursor_string.cur);
     } else if (to->type == AWS_ENDPOINTS_VALUE_BOOLEAN) {
         to->v.boolean = from->v.boolean;
+    } else if (to->type == AWS_ENDPOINTS_VALUE_ARRAY) {
+        size_t len = aws_array_list_length(&from->v.array);
+        aws_array_list_init_dynamic(&to->v.array, allocator, len, sizeof(struct aws_endpoints_value));
+        for (size_t i = 0; i < len; ++i) {
+            struct aws_endpoints_value val;
+            aws_array_list_get_at(&from->v.array, &val, i);
+
+            struct aws_endpoints_value to_val;
+            aws_endpoints_deep_copy_parameter_value(allocator, &val, &to_val);
+            aws_array_list_set_at(&to->v.array, &to_val, i);
+        }
     } else {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected value type.");
         return aws_raise_error(AWS_ERROR_INVALID_STATE);

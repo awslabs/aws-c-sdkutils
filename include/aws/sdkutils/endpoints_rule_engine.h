@@ -19,7 +19,11 @@ struct aws_endpoints_resolved_endpoint;
 struct aws_endpoints_request_context;
 struct aws_hash_table;
 
-enum aws_endpoints_parameter_type { AWS_ENDPOINTS_PARAMETER_STRING, AWS_ENDPOINTS_PARAMETER_BOOLEAN, AWS_ENDPOINTS_PARAMETER_STRING_ARRAY };
+enum aws_endpoints_parameter_type {
+    AWS_ENDPOINTS_PARAMETER_STRING,
+    AWS_ENDPOINTS_PARAMETER_BOOLEAN,
+    AWS_ENDPOINTS_PARAMETER_STRING_ARRAY
+};
 enum aws_endpoints_resolved_endpoint_type { AWS_ENDPOINTS_RESOLVED_ENDPOINT, AWS_ENDPOINTS_RESOLVED_ERROR };
 
 AWS_EXTERN_C_BEGIN
@@ -242,7 +246,6 @@ AWS_SDKUTILS_API int aws_endpoints_request_context_add_string_array(
     struct aws_byte_cursor name,
     struct aws_byte_cursor *values,
     size_t len);
-
 
 /*
  * Resolve an endpoint given request context.
