@@ -208,8 +208,6 @@ void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_valu
     }
 
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_STRING) {
-        AWS_LOGF_DEBUG(
-            0, "aaaa " PRInSTR " bbbb", AWS_BYTE_CURSOR_PRI(aws_endpoints_value->v.owning_cursor_string.cur));
         aws_string_destroy(aws_endpoints_value->v.owning_cursor_string.string);
     }
 
@@ -218,7 +216,6 @@ void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_valu
     }
 
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_ARRAY) {
-        AWS_LOGF_DEBUG(0, "foo %d ", aws_array_list_length(&aws_endpoints_value->v.array));
         aws_array_list_deep_clean_up(&aws_endpoints_value->v.array, aws_endpoints_value_clean_up_cb);
     }
 
@@ -228,7 +225,6 @@ on_done:
 
 void aws_endpoints_value_clean_up_cb(void *value) {
     struct aws_endpoints_value *aws_endpoints_value = value;
-    AWS_LOGF_DEBUG(0, "haha %d", aws_endpoints_value->is_shallow);
     aws_endpoints_value_clean_up(aws_endpoints_value);
 }
 
@@ -238,7 +234,6 @@ int aws_endpoints_deep_copy_parameter_value(
     struct aws_endpoints_value *to) {
 
     to->type = from->type;
-    AWS_LOGF_DEBUG(0, "haha boo %d", from->type);
 
     if (to->type == AWS_ENDPOINTS_VALUE_STRING) {
         to->v.owning_cursor_string =

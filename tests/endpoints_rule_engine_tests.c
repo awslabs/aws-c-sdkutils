@@ -151,7 +151,6 @@ static int s_on_parameter_key(
         return AWS_OP_SUCCESS;
     }
 
-    AWS_LOGF_DEBUG(0, "bar");
     return AWS_OP_ERR;
 }
 
@@ -284,7 +283,6 @@ static int eval_expected(struct aws_allocator *allocator, struct aws_byte_cursor
                 aws_json_value_get_from_object(endpoint, aws_byte_cursor_from_c_str("url"));
             struct aws_byte_cursor expected_url;
             aws_json_value_get_string(expected_url_node, &expected_url);
-            AWS_LOGF_DEBUG(0, PRInSTR " " PRInSTR, AWS_BYTE_CURSOR_PRI(url), AWS_BYTE_CURSOR_PRI(expected_url));
             ASSERT_TRUE(aws_byte_cursor_eq(&url, &expected_url));
 
             struct aws_byte_cursor properties;

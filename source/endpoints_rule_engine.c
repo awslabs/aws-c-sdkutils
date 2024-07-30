@@ -87,7 +87,6 @@ static bool is_value_truthy(const struct aws_endpoints_value *value) {
 
 void s_scope_value_destroy_cb(void *data) {
     struct aws_endpoints_scope_value *value = data;
-    AWS_LOGF_DEBUG(0, "here");
     aws_endpoints_scope_value_destroy(value);
 }
 
@@ -191,7 +190,6 @@ static int s_init_top_level_scope(
                 case AWS_ENDPOINTS_PARAMETER_STRING_ARRAY:
                     val->value = value->default_value;
                     val->value.is_shallow = true;
-                    AWS_LOGF_DEBUG(0, "assigned default");
                     break;
                     break;
                 default:
@@ -246,8 +244,6 @@ int aws_endpoints_argv_expect(
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to parse argv");
         goto on_error;
     }
-
-    AWS_LOGF_DEBUG(0, "foo expr type: %d", argv_expr.type);
 
     if (s_resolve_expr(allocator, &argv_expr, scope, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve argv.");
@@ -769,7 +765,6 @@ int aws_endpoints_request_context_add_string_array(
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
     };
 
-    AWS_LOGF_DEBUG(0, "foo");
     return AWS_OP_SUCCESS;
 }
 
@@ -1162,7 +1157,6 @@ int aws_endpoints_rule_engine_resolve(
     result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RULESET_EXHAUSTED);
 
 on_done:
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Resolved endpoint with status %d", result);
     s_scope_clean_up(&scope);
     return result;
 }

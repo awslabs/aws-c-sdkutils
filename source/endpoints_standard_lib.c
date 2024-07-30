@@ -68,7 +68,6 @@ static int s_resolve_fn_get_attr(
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
-    AWS_LOGF_DEBUG(0, "foo");
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
     struct aws_endpoints_value argv_path = {0};
@@ -81,7 +80,6 @@ static int s_resolve_fn_get_attr(
     }
 
     struct aws_byte_cursor path_cur = argv_path.v.owning_cursor_string.cur;
-    AWS_LOGF_DEBUG(0, "foo type %d", argv_value.type);
 
     if (argv_value.type == AWS_ENDPOINTS_VALUE_OBJECT) {
         if (aws_endpoints_path_through_object(allocator, &argv_value, path_cur, out_value)) {
@@ -101,8 +99,6 @@ static int s_resolve_fn_get_attr(
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
     }
-
-    AWS_LOGF_DEBUG(0, "done");
 
 on_done:
     aws_endpoints_value_clean_up(&argv_value);
