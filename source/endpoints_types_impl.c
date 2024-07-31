@@ -195,7 +195,7 @@ void aws_endpoints_scope_value_destroy(struct aws_endpoints_scope_value *scope_v
         return;
     }
     aws_string_destroy(scope_value->name.string);
-    
+
     aws_endpoints_value_clean_up(&scope_value->value);
     aws_mem_release(scope_value->allocator, scope_value);
 }
