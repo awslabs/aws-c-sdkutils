@@ -96,8 +96,8 @@ struct aws_endpoints_value {
         double number;
         struct aws_array_list array;
     } v;
-    /* TODO: ref count? */
-    bool is_shallow;
+    /* Value is a reference to another value, no need to clean it up. */
+    bool is_ref;
 };
 
 struct aws_endpoints_parameter {

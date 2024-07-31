@@ -205,7 +205,7 @@ void aws_endpoints_value_clean_up_cb(void *value);
 void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_value) {
     AWS_PRECONDITION(aws_endpoints_value);
 
-    if (aws_endpoints_value->is_shallow) {
+    if (aws_endpoints_value->is_ref) {
         goto on_done;
     }
 
@@ -236,7 +236,7 @@ int aws_endpoints_deep_copy_parameter_value(
     struct aws_endpoints_value *to) {
 
     to->type = from->type;
-    to->is_shallow = false;
+    to->is_ref = false;
 
     if (to->type == AWS_ENDPOINTS_VALUE_STRING) {
         to->v.owning_cursor_string =
@@ -251,7 +251,10 @@ int aws_endpoints_deep_copy_parameter_value(
             aws_array_list_get_at(&from->v.array, &val, i);
 
             struct aws_endpoints_value to_val;
-            aws_endpoints_deep_copy_parameter_value(allocator, &val, &to_val);
+            if (aws_endpoints_deep_copy_parameter_value(allocator, &val, &to_val)) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected array element type.");
+                goto on_error;
+            }
 
             aws_array_list_set_at(&to->v.array, &to_val, i);
         }
@@ -261,4 +264,8 @@ int aws_endpoints_deep_copy_parameter_value(
     }
 
     return AWS_OP_SUCCESS;
+
+on_error:
+    aws_endpoints_value_clean_up(to);
+    return AWS_OP_ERR;
 }

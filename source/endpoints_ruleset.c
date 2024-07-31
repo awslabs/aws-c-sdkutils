@@ -476,7 +476,7 @@ static int s_on_parameter_key(
                 aws_json_value_get_string(element, &cur);
 
                 struct aws_endpoints_value val = {
-                    .is_shallow = false,
+                    .is_ref = false,
                     .type = AWS_ENDPOINTS_VALUE_STRING,
                     .v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(cur)};
 

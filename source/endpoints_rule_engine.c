@@ -189,7 +189,7 @@ static int s_init_top_level_scope(
                 case AWS_ENDPOINTS_PARAMETER_BOOLEAN:
                 case AWS_ENDPOINTS_PARAMETER_STRING_ARRAY:
                     val->value = value->default_value;
-                    val->value.is_shallow = true;
+                    val->value.is_ref = true;
                     break;
                     break;
                 default:
@@ -312,12 +312,12 @@ static int s_resolve_expr(
                 size_t len = aws_array_list_length(&expr->e.array);
                 aws_array_list_init_dynamic(&out_value->v.array, allocator, len, sizeof(struct aws_endpoints_value));
                 for (size_t i = 0; i < len; ++i) {
-                    struct aws_endpoints_expr elem;
-                    aws_array_list_get_at(&expr->e.array, &elem, i);
+                    struct aws_endpoints_expr expr_elem;
+                    aws_array_list_get_at(&expr->e.array, &expr_elem, i);
                     struct aws_endpoints_value val;
-                    if (s_resolve_expr(allocator, &elem, scope, &val)) {
-                        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to array element.");
-                        /* todo: cleanup */
+                    if (s_resolve_expr(allocator, &expr_elem, scope, &val)) {
+                        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve array element.");
+                        aws_endpoints_value_clean_up(out_value);
                         goto on_error;
                     }
                     aws_array_list_set_at(&out_value->v.array, &val, i);
@@ -338,7 +338,7 @@ static int s_resolve_expr(
                 struct aws_endpoints_scope_value *aws_endpoints_scope_value = element->value;
 
                 *out_value = aws_endpoints_scope_value->value;
-                out_value->is_shallow = true;
+                out_value->is_ref = true;
             }
             break;
         }
@@ -481,7 +481,7 @@ int aws_endpoints_path_through_array(
     }
 
     *out_value = *val;
-    out_value->is_shallow = true;
+    out_value->is_ref = true;
 
     return AWS_OP_SUCCESS;
 
@@ -756,7 +756,7 @@ int aws_endpoints_request_context_add_string_array(
 
     for (size_t i = 0; i < len; ++i) {
         struct aws_endpoints_value elem = {
-            .is_shallow = false,
+            .is_ref = false,
             .type = AWS_ENDPOINTS_VALUE_STRING,
             .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, values[i])};
 
