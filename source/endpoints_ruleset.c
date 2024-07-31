@@ -476,6 +476,7 @@ static int s_on_parameter_key(
                 aws_json_value_get_string(element, &cur);
 
                 struct aws_endpoints_value val = {
+                    .is_shallow = false,
                     .type = AWS_ENDPOINTS_VALUE_STRING,
                     .v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(cur)};
 
@@ -943,11 +944,11 @@ static void s_endpoints_ruleset_destroy(void *data) {
 
     struct aws_endpoints_ruleset *ruleset = data;
 
-    aws_json_value_destroy(ruleset->json_root);
-
     aws_hash_table_clean_up(&ruleset->parameters);
 
     aws_array_list_deep_clean_up(&ruleset->rules, s_on_rule_array_element_clean_up);
+
+    aws_json_value_destroy(ruleset->json_root);
 
     aws_mem_release(ruleset->allocator, ruleset);
 }

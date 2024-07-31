@@ -11,6 +11,8 @@
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/private/endpoints_util.h>
 
+void s_endpoints_value_clean_up_cb(void *value);
+
 uint64_t aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_LAST];
 
 void aws_endpoints_rule_engine_init(void) {
@@ -86,8 +88,7 @@ void aws_endpoints_parameter_destroy(struct aws_endpoints_parameter *parameter) 
     }
 
     if (parameter->has_default_value && parameter->type == AWS_ENDPOINTS_PARAMETER_STRING_ARRAY) {
-        /* TODO */
-        aws_array_list_clean_up(&parameter->default_value.v.array);
+        aws_array_list_deep_clean_up(&parameter->default_value.v.array, s_endpoints_value_clean_up_cb);
     }
 
     aws_mem_release(parameter->allocator, parameter);
@@ -194,6 +195,7 @@ void aws_endpoints_scope_value_destroy(struct aws_endpoints_scope_value *scope_v
         return;
     }
     aws_string_destroy(scope_value->name.string);
+    
     aws_endpoints_value_clean_up(&scope_value->value);
     aws_mem_release(scope_value->allocator, scope_value);
 }
@@ -216,14 +218,14 @@ void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_valu
     }
 
     if (aws_endpoints_value->type == AWS_ENDPOINTS_VALUE_ARRAY) {
-        aws_array_list_deep_clean_up(&aws_endpoints_value->v.array, aws_endpoints_value_clean_up_cb);
+        aws_array_list_deep_clean_up(&aws_endpoints_value->v.array, s_endpoints_value_clean_up_cb);
     }
 
 on_done:
     AWS_ZERO_STRUCT(*aws_endpoints_value);
 }
 
-void aws_endpoints_value_clean_up_cb(void *value) {
+void s_endpoints_value_clean_up_cb(void *value) {
     struct aws_endpoints_value *aws_endpoints_value = value;
     aws_endpoints_value_clean_up(aws_endpoints_value);
 }
@@ -234,6 +236,7 @@ int aws_endpoints_deep_copy_parameter_value(
     struct aws_endpoints_value *to) {
 
     to->type = from->type;
+    to->is_shallow = false;
 
     if (to->type == AWS_ENDPOINTS_VALUE_STRING) {
         to->v.owning_cursor_string =
@@ -249,6 +252,7 @@ int aws_endpoints_deep_copy_parameter_value(
 
             struct aws_endpoints_value to_val;
             aws_endpoints_deep_copy_parameter_value(allocator, &val, &to_val);
+
             aws_array_list_set_at(&to->v.array, &to_val, i);
         }
     } else {

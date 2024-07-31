@@ -756,6 +756,7 @@ int aws_endpoints_request_context_add_string_array(
 
     for (size_t i = 0; i < len; ++i) {
         struct aws_endpoints_value elem = {
+            .is_shallow = false,
             .type = AWS_ENDPOINTS_VALUE_STRING,
             .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, values[i])};
 
