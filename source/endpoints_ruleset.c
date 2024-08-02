@@ -488,7 +488,8 @@ static int s_on_parameter_key(
 
     struct aws_json_value *deprecated_node = aws_json_value_get_from_object_c_str(value, "deprecated");
     if (deprecated_node != NULL) {
-        struct aws_json_value *deprecated_message_node = aws_json_value_get_from_object_c_str(deprecated_node, "message");
+        struct aws_json_value *deprecated_message_node =
+            aws_json_value_get_from_object_c_str(deprecated_node, "message");
         if (deprecated_message_node != NULL &&
             aws_json_value_get_string(deprecated_message_node, &parameter->deprecated_message)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for deprecated message.");
