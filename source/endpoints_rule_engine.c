@@ -191,7 +191,6 @@ static int s_init_top_level_scope(
                     val->value = value->default_value;
                     val->value.is_ref = true;
                     break;
-                    break;
                 default:
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected parameter type.");
                     goto on_error;

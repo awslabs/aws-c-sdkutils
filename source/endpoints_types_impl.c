@@ -262,7 +262,6 @@ int aws_endpoints_deep_copy_parameter_value(
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected value type.");
         return aws_raise_error(AWS_ERROR_INVALID_STATE);
     }
-
     return AWS_OP_SUCCESS;
 
 on_error:
