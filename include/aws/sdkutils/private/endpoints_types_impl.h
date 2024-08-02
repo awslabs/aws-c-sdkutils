@@ -71,6 +71,35 @@ enum aws_endpoints_fn_type {
     AWS_ENDPOINTS_FN_LAST,
 };
 
+enum aws_endpoints_value_type {
+    /* Special value to represent that any value type is expected from resolving an expresion.
+        Note a valid value for a value type. */
+    AWS_ENDPOINTS_VALUE_ANY,
+
+    AWS_ENDPOINTS_VALUE_NONE,
+    AWS_ENDPOINTS_VALUE_STRING,
+    AWS_ENDPOINTS_VALUE_BOOLEAN,
+    AWS_ENDPOINTS_VALUE_OBJECT, /* Generic type returned by some functions. json string under the covers. */
+    AWS_ENDPOINTS_VALUE_NUMBER,
+    AWS_ENDPOINTS_VALUE_ARRAY,
+
+    AWS_ENDPOINTS_VALUE_SIZE
+};
+
+/* concrete type value */
+struct aws_endpoints_value {
+    enum aws_endpoints_value_type type;
+    union {
+        struct aws_owning_cursor owning_cursor_string;
+        bool boolean;
+        struct aws_owning_cursor owning_cursor_object;
+        double number;
+        struct aws_array_list array;
+    } v;
+    /* Value is a reference to another value, no need to clean it up. */
+    bool is_ref;
+};
+
 struct aws_endpoints_parameter {
     struct aws_allocator *allocator;
 
@@ -80,10 +109,7 @@ struct aws_endpoints_parameter {
     struct aws_byte_cursor built_in;
 
     bool has_default_value;
-    union {
-        struct aws_byte_cursor string;
-        bool boolean;
-    } default_value;
+    struct aws_endpoints_value default_value;
 
     bool is_required;
     struct aws_byte_cursor documentation;
@@ -210,38 +236,11 @@ struct aws_partitions_config {
 ******************************
 */
 
-enum aws_endpoints_value_type {
-    /* Special value to represent that any value type is expected from resolving an expresion.
-        Note a valid value for a value type. */
-    AWS_ENDPOINTS_VALUE_ANY,
-
-    AWS_ENDPOINTS_VALUE_NONE,
-    AWS_ENDPOINTS_VALUE_STRING,
-    AWS_ENDPOINTS_VALUE_BOOLEAN,
-    AWS_ENDPOINTS_VALUE_OBJECT, /* Generic type returned by some functions. json string under the covers. */
-    AWS_ENDPOINTS_VALUE_NUMBER,
-    AWS_ENDPOINTS_VALUE_ARRAY,
-
-    AWS_ENDPOINTS_VALUE_SIZE
-};
-
 struct aws_endpoints_request_context {
     struct aws_allocator *allocator;
     struct aws_ref_count ref_count;
 
     struct aws_hash_table values;
-};
-
-/* concrete type value */
-struct aws_endpoints_value {
-    enum aws_endpoints_value_type type;
-    union {
-        struct aws_owning_cursor owning_cursor_string;
-        bool boolean;
-        struct aws_owning_cursor owning_cursor_object;
-        double number;
-        struct aws_array_list array;
-    } v;
 };
 
 /* wrapper around aws_endpoints_value to store it more easily in hash table*/

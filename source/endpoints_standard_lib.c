@@ -94,7 +94,8 @@ static int s_resolve_fn_get_attr(
             goto on_done;
         }
     } else {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Invalid value type for pathing through.");
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Invalid value type for pathing through. type: %d", argv_value.type);
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
     }

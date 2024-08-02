@@ -14,6 +14,7 @@
 /* parameter types */
 static struct aws_byte_cursor s_string_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("string");
 static struct aws_byte_cursor s_boolean_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("boolean");
+static struct aws_byte_cursor s_string_array_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("stringArray");
 
 /* rule types */
 static struct aws_byte_cursor s_endpoint_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("endpoint");
@@ -52,7 +53,7 @@ int aws_endpoints_parameter_get_default_string(
     AWS_PRECONDITION(out_cursor);
 
     if (parameter->type == AWS_ENDPOINTS_PARAMETER_STRING) {
-        *out_cursor = parameter->default_value.string;
+        *out_cursor = parameter->default_value.v.owning_cursor_string.cur;
         return AWS_OP_SUCCESS;
     };
 
@@ -67,7 +68,7 @@ int aws_endpoints_parameter_get_default_boolean(
     AWS_PRECONDITION(out_bool);
 
     if (parameter->type == AWS_ENDPOINTS_PARAMETER_BOOLEAN) {
-        *out_bool = &parameter->default_value.boolean;
+        *out_bool = &parameter->default_value.v.boolean;
         return AWS_OP_SUCCESS;
     };
 
@@ -405,6 +406,8 @@ static int s_on_parameter_key(
         type = AWS_ENDPOINTS_PARAMETER_STRING;
     } else if (aws_byte_cursor_eq_ignore_case(&type_cur, &s_boolean_type_cur)) {
         type = AWS_ENDPOINTS_PARAMETER_BOOLEAN;
+    } else if (aws_byte_cursor_eq_ignore_case(&type_cur, &s_string_array_type_cur)) {
+        type = AWS_ENDPOINTS_PARAMETER_STRING_ARRAY;
     } else {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for parameter.");
         goto on_error;
@@ -446,13 +449,40 @@ static int s_on_parameter_key(
     struct aws_json_value *default_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("default"));
     parameter->has_default_value = default_node != NULL;
     if (default_node != NULL) {
-        if (type == AWS_ENDPOINTS_PARAMETER_STRING &&
-            aws_json_value_get_string(default_node, &parameter->default_value.string)) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for default parameter value.");
-            goto on_error;
-        } else if (
-            type == AWS_ENDPOINTS_PARAMETER_BOOLEAN &&
-            aws_json_value_get_boolean(default_node, &parameter->default_value.boolean)) {
+        if (type == AWS_ENDPOINTS_PARAMETER_STRING && aws_json_value_is_string(default_node)) {
+            struct aws_byte_cursor cur;
+            aws_json_value_get_string(default_node, &cur);
+            parameter->default_value.type = AWS_ENDPOINTS_VALUE_STRING;
+            parameter->default_value.v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(cur);
+        } else if (type == AWS_ENDPOINTS_PARAMETER_BOOLEAN && aws_json_value_is_boolean(default_node)) {
+            parameter->default_value.type = AWS_ENDPOINTS_VALUE_BOOLEAN;
+            aws_json_value_get_boolean(default_node, &parameter->default_value.v.boolean);
+        } else if (type == AWS_ENDPOINTS_PARAMETER_STRING_ARRAY && aws_json_value_is_array(default_node)) {
+            parameter->default_value.type = AWS_ENDPOINTS_VALUE_ARRAY;
+            size_t len = aws_json_get_array_size(default_node);
+            aws_array_list_init_dynamic(
+                &parameter->default_value.v.array, wrapper->allocator, len, sizeof(struct aws_endpoints_value));
+            for (size_t i = 0; i < len; ++i) {
+                struct aws_json_value *element = aws_json_get_array_element(default_node, i);
+                if (!aws_json_value_is_string(element)) {
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_PARSING,
+                        "Unexpected type for default parameter value. String array parameter must have string "
+                        "elements");
+                    goto on_error;
+                }
+
+                struct aws_byte_cursor cur;
+                aws_json_value_get_string(element, &cur);
+
+                struct aws_endpoints_value val = {
+                    .is_ref = false,
+                    .type = AWS_ENDPOINTS_VALUE_STRING,
+                    .v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(cur)};
+
+                aws_array_list_set_at(&parameter->default_value.v.array, &val, i);
+            }
+        } else {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for default parameter value.");
             goto on_error;
         }
@@ -643,7 +673,7 @@ static int s_parse_endpoints_rule_data_endpoint(
     if (headers_node != NULL) {
 
         if (s_init_members_from_json(allocator, headers_node, &data_rule->headers, s_on_headers_key)) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameters.");
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract headers.");
             goto on_error;
         }
     }
@@ -914,11 +944,11 @@ static void s_endpoints_ruleset_destroy(void *data) {
 
     struct aws_endpoints_ruleset *ruleset = data;
 
-    aws_json_value_destroy(ruleset->json_root);
-
     aws_hash_table_clean_up(&ruleset->parameters);
 
     aws_array_list_deep_clean_up(&ruleset->rules, s_on_rule_array_element_clean_up);
+
+    aws_json_value_destroy(ruleset->json_root);
 
     aws_mem_release(ruleset->allocator, ruleset);
 }
