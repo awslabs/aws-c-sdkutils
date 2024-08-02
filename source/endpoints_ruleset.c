@@ -226,7 +226,7 @@ static int s_try_parse_reference(const struct aws_json_value *node, struct aws_b
 
     AWS_ZERO_STRUCT(*out_reference);
 
-    struct aws_json_value *ref_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("ref"));
+    struct aws_json_value *ref_node = aws_json_value_get_from_object_c_str(node, "ref");
     if (ref_node != NULL && aws_json_value_get_string(ref_node, out_reference)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse ref.");
         AWS_ZERO_STRUCT(*out_reference);
@@ -329,7 +329,7 @@ static int s_parse_function(
 
     AWS_ZERO_STRUCT(*function);
 
-    struct aws_json_value *fn_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("fn"));
+    struct aws_json_value *fn_node = aws_json_value_get_from_object_c_str(node, "fn");
     if (fn_node == NULL) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Node is not a function.");
         goto on_error;
@@ -358,7 +358,7 @@ static int s_parse_function(
         goto on_error;
     }
 
-    struct aws_json_value *argv_node = aws_json_value_get_from_object(node, aws_byte_cursor_from_c_str("argv"));
+    struct aws_json_value *argv_node = aws_json_value_get_from_object_c_str(node, "argv");
     if (argv_node == NULL || !aws_json_value_is_array(argv_node)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "No argv or unexpected type.");
         goto on_error;
@@ -395,7 +395,7 @@ static int s_on_parameter_key(
 
     /* required fields */
     struct aws_byte_cursor type_cur;
-    struct aws_json_value *type_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("type"));
+    struct aws_json_value *type_node = aws_json_value_get_from_object_c_str(value, "type");
     if (type_node == NULL || aws_json_value_get_string(type_node, &type_cur)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameter type.");
         goto on_error;
@@ -415,8 +415,7 @@ static int s_on_parameter_key(
 
     parameter->type = type;
 
-    struct aws_json_value *documentation_node =
-        aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("documentation"));
+    struct aws_json_value *documentation_node = aws_json_value_get_from_object_c_str(value, "documentation");
 
     /* TODO: spec calls for documentation to be required, but several test-cases
         are missing docs on parameters */
@@ -428,7 +427,7 @@ static int s_on_parameter_key(
     }
 
     /* optional fields */
-    struct aws_json_value *built_in_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("builtIn"));
+    struct aws_json_value *built_in_node = aws_json_value_get_from_object_c_str(value, "builtIn");
     if (built_in_node != NULL) {
         if (aws_json_value_get_string(built_in_node, &parameter->built_in)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for built-in parameter field.");
@@ -436,8 +435,7 @@ static int s_on_parameter_key(
         }
     }
 
-    struct aws_json_value *required_node =
-        aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("required"));
+    struct aws_json_value *required_node = aws_json_value_get_from_object_c_str(value, "required");
     if (required_node != NULL) {
         if (!aws_json_value_is_boolean(required_node)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for required parameter field.");
@@ -446,7 +444,7 @@ static int s_on_parameter_key(
         aws_json_value_get_boolean(required_node, &parameter->is_required);
     }
 
-    struct aws_json_value *default_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("default"));
+    struct aws_json_value *default_node = aws_json_value_get_from_object_c_str(value, "default");
     parameter->has_default_value = default_node != NULL;
     if (default_node != NULL) {
         if (type == AWS_ENDPOINTS_PARAMETER_STRING && aws_json_value_is_string(default_node)) {
@@ -488,19 +486,16 @@ static int s_on_parameter_key(
         }
     }
 
-    struct aws_json_value *deprecated_node =
-        aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("deprecated"));
+    struct aws_json_value *deprecated_node = aws_json_value_get_from_object_c_str(value, "deprecated");
     if (deprecated_node != NULL) {
-        struct aws_json_value *deprecated_message_node =
-            aws_json_value_get_from_object(deprecated_node, aws_byte_cursor_from_c_str("message"));
+        struct aws_json_value *deprecated_message_node = aws_json_value_get_from_object_c_str(deprecated_node, "message");
         if (deprecated_message_node != NULL &&
             aws_json_value_get_string(deprecated_message_node, &parameter->deprecated_message)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for deprecated message.");
             goto on_error;
         }
 
-        struct aws_json_value *deprecated_since_node =
-            aws_json_value_get_from_object(deprecated_node, aws_byte_cursor_from_c_str("since"));
+        struct aws_json_value *deprecated_since_node = aws_json_value_get_from_object_c_str(deprecated_node, "since");
         if (deprecated_since_node != NULL &&
             aws_json_value_get_string(deprecated_since_node, &parameter->deprecated_since)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for deprecated since.");
@@ -540,8 +535,7 @@ static int s_on_condition_element(
         goto on_error;
     }
 
-    struct aws_json_value *assign_node =
-        aws_json_value_get_from_object(condition_node, aws_byte_cursor_from_c_str("assign"));
+    struct aws_json_value *assign_node = aws_json_value_get_from_object_c_str(condition_node, "assign");
     if (assign_node != NULL && aws_json_value_get_string(assign_node, &condition.assign)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected value for assign.");
         goto on_error;
@@ -619,7 +613,7 @@ static int s_parse_endpoints_rule_data_endpoint(
     AWS_PRECONDITION(data_rule);
 
     data_rule->allocator = allocator;
-    struct aws_json_value *url_node = aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("url"));
+    struct aws_json_value *url_node = aws_json_value_get_from_object_c_str(rule_node, "url");
     if (url_node == NULL || aws_json_value_is_string(url_node)) {
         data_rule->url.type = AWS_ENDPOINTS_EXPR_STRING;
         aws_json_value_get_string(url_node, &data_rule->url.e.string);
@@ -642,8 +636,7 @@ static int s_parse_endpoints_rule_data_endpoint(
         }
     }
 
-    struct aws_json_value *properties_node =
-        aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("properties"));
+    struct aws_json_value *properties_node = aws_json_value_get_from_object_c_str(rule_node, "properties");
     if (properties_node != NULL) {
         aws_byte_buf_init(&data_rule->properties, allocator, 0);
 
@@ -668,8 +661,7 @@ static int s_parse_endpoints_rule_data_endpoint(
         aws_hash_callback_string_destroy,
         s_callback_headers_destroy);
 
-    struct aws_json_value *headers_node =
-        aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("headers"));
+    struct aws_json_value *headers_node = aws_json_value_get_from_object_c_str(rule_node, "headers");
     if (headers_node != NULL) {
 
         if (s_init_members_from_json(allocator, headers_node, &data_rule->headers, s_on_headers_key)) {
@@ -738,7 +730,7 @@ static int s_parse_endpoints_rule_data_tree(
     AWS_PRECONDITION(rule_node);
     AWS_PRECONDITION(rule_data);
 
-    struct aws_json_value *rules_node = aws_json_value_get_from_object(rule_node, aws_byte_cursor_from_c_str("rules"));
+    struct aws_json_value *rules_node = aws_json_value_get_from_object_c_str(rule_node, "rules");
     if (rules_node == NULL || !aws_json_value_is_array(rules_node)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Rules node is missing or unexpected type.");
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
@@ -769,7 +761,7 @@ static int s_on_rule_element(
 
     /* Required fields */
     struct aws_byte_cursor type_cur;
-    struct aws_json_value *type_node = aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("type"));
+    struct aws_json_value *type_node = aws_json_value_get_from_object_c_str(value, "type");
     if (type_node == NULL || aws_json_value_get_string(type_node, &type_cur)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract rule type.");
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
@@ -791,8 +783,7 @@ static int s_on_rule_element(
     AWS_ZERO_STRUCT(rule);
     rule.type = type;
 
-    struct aws_json_value *conditions_node =
-        aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("conditions"));
+    struct aws_json_value *conditions_node = aws_json_value_get_from_object_c_str(value, "conditions");
     if (conditions_node == NULL || !aws_json_value_is_array(conditions_node)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Conditions node missing.");
         goto on_error;
@@ -809,8 +800,7 @@ static int s_on_rule_element(
 
     switch (type) {
         case AWS_ENDPOINTS_RULE_ENDPOINT: {
-            struct aws_json_value *endpoint_node =
-                aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("endpoint"));
+            struct aws_json_value *endpoint_node = aws_json_value_get_from_object_c_str(value, "endpoint");
             if (endpoint_node == NULL ||
                 s_parse_endpoints_rule_data_endpoint(wrapper->allocator, endpoint_node, &rule.rule_data.endpoint)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract endpoint rule data.");
@@ -819,8 +809,7 @@ static int s_on_rule_element(
             break;
         }
         case AWS_ENDPOINTS_RULE_ERROR: {
-            struct aws_json_value *error_node =
-                aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("error"));
+            struct aws_json_value *error_node = aws_json_value_get_from_object_c_str(value, "error");
             if (error_node == NULL ||
                 s_parse_endpoints_rule_data_error(wrapper->allocator, error_node, &rule.rule_data.error)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract error rule data.");
@@ -840,8 +829,7 @@ static int s_on_rule_element(
     }
 
     /* Optional fields */
-    struct aws_json_value *documentation_node =
-        aws_json_value_get_from_object(value, aws_byte_cursor_from_c_str("documentation"));
+    struct aws_json_value *documentation_node = aws_json_value_get_from_object_c_str(value, "documentation");
     if (documentation_node != NULL) {
         if (aws_json_value_get_string(documentation_node, &rule.documentation)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameter documentation.");
@@ -875,7 +863,7 @@ static int s_init_ruleset_from_json(
 
     ruleset->json_root = root;
 
-    struct aws_json_value *version_node = aws_json_value_get_from_object(root, aws_byte_cursor_from_c_str("version"));
+    struct aws_json_value *version_node = aws_json_value_get_from_object_c_str(root, "version");
     if (version_node == NULL || aws_json_value_get_string(version_node, &ruleset->version)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract version.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);
@@ -890,8 +878,7 @@ static int s_init_ruleset_from_json(
     }
 #endif
 
-    struct aws_json_value *service_id_node =
-        aws_json_value_get_from_object(root, aws_byte_cursor_from_c_str("serviceId"));
+    struct aws_json_value *service_id_node = aws_json_value_get_from_object_c_str(root, "serviceId");
 
     if (service_id_node != NULL && aws_json_value_get_string(service_id_node, &ruleset->service_id)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract serviceId.");
@@ -908,8 +895,7 @@ static int s_init_ruleset_from_json(
         NULL,
         s_callback_endpoints_parameter_destroy);
 
-    struct aws_json_value *parameters_node =
-        aws_json_value_get_from_object(root, aws_byte_cursor_from_c_str("parameters"));
+    struct aws_json_value *parameters_node = aws_json_value_get_from_object_c_str(root, "parameters");
     if (parameters_node == NULL ||
         s_init_members_from_json(allocator, parameters_node, &ruleset->parameters, s_on_parameter_key)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameters.");
@@ -917,7 +903,7 @@ static int s_init_ruleset_from_json(
         goto on_error;
     }
 
-    struct aws_json_value *rules_node = aws_json_value_get_from_object(root, aws_byte_cursor_from_c_str("rules"));
+    struct aws_json_value *rules_node = aws_json_value_get_from_object_c_str(root, "rules");
     if (rules_node == NULL || !aws_json_value_is_array(rules_node)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected type for rules node.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);

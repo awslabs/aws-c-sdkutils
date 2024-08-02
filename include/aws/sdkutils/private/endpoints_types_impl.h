@@ -73,7 +73,7 @@ enum aws_endpoints_fn_type {
 
 enum aws_endpoints_value_type {
     /* Special value to represent that any value type is expected from resolving an expresion.
-        Note a valid value for a value type. */
+        Not a valid value for a value type. */
     AWS_ENDPOINTS_VALUE_ANY,
 
     AWS_ENDPOINTS_VALUE_NONE,
