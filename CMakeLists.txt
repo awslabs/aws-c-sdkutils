@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0.
 
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.13)
 project(aws-c-sdkutils LANGUAGES C VERSION 0.1.0)
 
 if (DEFINED CMAKE_PREFIX_PATH)
@@ -58,7 +58,6 @@ file(GLOB SDKUTILS_SRC
         ${AWS_SDKUTILS_SRC}
 )
 
-aws_set_common_policies()
 add_library(${PROJECT_NAME} ${SDKUTILS_SRC})
 aws_set_common_properties(${PROJECT_NAME} NO_WEXTRA)
 aws_prepare_symbol_visibility_args(${PROJECT_NAME} "AWS_SDKUTILS")
