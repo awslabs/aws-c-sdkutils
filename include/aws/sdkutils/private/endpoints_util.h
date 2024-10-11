@@ -74,7 +74,7 @@ AWS_SDKUTILS_API void aws_array_list_deep_clean_up(
 
 /* Function that resolves template. */
 typedef int(aws_endpoints_template_resolve_fn)(
-    struct aws_byte_cursor template,
+    struct aws_byte_cursor /* template */,
     void *user_data,
     struct aws_owning_cursor *out_resolved);
 /*
