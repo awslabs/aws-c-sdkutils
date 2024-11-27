@@ -44,11 +44,11 @@ static int s_test_iso_region_matches(struct aws_allocator *allocator, void *ctx)
     (void)ctx;
 
     struct aws_endpoints_regex *regex =
-        aws_endpoints_regex_new(allocator, aws_byte_cursor_from_c_str("^us\\-isob\\-\\w+\\-\\d+$"));
+        aws_endpoints_regex_new(allocator, aws_byte_cursor_from_c_str("^eu\\-isoe\\-\\w+\\-\\d+$"));
 
     ASSERT_NOT_NULL(regex);
 
-    ASSERT_SUCCESS(aws_endpoints_regex_match(regex, aws_byte_cursor_from_c_str("us-isob-east-1")));
+    ASSERT_SUCCESS(aws_endpoints_regex_match(regex, aws_byte_cursor_from_c_str("eu-isoe-west-1")));
 
     ASSERT_ERROR(
         AWS_ERROR_SDKUTILS_ENDPOINTS_REGEX_NO_MATCH,
