@@ -68,7 +68,7 @@ configure_file("cmake/${PROJECT_NAME}-config.cmake"
   @ONLY)
 
 aws_check_headers(${PROJECT_NAME} ${AWS_SDKUTILS_HEADERS})
-install(FILES ${AWS_SDKUTILS_HEADERS} DESTINATION "include/aws/sdkutils" COMPONENT Development)
+install(FILES ${AWS_SDKUTILS_HEADERS} DESTINATION "${INCLUDE_DIRECTORY}/aws/sdkutils" COMPONENT Development)
 
 if (BUILD_SHARED_LIBS)
    set (TARGET_DIR "shared")
