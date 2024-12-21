@@ -14,6 +14,7 @@ include(AwsCheckHeaders)
 include(AwsSharedLibSetup)
 include(AwsSanitizers)
 include(AwsFindPackage)
+include(GNUInstallDirs)
 
 file(GLOB AWS_SDKUTILS_HEADERS
         "include/aws/sdkutils/*.h"
@@ -68,7 +69,7 @@ configure_file("cmake/${PROJECT_NAME}-config.cmake"
   @ONLY)
 
 aws_check_headers(${PROJECT_NAME} ${AWS_SDKUTILS_HEADERS})
-install(FILES ${AWS_SDKUTILS_HEADERS} DESTINATION "${INCLUDE_DIRECTORY}/aws/sdkutils" COMPONENT Development)
+install(FILES ${AWS_SDKUTILS_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/aws/sdkutils" COMPONENT Development)
 
 if (BUILD_SHARED_LIBS)
    set (TARGET_DIR "shared")
@@ -77,16 +78,16 @@ else()
 endif()
 
 install(EXPORT "${PROJECT_NAME}-targets"
-    DESTINATION "${LIBRARY_DIRECTORY}/cmake/${PROJECT_NAME}/${TARGET_DIR}/"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}/${TARGET_DIR}/"
     NAMESPACE AWS::
     COMPONENT Development)
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
-    DESTINATION "${LIBRARY_DIRECTORY}/cmake/${PROJECT_NAME}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
     COMPONENT Development)
 
 install(FILES ${EXPORT_MODULES}
-        DESTINATION "${LIBRARY_DIRECTORY}/cmake/${PROJECT_NAME}/modules"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}/modules"
         COMPONENT Development)
 
 if (NOT CMAKE_CROSSCOMPILING)
