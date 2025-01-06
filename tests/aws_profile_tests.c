@@ -427,10 +427,11 @@ AWS_TEST_CASE(aws_profile_multiple_profile_test, s_aws_profile_multiple_profile_
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_credentials_sso_session,
-    "[profile foo]\nname = value\n[profile bar]\nname2 = value2\n[sso-session session]\nname3 = value3\ns3 =\n name4 = "
-    "value4");
+    "[profile foo]\nname = value\n[profile bar]\nname2 = value2\n"
+    "[sso-session session]\nname3 = value3\ns3 =\n name4 = value4\n"
+    "[services test-service]\nname4 = value4\ns3 =\n name5 = value5\n");
 
-static int s_aws_profile_multiple_profile_with_sso_session_test(struct aws_allocator *allocator, void *ctx) {
+static int s_aws_profile_multiple_sections(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     struct aws_profile_collection *profile_collection =
@@ -451,41 +452,52 @@ static int s_aws_profile_multiple_profile_with_sso_session_test(struct aws_alloc
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "name3", "value3");
     EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "s3", 1);
     EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "s3", "name4", "value4");
+
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "name4", "value4");
+    EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "s3", 1);
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "s3", "name5", "value5");
+
     aws_profile_collection_destroy(profile_collection);
 
     return 0;
 }
 
-AWS_TEST_CASE(aws_profile_multiple_profile_with_sso_session_test, s_aws_profile_multiple_profile_with_sso_session_test);
+AWS_TEST_CASE(aws_profile_multiple_sections, s_aws_profile_multiple_sections);
 
 /*
- * SSO-Session in credentials file is ignored
+ * sections in credentials file are ignored
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_sso_session_in_credentials,
-    "[foo]\nname = value\n[sso-session session]\nname3 = value3");
+    "[profile foo]\nname = value\n"
+    "[sso-session session]\nname2 = value2\n"
+    "[services test-service]\nname3 = value3\n"
+    );
 
-static int s_aws_profile_sso_session_in_credentials_test(struct aws_allocator *allocator, void *ctx) {
+static int s_aws_profile_sections_in_credentials_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     struct aws_profile_collection *profile_collection =
         aws_prepare_profile_test(allocator, s_sso_session_in_credentials, AWS_PST_CREDENTIALS);
 
     ASSERT_NOT_NULL(profile_collection);
-    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
     EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 0);
     aws_profile_collection_destroy(profile_collection);
 
     return 0;
 }
 
-AWS_TEST_CASE(aws_profile_sso_session_in_credentials_test, s_aws_profile_sso_session_in_credentials_test);
+AWS_TEST_CASE(aws_profile_sections_in_credentials_test, s_aws_profile_sections_in_credentials_test);
 
 /*
  * sso-session without name is ignored
  */
 AWS_STATIC_STRING_FROM_LITERAL(s_sso_session_without_name, "[sso-session session]\nname = value\n[sso-session ]");
-//"[profile foo]\nname = value\n[sso-session session]\nname3 = value3");
 static int s_aws_profile_sso_session_without_name_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
@@ -505,6 +517,28 @@ static int s_aws_profile_sso_session_without_name_test(struct aws_allocator *all
 
 AWS_TEST_CASE(aws_profile_sso_session_without_name_test, s_aws_profile_sso_session_without_name_test);
 
+/*
+ * services without name is ignored
+ */
+AWS_STATIC_STRING_FROM_LITERAL(s_services_without_name, "[services test-service]\nname = value\n[services ]");
+static int s_aws_profile_services_without_name_test(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    struct aws_profile_collection *profile_collection =
+        aws_prepare_profile_test(allocator, s_services_without_name, AWS_PST_CONFIG);
+
+    ASSERT_NOT_NULL(profile_collection);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "name", "value");
+
+    aws_profile_collection_destroy(profile_collection);
+
+    return 0;
+}
+
+AWS_TEST_CASE(aws_profile_services_without_name_test, s_aws_profile_services_without_name_test);
 /*
  * Blank lines are ignored
  */
@@ -826,12 +860,14 @@ AWS_TEST_CASE(
     s_aws_profile_continued_property_value_semicolon_comment_test);
 
 /*
- * duplicate profiles and sso-session merge properties
+ * duplicate profiles, sso-session, services merge properties
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_duplicate_profiles_merge_profile,
-    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n[sso-session foo]\nname3 = value-3\n[sso-session "
-    "foo]\nname3 = value3\nname4 = value4");
+    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n"
+    "[sso-session foo]\nname3 = value-3\n[sso-session foo]\nname3 = value3\nname4 = value4\n"
+    "[services test-service]\nname5 = value-5\n[services test-service]\nname5 = value5\nname6 = value6\n"
+    );
 
 static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
@@ -846,11 +882,17 @@ static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *all
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name2", "value2");
 
-    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 1);
     EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "foo");
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "foo", 2);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "foo", "name3", "value3");
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "foo", "name4", "value4");
+
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "name5", "value5");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "name6", "value6");
 
     aws_profile_collection_destroy(profile_collection);
 
