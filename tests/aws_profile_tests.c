@@ -59,10 +59,11 @@
     }
 
 #define EXPECT_SUB_PROPERTY(                                                                                           \
-    profile_collection, profile_name, property_name, sub_property_name, expected_sub_property_value)                   \
+    profile_collection, section_type, profile_name, property_name, sub_property_name, expected_sub_property_value)     \
     {                                                                                                                  \
         struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
+        const struct aws_profile *profile =                                                                            \
+            aws_profile_collection_get_section(profile_collection, section_type, profile_name_str);                    \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
         const struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);            \
         struct aws_string *sub_property_name_str = aws_string_new_from_c_str(allocator, sub_property_name);            \
@@ -71,23 +72,6 @@
         aws_string_destroy(sub_property_name_str);                                                                     \
         aws_string_destroy(property_name_str);                                                                         \
         aws_string_destroy(profile_name_str);                                                                          \
-        ASSERT_TRUE(strcmp(expected_sub_property_value, aws_string_c_str(sub_property_value)) == 0);                   \
-    }
-
-#define EXPECT_SSO_SESSION_SUB_PROPERTY(                                                                               \
-    profile_collection, sso_session_name, property_name, sub_property_name, expected_sub_property_value)               \
-    {                                                                                                                  \
-        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
-        const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
-        struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
-        const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
-        struct aws_string *sub_property_name_str = aws_string_new_from_c_str(allocator, sub_property_name);            \
-        const struct aws_string *sub_property_value =                                                                  \
-            aws_profile_property_get_sub_property(property, sub_property_name_str);                                    \
-        aws_string_destroy(sub_property_name_str);                                                                     \
-        aws_string_destroy(property_name_str);                                                                         \
-        aws_string_destroy(sso_session_name_str);                                                                      \
         ASSERT_TRUE(strcmp(expected_sub_property_value, aws_string_c_str(sub_property_value)) == 0);                   \
     }
 
@@ -466,7 +450,7 @@ static int s_aws_profile_multiple_profile_with_sso_session_test(struct aws_alloc
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", 2);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "name3", "value3");
     EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "s3", 1);
-    EXPECT_SSO_SESSION_SUB_PROPERTY(profile_collection, "session", "s3", "name4", "value4");
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "s3", "name4", "value4");
     aws_profile_collection_destroy(profile_collection);
 
     return 0;
@@ -1116,7 +1100,7 @@ static int s_aws_profile_basic_sub_property_test(struct aws_allocator *allocator
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "\nname = value");
     EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", 1);
-    EXPECT_SUB_PROPERTY(profile_collection, "foo", "s3", "name", "value");
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1143,7 +1127,7 @@ static int s_aws_profile_empty_sub_property_test(struct aws_allocator *allocator
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "\nname =");
     EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", 1);
-    EXPECT_SUB_PROPERTY(profile_collection, "foo", "s3", "name", "");
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "name", "");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1199,8 +1183,8 @@ static int s_aws_profile_sub_property_blank_line_test(struct aws_allocator *allo
     EXPECT_PROPERTY(
         profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "\nname = value\nname2 = value2");
     EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", 2);
-    EXPECT_SUB_PROPERTY(profile_collection, "foo", "s3", "name", "value");
-    EXPECT_SUB_PROPERTY(profile_collection, "foo", "s3", "name2", "value2");
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "name", "value");
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "name2", "value2");
 
     aws_profile_collection_destroy(profile_collection);
 
