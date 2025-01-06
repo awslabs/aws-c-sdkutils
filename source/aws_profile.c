@@ -863,7 +863,7 @@ static struct aws_byte_cursor s_trim_trailing_whitespace_comment(const struct aw
     return trimmed;
 }
 
-static int s_parse_section_declaration_prefix(
+static int s_parse_section_type_prefix(
     struct aws_byte_cursor *profile_cursor,
     enum aws_profile_section_type *out_section_type) {
     /* check profile prefix */
@@ -927,11 +927,11 @@ static bool s_parse_profile_declaration(
      * ("[profilefoo]" for example) should rewind and use the whole name properly.
      */
     struct aws_byte_cursor backtrack_cursor = profile_cursor;
-    bool valid_section_declation_prefix = false;
-    if (s_parse_section_declaration_prefix(&profile_cursor, &section_type) != AWS_OP_SUCCESS) {
+    bool has_valid_section_type_prefix = false;
+    if (s_parse_section_type_prefix(&profile_cursor, &section_type) != AWS_OP_SUCCESS) {
         profile_cursor = backtrack_cursor;
     } else {
-        valid_section_declation_prefix = true;
+        has_valid_section_type_prefix = true;
         if (context->profile_collection->profile_source == AWS_PST_CREDENTIALS) {
             AWS_LOGF_WARN(
                 AWS_LS_SDKUTILS_PROFILE,
@@ -953,7 +953,7 @@ static bool s_parse_profile_declaration(
         return true;
     }
 
-    if (context->profile_collection->profile_source == AWS_PST_CONFIG && !valid_section_declation_prefix &&
+    if (context->profile_collection->profile_source == AWS_PST_CONFIG && !has_valid_section_type_prefix &&
         !s_is_default_profile_name(&profile_name)) {
         AWS_LOGF_WARN(
             AWS_LS_SDKUTILS_PROFILE,
@@ -1002,7 +1002,7 @@ static bool s_parse_profile_declaration(
             context->profile_collection,
             section_type,
             &profile_name,
-            valid_section_declation_prefix && section_type == AWS_PROFILE_SECTION_TYPE_PROFILE,
+            has_valid_section_type_prefix && section_type == AWS_PROFILE_SECTION_TYPE_PROFILE,
             context,
             &context->current_profile)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PROFILE, "Failed to add profile to profile collection");
