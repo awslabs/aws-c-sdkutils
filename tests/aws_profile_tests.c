@@ -425,7 +425,7 @@ AWS_TEST_CASE(aws_profile_multiple_profile_test, s_aws_profile_multiple_profile_
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_credentials_sso_session,
-    "[profile foo]\nname = value\n[profile bar]\nname2 = value2\n"
+    "[profile foo]\nname = value\n[profile bar]\nname2 = value2\nservices = test-service\n"
     "[sso-session session]\nname3 = value3\ns3 =\n name4 = value4\n"
     "[services test-service]\nname4 = value4\ns3 =\n name5 = value5\n");
 
@@ -441,8 +441,9 @@ static int s_aws_profile_multiple_sections(struct aws_allocator *allocator, void
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
     EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar");
-    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", 1);
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", 2);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", "name2", "value2");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", "services", "test-service");
 
     EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 1);
     EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session");

@@ -918,7 +918,6 @@ static bool s_parse_profile_declaration(
     context->current_property = NULL;
 
     s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
-
     enum aws_profile_section_type section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
 
     /*
