@@ -10,9 +10,7 @@
 #include <aws/sdkutils/aws_profile.h>
 
 #define EXPECT_SECTION_COUNT(profile_collection, section_type, section_count)                                          \
-    {                                                                                                                  \
-        ASSERT_TRUE(aws_profile_collection_get_section_count(profile_collection, section_type) == (section_count));    \
-    }
+    { ASSERT_TRUE(aws_profile_collection_get_section_count(profile_collection, section_type) == (section_count)); }
 
 #define EXPECT_SECTION(profile_collection, section_type, section_name)                                                 \
     {                                                                                                                  \
@@ -474,8 +472,7 @@ AWS_STATIC_STRING_FROM_LITERAL(
     s_sso_session_in_credentials,
     "[profile foo]\nname = value\n"
     "[sso-session session]\nname2 = value2\n"
-    "[services test-service]\nname3 = value3\n"
-    );
+    "[services test-service]\nname3 = value3\n");
 
 static int s_aws_profile_sections_in_credentials_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
@@ -866,8 +863,7 @@ AWS_STATIC_STRING_FROM_LITERAL(
     s_duplicate_profiles_merge_profile,
     "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n"
     "[sso-session foo]\nname3 = value-3\n[sso-session foo]\nname3 = value3\nname4 = value4\n"
-    "[services test-service]\nname5 = value-5\n[services test-service]\nname5 = value5\nname6 = value6\n"
-    );
+    "[services test-service]\nname5 = value-5\n[services test-service]\nname5 = value5\nname6 = value6\n");
 
 static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
