@@ -472,7 +472,7 @@ static int s_aws_profile_multiple_profile_with_sso_session_test(struct aws_alloc
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", 1);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", "name2", "value2");
 
-    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 1);
     EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session");
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", 2);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "name3", "value3");
@@ -500,7 +500,7 @@ static int s_aws_profile_sso_session_in_credentials_test(struct aws_allocator *a
 
     ASSERT_NOT_NULL(profile_collection);
     EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
-    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 0);
     aws_profile_collection_destroy(profile_collection);
 
     return 0;
@@ -520,8 +520,7 @@ static int s_aws_profile_sso_session_without_name_test(struct aws_allocator *all
         aws_prepare_profile_test(allocator, s_sso_session_without_name, AWS_PST_CONFIG);
 
     ASSERT_NOT_NULL(profile_collection);
-    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
-    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 1);
     EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session");
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", 1);
     EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "name", "value");

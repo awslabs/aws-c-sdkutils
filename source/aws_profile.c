@@ -863,26 +863,28 @@ static struct aws_byte_cursor s_trim_trailing_whitespace_comment(const struct aw
     return trimmed;
 }
 
-static int s_parse_section_declaration_prefix(struct aws_byte_cursor *profile_cursor,
-        enum aws_profile_section_type *out_section_type) {
+static int s_parse_section_declaration_prefix(
+    struct aws_byte_cursor *profile_cursor,
+    enum aws_profile_section_type *out_section_type) {
     /* check profile prefix */
-    if(s_parse_by_token(profile_cursor, s_profile_token, NULL) &&
-                              s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+    if (s_parse_by_token(profile_cursor, s_profile_token, NULL) &&
+        s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
         *out_section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
         return AWS_OP_SUCCESS;
     }
     /* check sso-session prefix */
-    if(s_parse_by_token(profile_cursor, s_sso_session_token, NULL) && s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+    if (s_parse_by_token(profile_cursor, s_sso_session_token, NULL) &&
+        s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
         *out_section_type = AWS_PROFILE_SECTION_TYPE_SSO_SESSION;
         return AWS_OP_SUCCESS;
-    } 
+    }
     /* check services prefix */
-    if(s_parse_by_token(profile_cursor, s_services_token, NULL) &&
-                                  s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+    if (s_parse_by_token(profile_cursor, s_services_token, NULL) &&
+        s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
         *out_section_type = AWS_PROFILE_SECTION_TYPE_SERVICES;
         return AWS_OP_SUCCESS;
     }
-    
+
     return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE);
 }
 
@@ -917,8 +919,7 @@ static bool s_parse_profile_declaration(
 
     s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
 
-    enum aws_profile_section_type section_type;
-
+    enum aws_profile_section_type section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
 
     /*
      * Check if the profile name starts with a valid prefix.  We need to check for
@@ -927,7 +928,7 @@ static bool s_parse_profile_declaration(
      */
     struct aws_byte_cursor backtrack_cursor = profile_cursor;
     bool valid_section_declation_prefix = false;
-    if(s_parse_section_declaration_prefix(&profile_cursor, &section_type) != AWS_OP_SUCCESS) {
+    if (s_parse_section_declaration_prefix(&profile_cursor, &section_type) != AWS_OP_SUCCESS) {
         profile_cursor = backtrack_cursor;
     } else {
         valid_section_declation_prefix = true;
@@ -942,7 +943,7 @@ static bool s_parse_profile_declaration(
         }
 
         s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
-    } 
+    }
     struct aws_byte_cursor profile_name;
     if (!s_parse_by_character_predicate(&profile_cursor, s_is_identifier, &profile_name, 0)) {
         AWS_LOGF_WARN(AWS_LS_SDKUTILS_PROFILE, "Profile declarations must contain a valid identifier for a name");
@@ -952,7 +953,8 @@ static bool s_parse_profile_declaration(
         return true;
     }
 
-    if (context->profile_collection->profile_source == AWS_PST_CONFIG && !valid_section_declation_prefix && !s_is_default_profile_name(&profile_name)) {
+    if (context->profile_collection->profile_source == AWS_PST_CONFIG && !valid_section_declation_prefix &&
+        !s_is_default_profile_name(&profile_name)) {
         AWS_LOGF_WARN(
             AWS_LS_SDKUTILS_PROFILE,
             "Non-default profile declarations in config files must use the \"profile\" keyword");
