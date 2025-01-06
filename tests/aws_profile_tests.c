@@ -503,6 +503,7 @@ static int s_aws_profile_sso_session_without_name_test(struct aws_allocator *all
         aws_prepare_profile_test(allocator, s_sso_session_without_name, AWS_PST_CONFIG);
 
     ASSERT_NOT_NULL(profile_collection);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
     EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 1);
     EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session");
     EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", 1);
