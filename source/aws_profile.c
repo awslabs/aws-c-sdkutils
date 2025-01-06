@@ -612,6 +612,7 @@ static void s_aws_profile_collection_destroy_internal(struct aws_profile_collect
 
 AWS_STATIC_STRING_FROM_LITERAL(s_profile_token, "profile");
 AWS_STATIC_STRING_FROM_LITERAL(s_sso_session_token, "sso-session");
+AWS_STATIC_STRING_FROM_LITERAL(s_services_token, "services");
 
 const struct aws_profile *aws_profile_collection_get_profile(
     const struct aws_profile_collection *profile_collection,
@@ -635,7 +636,7 @@ static int s_profile_collection_add_profile(
     struct aws_profile_collection *profile_collection,
     const enum aws_profile_section_type section_type,
     const struct aws_byte_cursor *profile_name,
-    bool has_prefix,
+    bool has_profile_prefix,
     const struct profile_file_parse_context *context,
     struct aws_profile **current_profile_out) {
 
@@ -660,7 +661,7 @@ static int s_profile_collection_add_profile(
         /*
          *  In a config file, "profile default" always supercedes "default"
          */
-        if (!has_prefix && existing_profile && existing_profile->has_profile_prefix) {
+        if (!has_profile_prefix && existing_profile && existing_profile->has_profile_prefix) {
             /*
              * existing one supercedes: ignore this (and its properties) completely by failing the add
              * which sets the current profile to NULL
@@ -673,7 +674,7 @@ static int s_profile_collection_add_profile(
             return AWS_OP_SUCCESS;
         }
 
-        if (has_prefix && existing_profile && !existing_profile->has_profile_prefix) {
+        if (has_profile_prefix && existing_profile && !existing_profile->has_profile_prefix) {
             /*
              * stomp over existing: remove it, then proceed with add
              * element destroy function will clean up the profile and key
@@ -692,7 +693,7 @@ static int s_profile_collection_add_profile(
         return AWS_OP_SUCCESS;
     }
 
-    struct aws_profile *new_profile = aws_profile_new(profile_collection->allocator, profile_name, has_prefix);
+    struct aws_profile *new_profile = aws_profile_new(profile_collection->allocator, profile_name, has_profile_prefix);
     if (new_profile == NULL) {
         goto on_aws_profile_new_failure;
     }
@@ -862,6 +863,29 @@ static struct aws_byte_cursor s_trim_trailing_whitespace_comment(const struct aw
     return trimmed;
 }
 
+static int s_parse_section_declaration_prefix(struct aws_byte_cursor *profile_cursor,
+        enum aws_profile_section_type *out_section_type) {
+    /* check profile prefix */
+    if(s_parse_by_token(profile_cursor, s_profile_token, NULL) &&
+                              s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+        *out_section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
+        return AWS_OP_SUCCESS;
+    }
+    /* check sso-session prefix */
+    if(s_parse_by_token(profile_cursor, s_sso_session_token, NULL) && s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+        *out_section_type = AWS_PROFILE_SECTION_TYPE_SSO_SESSION;
+        return AWS_OP_SUCCESS;
+    } 
+    /* check services prefix */
+    if(s_parse_by_token(profile_cursor, s_services_token, NULL) &&
+                                  s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+        *out_section_type = AWS_PROFILE_SECTION_TYPE_SERVICES;
+        return AWS_OP_SUCCESS;
+    }
+    
+    return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE);
+}
+
 /**
  * Attempts to parse profile declaration lines
  *
@@ -892,24 +916,25 @@ static bool s_parse_profile_declaration(
     context->current_property = NULL;
 
     s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
-    enum aws_profile_section_type section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
+
+    enum aws_profile_section_type section_type;
+
 
     /*
-     * Check if the profile name starts with the 'profile' keyword.  We need to check for
-     * "profile" and at least one whitespace character.  A partial match
+     * Check if the profile name starts with a valid prefix.  We need to check for
+     * prefix and at least one whitespace character.  A partial match like
      * ("[profilefoo]" for example) should rewind and use the whole name properly.
      */
     struct aws_byte_cursor backtrack_cursor = profile_cursor;
-    bool has_profile_prefix = s_parse_by_token(&profile_cursor, s_profile_token, NULL) &&
-                              s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 1);
-    bool has_sso_session_prefix = !has_profile_prefix && s_parse_by_token(&profile_cursor, s_sso_session_token, NULL) &&
-                                  s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 1);
-
-    if (has_profile_prefix) {
+    bool valid_section_declation_prefix = false;
+    if(s_parse_section_declaration_prefix(&profile_cursor, &section_type) != AWS_OP_SUCCESS) {
+        profile_cursor = backtrack_cursor;
+    } else {
+        valid_section_declation_prefix = true;
         if (context->profile_collection->profile_source == AWS_PST_CREDENTIALS) {
             AWS_LOGF_WARN(
                 AWS_LS_SDKUTILS_PROFILE,
-                "Profile declarations in credentials files are not allowed to begin with the \"profile\" keyword");
+                "Profile declarations in credentials files are not allowed to begin with the section-type keyword");
             s_log_parse_context(AWS_LL_WARN, context);
 
             context->parse_error = AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE;
@@ -917,20 +942,7 @@ static bool s_parse_profile_declaration(
         }
 
         s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
-    } else if (has_sso_session_prefix) {
-        if (context->profile_collection->profile_source == AWS_PST_CREDENTIALS) {
-            AWS_LOGF_WARN(AWS_LS_SDKUTILS_PROFILE, "sso-session declarations in credentials files are not allowed");
-            s_log_parse_context(AWS_LL_WARN, context);
-
-            context->parse_error = AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE;
-            return true;
-        }
-        section_type = AWS_PROFILE_SECTION_TYPE_SSO_SESSION;
-        s_parse_by_character_predicate(&profile_cursor, s_is_whitespace, NULL, 0);
-    } else {
-        profile_cursor = backtrack_cursor;
-    }
-
+    } 
     struct aws_byte_cursor profile_name;
     if (!s_parse_by_character_predicate(&profile_cursor, s_is_identifier, &profile_name, 0)) {
         AWS_LOGF_WARN(AWS_LS_SDKUTILS_PROFILE, "Profile declarations must contain a valid identifier for a name");
@@ -940,8 +952,7 @@ static bool s_parse_profile_declaration(
         return true;
     }
 
-    if (context->profile_collection->profile_source == AWS_PST_CONFIG && !has_profile_prefix &&
-        !s_is_default_profile_name(&profile_name) && !has_sso_session_prefix) {
+    if (context->profile_collection->profile_source == AWS_PST_CONFIG && !valid_section_declation_prefix && !s_is_default_profile_name(&profile_name)) {
         AWS_LOGF_WARN(
             AWS_LS_SDKUTILS_PROFILE,
             "Non-default profile declarations in config files must use the \"profile\" keyword");
@@ -989,7 +1000,7 @@ static bool s_parse_profile_declaration(
             context->profile_collection,
             section_type,
             &profile_name,
-            has_profile_prefix,
+            valid_section_declation_prefix && section_type == AWS_PROFILE_SECTION_TYPE_PROFILE,
             context,
             &context->current_profile)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PROFILE, "Failed to add profile to profile collection");
