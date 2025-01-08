@@ -519,12 +519,12 @@ AWS_TEST_CASE(aws_profile_sso_session_without_name_test, s_aws_profile_sso_sessi
 /*
  * services without name is ignored
  */
-AWS_STATIC_STRING_FROM_LITERAL(s_services_with_invali_prefix,
-         "[services test-service]\nname = value\n"
-         "[services ]\n"
-         "[profilesso-sessionservices test]\nname = value\n"
-        "[services\rtest-service]\nname = value\n"
-        );
+AWS_STATIC_STRING_FROM_LITERAL(
+    s_services_with_invali_prefix,
+    "[services test-service]\nname = value\n"
+    "[services ]\n"
+    "[profilesso-sessionservices test]\nname = value\n"
+    "[services\rtest-service]\nname = value\n");
 static int s_aws_profile_services_invalid_prefix_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
