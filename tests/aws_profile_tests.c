@@ -519,12 +519,17 @@ AWS_TEST_CASE(aws_profile_sso_session_without_name_test, s_aws_profile_sso_sessi
 /*
  * services without name is ignored
  */
-AWS_STATIC_STRING_FROM_LITERAL(s_services_without_name, "[services test-service]\nname = value\n[services ]");
-static int s_aws_profile_services_without_name_test(struct aws_allocator *allocator, void *ctx) {
+AWS_STATIC_STRING_FROM_LITERAL(s_services_with_invali_prefix,
+         "[services test-service]\nname = value\n"
+         "[services ]\n"
+         "[profilesso-sessionservices test]\nname = value\n"
+        "[services\rtest-service]\nname = value\n"
+        );
+static int s_aws_profile_services_invalid_prefix_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     struct aws_profile_collection *profile_collection =
-        aws_prepare_profile_test(allocator, s_services_without_name, AWS_PST_CONFIG);
+        aws_prepare_profile_test(allocator, s_services_with_invali_prefix, AWS_PST_CONFIG);
 
     ASSERT_NOT_NULL(profile_collection);
     EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 1);
@@ -537,7 +542,7 @@ static int s_aws_profile_services_without_name_test(struct aws_allocator *alloca
     return 0;
 }
 
-AWS_TEST_CASE(aws_profile_services_without_name_test, s_aws_profile_services_without_name_test);
+AWS_TEST_CASE(aws_profile_services_invalid_prefix_test, s_aws_profile_services_invalid_prefix_test);
 /*
  * Blank lines are ignored
  */

@@ -867,24 +867,30 @@ static int s_parse_section_type_prefix(
     struct aws_byte_cursor *profile_cursor,
     enum aws_profile_section_type *out_section_type) {
     /* check profile prefix */
-    if (s_parse_by_token(profile_cursor, s_profile_token, NULL) &&
-        s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
-        *out_section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
-        return AWS_OP_SUCCESS;
-    }
-    /* check sso-session prefix */
-    if (s_parse_by_token(profile_cursor, s_sso_session_token, NULL) &&
-        s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
-        *out_section_type = AWS_PROFILE_SECTION_TYPE_SSO_SESSION;
-        return AWS_OP_SUCCESS;
-    }
-    /* check services prefix */
-    if (s_parse_by_token(profile_cursor, s_services_token, NULL) &&
-        s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
-        *out_section_type = AWS_PROFILE_SECTION_TYPE_SERVICES;
-        return AWS_OP_SUCCESS;
+    if (s_parse_by_token(profile_cursor, s_profile_token, NULL)) {
+        if (s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+            *out_section_type = AWS_PROFILE_SECTION_TYPE_PROFILE;
+            return AWS_OP_SUCCESS;
+        }
+        return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE);
     }
 
+    /* check sso-session prefix */
+    if (s_parse_by_token(profile_cursor, s_sso_session_token, NULL)) {
+        if (s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+            *out_section_type = AWS_PROFILE_SECTION_TYPE_SSO_SESSION;
+            return AWS_OP_SUCCESS;
+        }
+        return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE);
+    }
+    /* check services prefix */
+    if (s_parse_by_token(profile_cursor, s_services_token, NULL)) {
+        if (s_parse_by_character_predicate(profile_cursor, s_is_whitespace, NULL, 1)) {
+            *out_section_type = AWS_PROFILE_SECTION_TYPE_SERVICES;
+            return AWS_OP_SUCCESS;
+        }
+        return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE);
+    }
     return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_RECOVERABLE);
 }
 
