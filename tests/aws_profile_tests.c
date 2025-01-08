@@ -9,54 +9,59 @@
 #include <aws/common/string.h>
 #include <aws/sdkutils/aws_profile.h>
 
-#define EXPECT_PROFILE_COUNT(profile_collection, profile_count)                                                        \
-    { ASSERT_TRUE(aws_profile_collection_get_profile_count(profile_collection) == (profile_count)); }
+#define EXPECT_SECTION_COUNT(profile_collection, section_type, section_count)                                          \
+    { ASSERT_TRUE(aws_profile_collection_get_section_count(profile_collection, section_type) == (section_count)); }
 
-#define EXPECT_PROFILE(profile_collection, profile_name)                                                               \
+#define EXPECT_SECTION(profile_collection, section_type, section_name)                                                 \
     {                                                                                                                  \
-        struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
-        aws_string_destroy(profile_name_str);                                                                          \
+        struct aws_string *section_name_str = aws_string_new_from_c_str(allocator, section_name);                      \
+        const struct aws_profile *profile =                                                                            \
+            aws_profile_collection_get_section(profile_collection, section_type, section_name_str);                    \
+        aws_string_destroy(section_name_str);                                                                          \
         ASSERT_TRUE(profile != NULL);                                                                                  \
     }
 
-#define EXPECT_PROPERTY_COUNT(profile_collection, profile_name, expected_property_count)                               \
+#define EXPECT_PROPERTY_COUNT(profile_collection, section_type, section_name, expected_property_count)                 \
     {                                                                                                                  \
-        struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
-        aws_string_destroy(profile_name_str);                                                                          \
+        struct aws_string *section_name_str = aws_string_new_from_c_str(allocator, section_name);                      \
+        const struct aws_profile *profile =                                                                            \
+            aws_profile_collection_get_section(profile_collection, section_type, section_name_str);                    \
+        aws_string_destroy(section_name_str);                                                                          \
         ASSERT_TRUE(aws_profile_get_property_count(profile) == (expected_property_count));                             \
     }
-
-#define EXPECT_PROPERTY(profile_collection, profile_name, property_name, expected_property_value)                      \
+#define EXPECT_PROPERTY(profile_collection, section_type, section_name, property_name, expected_property_value)        \
     {                                                                                                                  \
-        struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
+        struct aws_string *section_name_str = aws_string_new_from_c_str(allocator, section_name);                      \
+        const struct aws_profile *profile =                                                                            \
+            aws_profile_collection_get_section(profile_collection, section_type, section_name_str);                    \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
         const struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);            \
         aws_string_destroy(property_name_str);                                                                         \
-        aws_string_destroy(profile_name_str);                                                                          \
+        aws_string_destroy(section_name_str);                                                                          \
         ASSERT_TRUE(                                                                                                   \
             property != NULL &&                                                                                        \
             strcmp(expected_property_value, aws_string_c_str(aws_profile_property_get_value(property))) == 0);         \
     }
 
-#define EXPECT_SUB_PROPERTY_COUNT(profile_collection, profile_name, property_name, expected_sub_property_count)        \
+#define EXPECT_SUB_PROPERTY_COUNT(                                                                                     \
+    profile_collection, section_type, section_name, property_name, expected_sub_property_count)                        \
     {                                                                                                                  \
-        struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
+        struct aws_string *section_name_str = aws_string_new_from_c_str(allocator, section_name);                      \
+        const struct aws_profile *profile =                                                                            \
+            aws_profile_collection_get_section(profile_collection, section_type, section_name_str);                    \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
         const struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);            \
         aws_string_destroy(property_name_str);                                                                         \
-        aws_string_destroy(profile_name_str);                                                                          \
+        aws_string_destroy(section_name_str);                                                                          \
         ASSERT_UINT_EQUALS((expected_sub_property_count), aws_profile_property_get_sub_property_count(property));      \
     }
 
 #define EXPECT_SUB_PROPERTY(                                                                                           \
-    profile_collection, profile_name, property_name, sub_property_name, expected_sub_property_value)                   \
+    profile_collection, section_type, profile_name, property_name, sub_property_name, expected_sub_property_value)     \
     {                                                                                                                  \
         struct aws_string *profile_name_str = aws_string_new_from_c_str(allocator, profile_name);                      \
-        const struct aws_profile *profile = aws_profile_collection_get_profile(profile_collection, profile_name_str);  \
+        const struct aws_profile *profile =                                                                            \
+            aws_profile_collection_get_section(profile_collection, section_type, profile_name_str);                    \
         struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
         const struct aws_profile_property *property = aws_profile_get_property(profile, property_name_str);            \
         struct aws_string *sub_property_name_str = aws_string_new_from_c_str(allocator, sub_property_name);            \
@@ -65,74 +70,6 @@
         aws_string_destroy(sub_property_name_str);                                                                     \
         aws_string_destroy(property_name_str);                                                                         \
         aws_string_destroy(profile_name_str);                                                                          \
-        ASSERT_TRUE(strcmp(expected_sub_property_value, aws_string_c_str(sub_property_value)) == 0);                   \
-    }
-
-#define EXPECT_SSO_SESSION_COUNT(profile_collection, sso_session_count)                                                \
-    {                                                                                                                  \
-        ASSERT_TRUE(                                                                                                   \
-            aws_profile_collection_get_section_count(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION) ==      \
-            (sso_session_count));                                                                                      \
-    }
-
-#define EXPECT_SSO_SESSION(profile_collection, sso_session_name)                                                       \
-    {                                                                                                                  \
-        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
-        const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
-        aws_string_destroy(sso_session_name_str);                                                                      \
-        ASSERT_TRUE(sso_session != NULL);                                                                              \
-    }
-#define EXPECT_SSO_SESSION_PROPERTY_COUNT(profile_collection, sso_session_name, expected_sso_session_count)            \
-    {                                                                                                                  \
-        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
-        const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
-        aws_string_destroy(sso_session_name_str);                                                                      \
-        ASSERT_TRUE(aws_profile_get_property_count(sso_session) == (expected_sso_session_count));                      \
-    }
-
-#define EXPECT_SSO_SESSION_PROPERTY(profile_collection, sso_session_name, property_name, expected_property_value)      \
-    {                                                                                                                  \
-        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
-        const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
-        struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
-        const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
-        aws_string_destroy(property_name_str);                                                                         \
-        aws_string_destroy(sso_session_name_str);                                                                      \
-        ASSERT_TRUE(                                                                                                   \
-            property != NULL &&                                                                                        \
-            strcmp(expected_property_value, aws_string_c_str(aws_profile_property_get_value(property))) == 0);         \
-    }
-
-#define EXPECT_SSO_SESSION_SUB_PROPERTY_COUNT(                                                                         \
-    profile_collection, sso_session_name, property_name, expected_sub_property_count)                                  \
-    {                                                                                                                  \
-        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
-        const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
-        struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
-        const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
-        aws_string_destroy(property_name_str);                                                                         \
-        aws_string_destroy(sso_session_name_str);                                                                      \
-        ASSERT_UINT_EQUALS((expected_sub_property_count), aws_profile_property_get_sub_property_count(property));      \
-    }
-
-#define EXPECT_SSO_SESSION_SUB_PROPERTY(                                                                               \
-    profile_collection, sso_session_name, property_name, sub_property_name, expected_sub_property_value)               \
-    {                                                                                                                  \
-        struct aws_string *sso_session_name_str = aws_string_new_from_c_str(allocator, sso_session_name);              \
-        const struct aws_profile *sso_session = aws_profile_collection_get_section(                                    \
-            profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, sso_session_name_str);                           \
-        struct aws_string *property_name_str = aws_string_new_from_c_str(allocator, property_name);                    \
-        const struct aws_profile_property *property = aws_profile_get_property(sso_session, property_name_str);        \
-        struct aws_string *sub_property_name_str = aws_string_new_from_c_str(allocator, sub_property_name);            \
-        const struct aws_string *sub_property_value =                                                                  \
-            aws_profile_property_get_sub_property(property, sub_property_name_str);                                    \
-        aws_string_destroy(sub_property_name_str);                                                                     \
-        aws_string_destroy(property_name_str);                                                                         \
-        aws_string_destroy(sso_session_name_str);                                                                      \
         ASSERT_TRUE(strcmp(expected_sub_property_value, aws_string_c_str(sub_property_value)) == 0);                   \
     }
 
@@ -206,7 +143,7 @@ static int s_aws_profile_empty_test(struct aws_allocator *allocator, void *ctx) 
         aws_prepare_profile_test(allocator, s_empty_string, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -227,9 +164,9 @@ static int s_aws_profile_empty_profile_test(struct aws_allocator *allocator, voi
         aws_prepare_profile_test(allocator, s_empty_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -250,9 +187,9 @@ static int s_aws_profile_whitespace_empty_profile_test(struct aws_allocator *all
         aws_prepare_profile_test(allocator, s_whitespace_empty_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -273,9 +210,9 @@ static int s_aws_profile_tab_empty_profile_test(struct aws_allocator *allocator,
         aws_prepare_profile_test(allocator, s_tab_empty_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -296,10 +233,10 @@ static int s_aws_profile_single_simple_property_profile_test(struct aws_allocato
         aws_prepare_profile_test(allocator, s_single_simple_property_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -320,10 +257,10 @@ static int s_aws_profile_equal_containing_property_profile_test(struct aws_alloc
         aws_prepare_profile_test(allocator, s_equal_containing_property_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "val=ue");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "val=ue");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -344,10 +281,10 @@ static int s_aws_profile_unicode_containing_property_profile_test(struct aws_all
         aws_prepare_profile_test(allocator, s_unicode_containing_property_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "\xF0\x9F\x98\x82");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "\xF0\x9F\x98\x82");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -370,11 +307,11 @@ static int s_aws_profile_multiple_property_profile_test(struct aws_allocator *al
         aws_prepare_profile_test(allocator, s_multiple_property_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 2);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
-    EXPECT_PROPERTY(profile_collection, "foo", "name2", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name2", "value2");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -395,10 +332,10 @@ static int s_aws_profile_trimmable_property_profile_test(struct aws_allocator *a
         aws_prepare_profile_test(allocator, s_trimmable_property_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -419,10 +356,10 @@ static int s_aws_profile_empty_property_profile_test(struct aws_allocator *alloc
         aws_prepare_profile_test(allocator, s_empty_property_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -443,11 +380,11 @@ static int s_aws_profile_multiple_empty_profile_test(struct aws_allocator *alloc
         aws_prepare_profile_test(allocator, s_multiple_empty_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 2);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 0);
-    EXPECT_PROFILE(profile_collection, "bar");
-    EXPECT_PROPERTY_COUNT(profile_collection, "bar", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 2);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 0);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -468,13 +405,13 @@ static int s_aws_profile_multiple_profile_test(struct aws_allocator *allocator, 
         aws_prepare_profile_test(allocator, s_multiple_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 2);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
-    EXPECT_PROFILE(profile_collection, "bar");
-    EXPECT_PROPERTY_COUNT(profile_collection, "bar", 1);
-    EXPECT_PROPERTY(profile_collection, "bar", "name2", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 2);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", "name2", "value2");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -488,65 +425,77 @@ AWS_TEST_CASE(aws_profile_multiple_profile_test, s_aws_profile_multiple_profile_
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_credentials_sso_session,
-    "[profile foo]\nname = value\n[profile bar]\nname2 = value2\n[sso-session session]\nname3 = value3\ns3 =\n name4 = "
-    "value4");
+    "[profile foo]\nname = value\n[profile bar]\nname2 = value2\nservices = test-service\n"
+    "[sso-session session]\nname3 = value3\ns3 =\n name4 = value4\n"
+    "[services test-service]\nname4 = value4\ns3 =\n name5 = value5\n");
 
-static int s_aws_profile_multiple_profile_with_sso_session_test(struct aws_allocator *allocator, void *ctx) {
+static int s_aws_profile_multiple_sections(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     struct aws_profile_collection *profile_collection =
         aws_prepare_profile_test(allocator, s_credentials_sso_session, AWS_PST_CONFIG);
 
     ASSERT_NOT_NULL(profile_collection);
-    EXPECT_PROFILE_COUNT(profile_collection, 2);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
-    EXPECT_PROFILE(profile_collection, "bar");
-    EXPECT_PROPERTY_COUNT(profile_collection, "bar", 1);
-    EXPECT_PROPERTY(profile_collection, "bar", "name2", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 2);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", "name2", "value2");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", "services", "test-service");
 
-    EXPECT_SSO_SESSION_COUNT(profile_collection, 1);
-    EXPECT_SSO_SESSION(profile_collection, "session");
-    EXPECT_SSO_SESSION_PROPERTY_COUNT(profile_collection, "session", 2);
-    EXPECT_SSO_SESSION_PROPERTY(profile_collection, "session", "name3", "value3");
-    EXPECT_SSO_SESSION_SUB_PROPERTY_COUNT(profile_collection, "session", "s3", 1);
-    EXPECT_SSO_SESSION_SUB_PROPERTY(profile_collection, "session", "s3", "name4", "value4");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "name3", "value3");
+    EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "s3", 1);
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "s3", "name4", "value4");
+
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "name4", "value4");
+    EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "s3", 1);
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "s3", "name5", "value5");
+
     aws_profile_collection_destroy(profile_collection);
 
     return 0;
 }
 
-AWS_TEST_CASE(aws_profile_multiple_profile_with_sso_session_test, s_aws_profile_multiple_profile_with_sso_session_test);
+AWS_TEST_CASE(aws_profile_multiple_sections, s_aws_profile_multiple_sections);
 
 /*
- * SSO-Session in credentials file is ignored
+ * sections in credentials file are ignored
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_sso_session_in_credentials,
-    "[foo]\nname = value\n[sso-session session]\nname3 = value3");
+    "[profile foo]\nname = value\n"
+    "[sso-session session]\nname2 = value2\n"
+    "[services test-service]\nname3 = value3\n");
 
-static int s_aws_profile_sso_session_in_credentials_test(struct aws_allocator *allocator, void *ctx) {
+static int s_aws_profile_sections_in_credentials_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     struct aws_profile_collection *profile_collection =
         aws_prepare_profile_test(allocator, s_sso_session_in_credentials, AWS_PST_CREDENTIALS);
 
     ASSERT_NOT_NULL(profile_collection);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_SSO_SESSION_COUNT(profile_collection, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 0);
     aws_profile_collection_destroy(profile_collection);
 
     return 0;
 }
 
-AWS_TEST_CASE(aws_profile_sso_session_in_credentials_test, s_aws_profile_sso_session_in_credentials_test);
+AWS_TEST_CASE(aws_profile_sections_in_credentials_test, s_aws_profile_sections_in_credentials_test);
 
 /*
  * sso-session without name is ignored
  */
 AWS_STATIC_STRING_FROM_LITERAL(s_sso_session_without_name, "[sso-session session]\nname = value\n[sso-session ]");
-//"[profile foo]\nname = value\n[sso-session session]\nname3 = value3");
 static int s_aws_profile_sso_session_without_name_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
@@ -554,11 +503,12 @@ static int s_aws_profile_sso_session_without_name_test(struct aws_allocator *all
         aws_prepare_profile_test(allocator, s_sso_session_without_name, AWS_PST_CONFIG);
 
     ASSERT_NOT_NULL(profile_collection);
-    EXPECT_PROFILE_COUNT(profile_collection, 0);
-    EXPECT_SSO_SESSION_COUNT(profile_collection, 1);
-    EXPECT_SSO_SESSION(profile_collection, "session");
-    EXPECT_SSO_SESSION_PROPERTY_COUNT(profile_collection, "session", 1);
-    EXPECT_SSO_SESSION_PROPERTY(profile_collection, "session", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "session", "name", "value");
+
     aws_profile_collection_destroy(profile_collection);
 
     return 0;
@@ -566,6 +516,33 @@ static int s_aws_profile_sso_session_without_name_test(struct aws_allocator *all
 
 AWS_TEST_CASE(aws_profile_sso_session_without_name_test, s_aws_profile_sso_session_without_name_test);
 
+/*
+ * services without name is ignored
+ */
+AWS_STATIC_STRING_FROM_LITERAL(
+    s_services_with_invali_prefix,
+    "[services test-service]\nname = value\n"
+    "[services ]\n"
+    "[profilesso-sessionservices test]\nname = value\n"
+    "[services\rtest-service]\nname = value\n");
+static int s_aws_profile_services_invalid_prefix_test(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    struct aws_profile_collection *profile_collection =
+        aws_prepare_profile_test(allocator, s_services_with_invali_prefix, AWS_PST_CONFIG);
+
+    ASSERT_NOT_NULL(profile_collection);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "name", "value");
+
+    aws_profile_collection_destroy(profile_collection);
+
+    return 0;
+}
+
+AWS_TEST_CASE(aws_profile_services_invalid_prefix_test, s_aws_profile_services_invalid_prefix_test);
 /*
  * Blank lines are ignored
  */
@@ -580,12 +557,12 @@ static int s_aws_profile_blank_lines_ignored_test(struct aws_allocator *allocato
         aws_prepare_profile_test(allocator, s_blank_lines_ignored_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 2);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
-    EXPECT_PROFILE(profile_collection, "bar");
-    EXPECT_PROPERTY_COUNT(profile_collection, "bar", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 2);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -608,10 +585,10 @@ static int s_aws_profile_pound_comments_ignored_test(struct aws_allocator *alloc
         aws_prepare_profile_test(allocator, s_pound_comments_ignored_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -634,10 +611,10 @@ static int s_aws_profile_semicolon_comments_ignored_test(struct aws_allocator *a
         aws_prepare_profile_test(allocator, s_semicolon_comments_ignored_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -660,10 +637,10 @@ static int s_aws_profile_mixed_comments_ignored_test(struct aws_allocator *alloc
         aws_prepare_profile_test(allocator, s_mixed_comments_ignored_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -684,10 +661,10 @@ static int s_aws_profile_empty_comments_ignored_test(struct aws_allocator *alloc
         aws_prepare_profile_test(allocator, s_empty_comments_ignored_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -710,11 +687,11 @@ static int s_aws_profile_profile_adjacent_comment_test(struct aws_allocator *all
         aws_prepare_profile_test(allocator, s_profile_adjacent_comment_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 2);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 0);
-    EXPECT_PROFILE(profile_collection, "bar");
-    EXPECT_PROPERTY_COUNT(profile_collection, "bar", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 2);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 0);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "bar", 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -737,11 +714,12 @@ static int s_aws_profile_value_adjacent_comment_test(struct aws_allocator *alloc
         aws_prepare_profile_test(allocator, s_value_adjacent_comment_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 2);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value; Adjacent semicolons");
-    EXPECT_PROPERTY(profile_collection, "foo", "name2", "value# Adjacent pound signs");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value; Adjacent semicolons");
+    EXPECT_PROPERTY(
+        profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name2", "value# Adjacent pound signs");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -762,10 +740,10 @@ static int s_aws_profile_continued_property_value_test(struct aws_allocator *all
         aws_prepare_profile_test(allocator, s_continued_property_value_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value\n-continued");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value\n-continued");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -788,10 +766,11 @@ static int s_aws_profile_multiline_continued_property_value_test(struct aws_allo
         aws_prepare_profile_test(allocator, s_multiline_continued_property_value_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value\n-continued\n-and-continued");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(
+        profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value\n-continued\n-and-continued");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -816,10 +795,10 @@ static int s_aws_profile_continued_property_value_trim_test(struct aws_allocator
         aws_prepare_profile_test(allocator, s_continued_property_value_trim_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value\n-continued");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value\n-continued");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -842,10 +821,10 @@ static int s_aws_profile_continued_property_value_pound_comment_test(struct aws_
         aws_prepare_profile_test(allocator, s_continued_property_value_pound_comment_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value\n-continued # Comment");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value\n-continued # Comment");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -870,10 +849,10 @@ static int s_aws_profile_continued_property_value_semicolon_comment_test(struct 
         aws_prepare_profile_test(allocator, s_continued_property_value_semicolon_comment_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value\n-continued ; Comment");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value\n-continued ; Comment");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -885,12 +864,13 @@ AWS_TEST_CASE(
     s_aws_profile_continued_property_value_semicolon_comment_test);
 
 /*
- * duplicate profiles and sso-session merge properties
+ * duplicate profiles, sso-session, services merge properties
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_duplicate_profiles_merge_profile,
-    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n[sso-session foo]\nname3 = value-3\n[sso-session "
-    "foo]\nname3 = value3\nname4 = value4");
+    "[profile foo]\nname = value\n[profile foo]\nname2 = value2\n"
+    "[sso-session foo]\nname3 = value-3\n[sso-session foo]\nname3 = value3\nname4 = value4\n"
+    "[services test-service]\nname5 = value-5\n[services test-service]\nname5 = value5\nname6 = value6\n");
 
 static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
@@ -899,17 +879,23 @@ static int s_aws_profile_duplicate_profiles_merge_test(struct aws_allocator *all
         aws_prepare_profile_test(allocator, s_duplicate_profiles_merge_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 2);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
-    EXPECT_PROPERTY(profile_collection, "foo", "name2", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name2", "value2");
 
-    EXPECT_SSO_SESSION_COUNT(profile_collection, 1);
-    EXPECT_SSO_SESSION(profile_collection, "foo");
-    EXPECT_SSO_SESSION_PROPERTY_COUNT(profile_collection, "foo", 2);
-    EXPECT_SSO_SESSION_PROPERTY(profile_collection, "foo", "name3", "value3");
-    EXPECT_SSO_SESSION_PROPERTY(profile_collection, "foo", "name4", "value4");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "foo", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "foo", "name3", "value3");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SSO_SESSION, "foo", "name4", "value4");
+
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "name5", "value5");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_SERVICES, "test-service", "name6", "value6");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -932,10 +918,10 @@ static int s_aws_profile_duplicate_properties_last_property_value_test(struct aw
         aws_prepare_profile_test(allocator, s_duplicate_properties_last_property_value_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value2");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -960,10 +946,10 @@ static int s_aws_profile_duplicate_profiles_last_property_value_test(struct aws_
         aws_prepare_profile_test(allocator, s_duplicate_profiles_last_property_value_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value2");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -990,10 +976,10 @@ static int s_aws_profile_duplicate_default_profiles_property_resolution1_test(
         aws_prepare_profile_test(allocator, s_duplicate_default_profiles_property_resolution1_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "default");
-    EXPECT_PROPERTY_COUNT(profile_collection, "default", 1);
-    EXPECT_PROPERTY(profile_collection, "default", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1020,10 +1006,10 @@ static int s_aws_profile_duplicate_default_profiles_property_resolution2_test(
         aws_prepare_profile_test(allocator, s_duplicate_default_profiles_property_resolution2_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "default");
-    EXPECT_PROPERTY_COUNT(profile_collection, "default", 1);
-    EXPECT_PROPERTY(profile_collection, "default", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1047,7 +1033,7 @@ static int s_aws_profile_invalid_profile_names_merge_test(struct aws_allocator *
         allocator, s_invalid_profile_names_config_profile, s_invalid_profile_names_credentials_profile);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1068,9 +1054,9 @@ static int s_aws_profile_invalid_property_names_ignored_test(struct aws_allocato
         aws_prepare_profile_test(allocator, s_invalid_property_names_ignored_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1093,9 +1079,16 @@ static int s_aws_profile_all_valid_profile_characters_test(struct aws_allocator 
         aws_prepare_profile_test(allocator, s_all_valid_profile_characters_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
-    EXPECT_PROPERTY_COUNT(profile_collection, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(
+        profile_collection,
+        AWS_PROFILE_SECTION_TYPE_PROFILE,
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
+    EXPECT_PROPERTY_COUNT(
+        profile_collection,
+        AWS_PROFILE_SECTION_TYPE_PROFILE,
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
+        0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1118,11 +1111,15 @@ static int s_aws_profile_all_valid_property_characters_test(struct aws_allocator
         aws_prepare_profile_test(allocator, s_all_valid_property_characters_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
     EXPECT_PROPERTY(
-        profile_collection, "foo", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_", "value");
+        profile_collection,
+        AWS_PROFILE_SECTION_TYPE_PROFILE,
+        "foo",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
+        "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1143,12 +1140,12 @@ static int s_aws_profile_basic_sub_property_test(struct aws_allocator *allocator
         aws_prepare_profile_test(allocator, s_basic_sub_property_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "s3", "\nname = value");
-    EXPECT_SUB_PROPERTY_COUNT(profile_collection, "foo", "s3", 1);
-    EXPECT_SUB_PROPERTY(profile_collection, "foo", "s3", "name", "value");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "\nname = value");
+    EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", 1);
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "name", "value");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1170,12 +1167,12 @@ static int s_aws_profile_empty_sub_property_test(struct aws_allocator *allocator
         aws_prepare_profile_test(allocator, s_empty_sub_property_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "s3", "\nname =");
-    EXPECT_SUB_PROPERTY_COUNT(profile_collection, "foo", "s3", 1);
-    EXPECT_SUB_PROPERTY(profile_collection, "foo", "s3", "name", "");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "\nname =");
+    EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", 1);
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "name", "");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1197,11 +1194,11 @@ static int s_aws_profile_invalid_sub_property_name_test(struct aws_allocator *al
         aws_prepare_profile_test(allocator, s_invalid_sub_property_name_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "s3", "\nin valid = value");
-    EXPECT_SUB_PROPERTY_COUNT(profile_collection, "foo", "s3", 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "\nin valid = value");
+    EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1225,13 +1222,14 @@ static int s_aws_profile_sub_property_blank_line_test(struct aws_allocator *allo
         aws_prepare_profile_test(allocator, s_sub_property_blank_line_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "s3", "\nname = value\nname2 = value2");
-    EXPECT_SUB_PROPERTY_COUNT(profile_collection, "foo", "s3", 2);
-    EXPECT_SUB_PROPERTY(profile_collection, "foo", "s3", "name", "value");
-    EXPECT_SUB_PROPERTY(profile_collection, "foo", "s3", "name2", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(
+        profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "\nname = value\nname2 = value2");
+    EXPECT_SUB_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", 2);
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "name", "value");
+    EXPECT_SUB_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "s3", "name2", "value2");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1253,11 +1251,11 @@ static int s_aws_profile_basic_duplicate_merge_test(struct aws_allocator *alloca
         allocator, s_basic_duplicate_config_profile, s_basic_duplicate_credentials_profile);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 2);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value");
-    EXPECT_PROPERTY(profile_collection, "foo", "name2", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name2", "value2");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1281,11 +1279,11 @@ static int s_aws_profile_mixed_prefix_default_test(struct aws_allocator *allocat
         aws_prepare_profile_test(allocator, s_mixed_prefix_default_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "default");
-    EXPECT_PROPERTY_COUNT(profile_collection, "default", 2);
-    EXPECT_PROPERTY(profile_collection, "default", "name", "value");
-    EXPECT_PROPERTY(profile_collection, "default", "name3", "value3");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default", 2);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default", "name", "value");
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "default", "name3", "value3");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1308,10 +1306,10 @@ static int s_aws_profile_override_duplicate_merge_test(struct aws_allocator *all
         allocator, s_override_duplicate_config_profile, s_override_duplicate_credentials_profile);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 1);
-    EXPECT_PROFILE(profile_collection, "foo");
-    EXPECT_PROPERTY_COUNT(profile_collection, "foo", 1);
-    EXPECT_PROPERTY(profile_collection, "foo", "name", "value2");
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 1);
+    EXPECT_SECTION(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo");
+    EXPECT_PROPERTY_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", 1);
+    EXPECT_PROPERTY(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, "foo", "name", "value2");
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1333,7 +1331,7 @@ static int s_aws_profile_no_prefix_nondefault_test(struct aws_allocator *allocat
         aws_prepare_profile_test(allocator, s_no_prefix_nondefault_profile, AWS_PST_CONFIG);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
 
     aws_profile_collection_destroy(profile_collection);
 
@@ -1355,7 +1353,7 @@ static int s_aws_profile_prefix_credentials_test(struct aws_allocator *allocator
         aws_prepare_profile_test(allocator, s_prefix_credentials_profile, AWS_PST_CREDENTIALS);
 
     ASSERT_TRUE(profile_collection != NULL);
-    EXPECT_PROFILE_COUNT(profile_collection, 0);
+    EXPECT_SECTION_COUNT(profile_collection, AWS_PROFILE_SECTION_TYPE_PROFILE, 0);
 
     aws_profile_collection_destroy(profile_collection);
 
