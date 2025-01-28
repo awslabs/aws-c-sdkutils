@@ -1,35 +1,20 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0.
 
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.9...3.31)
 project(aws-c-sdkutils LANGUAGES C VERSION 0.1.0)
 
-if (DEFINED CMAKE_PREFIX_PATH)
-    file(TO_CMAKE_PATH "${CMAKE_PREFIX_PATH}" CMAKE_PREFIX_PATH)
+if (NOT IN_SOURCE_BUILD)
+    # this is required so we can use aws-c-common's CMake modules
+    find_package(aws-c-common REQUIRED)
 endif()
-
-if (DEFINED CMAKE_INSTALL_PREFIX)
-    file(TO_CMAKE_PATH "${CMAKE_INSTALL_PREFIX}" CMAKE_INSTALL_PREFIX)
-endif()
-
-if (UNIX AND NOT APPLE)
-    include(GNUInstallDirs)
-elseif(NOT DEFINED CMAKE_INSTALL_LIBDIR)
-    set(CMAKE_INSTALL_LIBDIR "lib")
-endif()
-
-# This is required in order to append /lib/cmake to each element in CMAKE_PREFIX_PATH
-set(AWS_MODULE_DIR "/${CMAKE_INSTALL_LIBDIR}/cmake")
-string(REPLACE ";" "${AWS_MODULE_DIR};" AWS_MODULE_PATH "${CMAKE_PREFIX_PATH}${AWS_MODULE_DIR}")
-# Append that generated list to the module search path
-list(APPEND CMAKE_MODULE_PATH ${AWS_MODULE_PATH})
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
 
 include(AwsCFlags)
 include(AwsCheckHeaders)
 include(AwsSharedLibSetup)
 include(AwsSanitizers)
 include(AwsFindPackage)
+include(GNUInstallDirs)
 
 file(GLOB AWS_SDKUTILS_HEADERS
         "include/aws/sdkutils/*.h"
@@ -84,7 +69,7 @@ configure_file("cmake/${PROJECT_NAME}-config.cmake"
   @ONLY)
 
 aws_check_headers(${PROJECT_NAME} ${AWS_SDKUTILS_HEADERS})
-install(FILES ${AWS_SDKUTILS_HEADERS} DESTINATION "include/aws/sdkutils" COMPONENT Development)
+install(FILES ${AWS_SDKUTILS_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/aws/sdkutils" COMPONENT Development)
 
 if (BUILD_SHARED_LIBS)
    set (TARGET_DIR "shared")
@@ -93,16 +78,16 @@ else()
 endif()
 
 install(EXPORT "${PROJECT_NAME}-targets"
-    DESTINATION "${LIBRARY_DIRECTORY}/${PROJECT_NAME}/cmake/${TARGET_DIR}/"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}/${TARGET_DIR}/"
     NAMESPACE AWS::
     COMPONENT Development)
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
-    DESTINATION "${LIBRARY_DIRECTORY}/${PROJECT_NAME}/cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
     COMPONENT Development)
 
 install(FILES ${EXPORT_MODULES}
-        DESTINATION "${LIBRARY_DIRECTORY}/${PROJECT_NAME}/cmake/modules"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}/modules"
         COMPONENT Development)
 
 if (NOT CMAKE_CROSSCOMPILING)
