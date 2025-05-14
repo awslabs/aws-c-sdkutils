@@ -183,7 +183,7 @@ static int s_on_partition_element(
 
     if (aws_hash_table_put(&partitions->base_partitions, &partition_info->name, partition_info, NULL)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to add partition info.");
-        goto on_error;
+        goto on_partitions_new_error;
     }
 
     struct partition_parse_wrapper wrapper = {
