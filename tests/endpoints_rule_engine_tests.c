@@ -503,14 +503,15 @@ static int s_test_endpoints_string_array(struct aws_allocator *allocator, void *
     return AWS_OP_SUCCESS;
 }
 
-AWS_TEST_CASE(test_endpoints_malformed, s_test_endpoints_malformed)
-static int s_test_endpoints_malformed(struct aws_allocator *allocator, void *ctx) {
+AWS_TEST_CASE(test_endpoints_malformed_no_required_default, s_test_endpoints_malformed_no_required_default)
+static int s_test_endpoints_malformed_no_required_default(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     aws_sdkutils_library_init(allocator);
 
     struct aws_byte_buf buf;
-    ASSERT_SUCCESS(read_file_contents(&buf, allocator, aws_byte_cursor_from_c_str("malformed-rules/missing_params.json")));
+    ASSERT_SUCCESS(
+        read_file_contents(&buf, allocator, aws_byte_cursor_from_c_str("malformed-rules/no_default_on_required.json")));
     struct aws_byte_cursor ruleset_json = aws_byte_cursor_from_buf(&buf);
 
     struct aws_endpoints_ruleset *ruleset = aws_endpoints_ruleset_new_from_string(allocator, ruleset_json);
@@ -529,9 +530,35 @@ static int s_test_endpoints_malformed(struct aws_allocator *allocator, void *ctx
     ASSERT_NOT_NULL(context);
     struct aws_endpoints_resolved_endpoint *resolved = NULL;
     ASSERT_ERROR(
-        AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED, 
+        AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED,
         aws_endpoints_rule_engine_resolve(engine, context, &resolved));
 
+    aws_endpoints_ruleset_release(ruleset);
+    aws_partitions_config_release(partitions);
+    aws_endpoints_rule_engine_release(engine);
+    aws_endpoints_request_context_release(context);
+    aws_byte_buf_clean_up(&buf);
+    aws_byte_buf_clean_up(&partitions_buf);
+    aws_sdkutils_library_clean_up();
+
+    return AWS_OP_SUCCESS;
+}
+
+AWS_TEST_CASE(test_endpoints_malformed_regex, s_test_endpoints_malformed_regex)
+static int s_test_endpoints_malformed_regex(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    aws_sdkutils_library_init(allocator);
+
+    struct aws_byte_buf partitions_buf;
+    ASSERT_SUCCESS(
+        read_file_contents(&partitions_buf, allocator, aws_byte_cursor_from_c_str("sample_partitions_bad_regex.json")));
+    struct aws_byte_cursor partitions_json = aws_byte_cursor_from_buf(&partitions_buf);
+    struct aws_partitions_config *partitions = aws_partitions_config_new_from_string(allocator, partitions_json);
+    ASSERT_NULL(partitions);
+    ASSERT_INT_EQUALS(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED, aws_last_error());
+
+    aws_byte_buf_clean_up(&partitions_buf);
     aws_sdkutils_library_clean_up();
 
     return AWS_OP_SUCCESS;

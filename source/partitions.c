@@ -173,6 +173,9 @@ static int s_on_partition_element(
         }
 
         partition_info->region_regex = aws_endpoints_regex_new(partitions->allocator, regex_cur);
+        if (partition_info->region_regex == NULL) {
+            goto on_error;
+        }
     }
 
     if (partition_info->info == NULL) {

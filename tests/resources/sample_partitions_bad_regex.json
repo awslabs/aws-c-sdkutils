@@ -3,7 +3,7 @@
     "partitions": [
       {
         "id": "aws",
-        "regionRegex": "^(us|eu|ap|sa|ca|me|af|il)\\-\\w+\\-\\d+$",
+        "regionRegex": "^(us|eu|ap|sa|ca|me|af)-\\w+-\\d+$",
         "regions": {
           "af-south-1": {
             "supportsFIPS": false 
