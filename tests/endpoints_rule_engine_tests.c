@@ -504,7 +504,7 @@ static int s_test_endpoints_string_array(struct aws_allocator *allocator, void *
 }
 
 AWS_TEST_CASE(test_endpoints_malformed, s_test_endpoints_malformed)
-static int s_test_endpoints_string_array(struct aws_allocator *allocator, void *ctx) {
+static int s_test_endpoints_malformed(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
     struct aws_allocator *allocator = aws_default_allocator();
