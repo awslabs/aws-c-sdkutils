@@ -203,7 +203,6 @@ static int s_on_partition_element(
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_partition_info_destroy(partition_info);
     return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
 }
 
