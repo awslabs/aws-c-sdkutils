@@ -502,3 +502,36 @@ static int s_test_endpoints_string_array(struct aws_allocator *allocator, void *
 
     return AWS_OP_SUCCESS;
 }
+
+AWS_TEST_CASE(test_endpoints_malformed, s_test_endpoints_malformed)
+static int s_test_endpoints_string_array(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    struct aws_allocator *allocator = aws_default_allocator();
+    aws_sdkutils_library_init(allocator);
+
+    struct aws_byte_buf buf;
+    ASSERT_SUCCESS(read_file_contents(&buf, allocator, aws_byte_cursor_from_c_str("malformed-rules/missing_params.json")));
+    struct aws_byte_cursor ruleset_json = aws_byte_cursor_from_buf(&buf);
+
+    struct aws_endpoints_ruleset *ruleset = aws_endpoints_ruleset_new_from_string(allocator, ruleset_json);
+    ASSERT_NOT_NULL(ruleset);
+
+    struct aws_byte_buf partitions_buf;
+    ASSERT_SUCCESS(
+        read_file_contents(&partitions_buf, allocator, aws_byte_cursor_from_c_str("sample_partitions.json")));
+    struct aws_byte_cursor partitions_json = aws_byte_cursor_from_buf(&partitions_buf);
+    struct aws_partitions_config *partitions = aws_partitions_config_new_from_string(allocator, partitions_json);
+    ASSERT_NOT_NULL(partitions);
+
+    struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset, partitions);
+    ASSERT_NOT_NULL(engine);
+    struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
+    ASSERT_NOT_NULL(context);
+    struct aws_endpoints_resolved_endpoint *resolved = NULL;
+    ASSERT_ERROR(
+        AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED, 
+        aws_endpoints_rule_engine_resolve(engine, context, &resolved));
+
+    return AWS_OP_SUCCESS;
+}
