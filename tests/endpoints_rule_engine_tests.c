@@ -507,7 +507,6 @@ AWS_TEST_CASE(test_endpoints_malformed, s_test_endpoints_malformed)
 static int s_test_endpoints_malformed(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
-    struct aws_allocator *allocator = aws_default_allocator();
     aws_sdkutils_library_init(allocator);
 
     struct aws_byte_buf buf;
@@ -532,6 +531,8 @@ static int s_test_endpoints_malformed(struct aws_allocator *allocator, void *ctx
     ASSERT_ERROR(
         AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED, 
         aws_endpoints_rule_engine_resolve(engine, context, &resolved));
+
+    aws_sdkutils_library_clean_up();
 
     return AWS_OP_SUCCESS;
 }
