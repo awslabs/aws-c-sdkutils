@@ -201,7 +201,6 @@ static int s_init_top_level_scope(
                 aws_endpoints_scope_value_destroy(val);
                 goto on_error;
             }
-            val = NULL;
         }
     }
 
