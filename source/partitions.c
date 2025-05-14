@@ -129,9 +129,7 @@ static int s_on_region_element(
     return AWS_OP_SUCCESS;
 
 on_error:
-    if (partition_info != NULL) {
-        aws_partition_info_destroy(partition_info);
-    }
+    aws_partition_info_destroy(partition_info);
     return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
 }
 
@@ -143,6 +141,7 @@ static int s_on_partition_element(
     (void)out_should_continue;
     (void)idx;
 
+    struct aws_partition_info *partition_info = NULL;
     struct aws_partitions_config *partitions = user_data;
 
     struct aws_byte_cursor id_cur;
@@ -162,7 +161,7 @@ static int s_on_partition_element(
     struct aws_json_value *regex_node =
         aws_json_value_get_from_object(partition_node, aws_byte_cursor_from_c_str("regionRegex"));
 
-    struct aws_partition_info *partition_info = aws_partition_info_new(partitions->allocator, id_cur);
+    partition_info = aws_partition_info_new(partitions->allocator, id_cur);
     partition_info->info = aws_string_new_from_json(partitions->allocator, outputs_node);
 
     if (regex_node != NULL) {
@@ -204,6 +203,7 @@ static int s_on_partition_element(
     return AWS_OP_SUCCESS;
 
 on_error:
+    aws_partition_info_destroy(partition_info);
     return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
 }
 
