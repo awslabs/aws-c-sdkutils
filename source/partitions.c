@@ -129,9 +129,7 @@ static int s_on_region_element(
     return AWS_OP_SUCCESS;
 
 on_error:
-    if (partition_info != NULL) {
-        aws_partition_info_destroy(partition_info);
-    }
+    aws_partition_info_destroy(partition_info);
     return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
 }
 
@@ -169,20 +167,23 @@ static int s_on_partition_element(
         struct aws_byte_cursor regex_cur = {0};
         if (aws_json_value_get_string(regex_node, &regex_cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to parse region regex.");
-            goto on_error;
+            goto on_partitions_new_error;
         }
 
         partition_info->region_regex = aws_endpoints_regex_new(partitions->allocator, regex_cur);
+        if (partition_info->region_regex == NULL) {
+            goto on_partitions_new_error;
+        }
     }
 
     if (partition_info->info == NULL) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to parse partition info.");
-        goto on_error;
+        goto on_partitions_new_error;
     }
 
     if (aws_hash_table_put(&partitions->base_partitions, &partition_info->name, partition_info, NULL)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "Failed to add partition info.");
-        goto on_error;
+        goto on_partitions_new_error;
     }
 
     struct partition_parse_wrapper wrapper = {
@@ -200,6 +201,8 @@ static int s_on_partition_element(
 
     return AWS_OP_SUCCESS;
 
+on_partitions_new_error:
+    aws_partition_info_destroy(partition_info);
 on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_PARTITIONS_PARSE_FAILED);
 }

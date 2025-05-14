@@ -132,7 +132,6 @@ static int s_init_top_level_scope(
     AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(scope);
 
-    struct aws_endpoints_scope_value *val = NULL;
     scope->rule_idx = 0;
     scope->rules = &ruleset->rules;
     scope->partitions = partitions;
@@ -181,7 +180,7 @@ static int s_init_top_level_scope(
                 goto on_error;
             }
 
-            val = aws_endpoints_scope_value_new(allocator, key);
+            struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, key);
             AWS_ASSERT(val);
 
             switch (value->type) {
@@ -193,11 +192,13 @@ static int s_init_top_level_scope(
                     break;
                 default:
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected parameter type.");
+                    aws_endpoints_scope_value_destroy(val);
                     goto on_error;
             }
 
             if (aws_hash_table_put(&scope->values, &val->name.cur, val, NULL)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to add value to top level scope.");
+                aws_endpoints_scope_value_destroy(val);
                 goto on_error;
             }
         }
@@ -206,7 +207,6 @@ static int s_init_top_level_scope(
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_endpoints_scope_value_destroy(val);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
 }
 

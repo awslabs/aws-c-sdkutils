@@ -30,6 +30,12 @@ AWS_EXTERN_C_BEGIN
 
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_get_supported_ruleset_version(void);
 
+/**
+ * Warning: The following helpers are intended for use by SDKs that validate correctness of the ruleset at compile time.
+ * The engine sanity checks the provided ruleset, but does not do extensive checking.
+ * Some malformed rulesets might fail in unexpected ways.
+ */
+
 /*
 ******************************
 * Parameter
