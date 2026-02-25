@@ -46,6 +46,14 @@ static void s_on_expr_array_element_clean_up(void *element) {
     aws_endpoints_expr_clean_up(expr);
 }
 
+static void s_on_kv_pair_array_element_clean_up(void *element) {
+    struct aws_endpoints_kv_pair *pair = element;
+    if (pair->value) {
+        aws_endpoints_expr_clean_up(pair->value);
+        aws_mem_release(pair->allocator, pair->value);
+    }
+}
+
 struct aws_partition_info *aws_partition_info_new(struct aws_allocator *allocator, struct aws_byte_cursor name) {
     AWS_PRECONDITION(allocator);
     struct aws_partition_info *partition_info = aws_mem_calloc(allocator, 1, sizeof(struct aws_partition_info));
@@ -170,6 +178,9 @@ void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr) {
             break;
         case AWS_ENDPOINTS_EXPR_ARRAY:
             aws_array_list_deep_clean_up(&expr->e.array, s_on_expr_array_element_clean_up);
+            break;
+        case AWS_ENDPOINTS_EXPR_OBJECT:
+            aws_array_list_deep_clean_up(&expr->e.object, s_on_kv_pair_array_element_clean_up);
             break;
         default:
             AWS_FATAL_ASSERT(false);
