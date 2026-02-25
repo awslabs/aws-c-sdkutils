@@ -51,7 +51,8 @@ enum aws_endpoints_expr_type {
     AWS_ENDPOINTS_EXPR_BOOLEAN,
     AWS_ENDPOINTS_EXPR_ARRAY,
     AWS_ENDPOINTS_EXPR_REFERENCE,
-    AWS_ENDPOINTS_EXPR_FUNCTION
+    AWS_ENDPOINTS_EXPR_FUNCTION,
+    AWS_ENDPOINTS_EXPR_OBJECT
 };
 
 enum aws_endpoints_fn_type {
@@ -139,6 +140,14 @@ struct aws_endpoints_function {
     struct aws_array_list argv;
 };
 
+struct aws_endpoints_expr; /* Forward declaration */
+
+struct aws_endpoints_kv_pair {
+    struct aws_allocator *allocator;
+    struct aws_byte_cursor key;
+    struct aws_endpoints_expr *value;
+};
+
 struct aws_endpoints_expr {
     enum aws_endpoints_expr_type type;
     union {
@@ -148,6 +157,7 @@ struct aws_endpoints_expr {
         struct aws_array_list array; /* List of (aws_endpoints_expr) */
         struct aws_byte_cursor reference;
         struct aws_endpoints_function function;
+        struct aws_array_list object; /* List of (aws_endpoints_kv_pair) */
     } e;
 };
 
@@ -327,5 +337,52 @@ int aws_endpoints_path_through_object(
     struct aws_endpoints_value *eval_val,
     struct aws_byte_cursor path_cur,
     struct aws_endpoints_value *out_value);
+
+/*
+******************************
+* BDD types.
+******************************
+*/
+
+struct aws_endpoints_bdd_node {
+    int32_t condition_index;
+    int32_t high_ref;
+    int32_t low_ref;
+};
+
+struct aws_endpoints_bdd_result {
+    enum aws_endpoints_resolved_endpoint_type type;
+    union {
+        struct {
+            struct aws_byte_cursor url;
+            struct aws_byte_buf properties;
+        } endpoint;
+        struct {
+            struct aws_byte_cursor error;
+        } error;
+    } data;
+};
+
+struct aws_endpoints_bdd_engine {
+    struct aws_allocator *allocator;
+    struct aws_ref_count ref_count;
+
+    struct aws_partitions_config *partitions_config;
+
+    struct aws_byte_cursor version;
+
+    uint16_t string_count;
+    struct aws_string **strings;
+
+    struct aws_hash_table parameters;
+
+    struct aws_array_list conditions;
+
+    struct aws_array_list results;
+
+    int32_t root_ref;
+    uint32_t node_count;
+    struct aws_endpoints_bdd_node *nodes;
+};
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H */
