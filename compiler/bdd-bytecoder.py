@@ -69,7 +69,8 @@ def _collect_value_strings(val, strings):
     if isinstance(val, str):
         strings.add(val)
     elif isinstance(val, dict):
-        for v in val.values():
+        for k, v in val.items():
+            strings.add(k)
             _collect_value_strings(v, strings)
     elif isinstance(val, list):
         for v in val:
@@ -85,11 +86,6 @@ def encode_parameters(buf, data, strings):
         opcode = 0x01 if ptype == "string" else 0x02
         buf += struct.pack("<B", opcode)
         write_string_ref(buf, *strings.add(name))
-        buf += struct.pack("<B", 1 if p.get("required") else 0)
-        built_in = p.get("builtIn")
-        buf += struct.pack("<B", 1 if built_in else 0)
-        if built_in:
-            write_string_ref(buf, *strings.add(built_in))
         dv = p.get("default")
         has_default = dv is not None
         buf += struct.pack("<B", 1 if has_default else 0)
@@ -98,6 +94,11 @@ def encode_parameters(buf, data, strings):
                 write_string_ref(buf, *strings.add(dv))
             else:
                 buf += struct.pack("<B", 1 if dv else 0)
+        buf += struct.pack("<B", 1 if p.get("required") else 0)
+        built_in = p.get("builtIn")
+        buf += struct.pack("<B", 1 if built_in else 0)
+        if built_in:
+            write_string_ref(buf, *strings.add(built_in))
 
 
 def encode_value(buf, val, strings):
@@ -248,16 +249,16 @@ def verify(bin_path):
         for _ in range(param_count):
             opcode = read("<B")
             track_ref()  # name
-            pos += 1  # required
-            has_bi = read("<B")
-            if has_bi:
-                track_ref()  # built_in ref
             has_def = read("<B")
             if has_def:
                 if opcode == 0x01:
                     track_ref()
                 else:
                     pos += 1
+            pos += 1  # required
+            has_bi = read("<B")
+            if has_bi:
+                track_ref()  # built_in ref
 
         # Conditions
         cond_count = read("<H")

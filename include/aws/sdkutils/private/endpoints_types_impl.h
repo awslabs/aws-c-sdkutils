@@ -371,8 +371,7 @@ struct aws_endpoints_bdd_engine {
 
     struct aws_byte_cursor version;
 
-    uint16_t string_count;
-    struct aws_string **strings;
+    struct aws_byte_cursor string_blob;
 
     struct aws_hash_table parameters;
 
