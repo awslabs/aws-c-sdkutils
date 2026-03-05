@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0.
  */
 
-#include <aws/sdkutils/endpoints_bdd_engine.h>
-#include <aws/sdkutils/private/endpoints_types_impl.h>
-#include <aws/sdkutils/private/endpoints_util.h>
-#include <aws/sdkutils/partitions.h>
 #include <aws/common/byte_buf.h>
 #include <aws/common/encoding.h>
 #include <aws/common/hash_table.h>
+#include <aws/sdkutils/endpoints_bdd_engine.h>
+#include <aws/sdkutils/partitions.h>
+#include <aws/sdkutils/private/endpoints_types_impl.h>
+#include <aws/sdkutils/private/endpoints_util.h>
 
 #define BDD_MAGIC_NUMBER 0x45504452 /* "EPDR" */
 
@@ -47,8 +47,8 @@ static int s_read_u32(struct aws_byte_cursor *cursor, uint32_t *out) {
     if (cursor->len < 4) {
         return AWS_OP_ERR;
     }
-    *out = (uint32_t)cursor->ptr[0] | ((uint32_t)cursor->ptr[1] << 8) |
-           ((uint32_t)cursor->ptr[2] << 16) | ((uint32_t)cursor->ptr[3] << 24);
+    *out = (uint32_t)cursor->ptr[0] | ((uint32_t)cursor->ptr[1] << 8) | ((uint32_t)cursor->ptr[2] << 16) |
+           ((uint32_t)cursor->ptr[3] << 24);
     aws_byte_cursor_advance(cursor, 4);
     return AWS_OP_SUCCESS;
 }
@@ -302,7 +302,7 @@ static int s_decode_value(
 
             out_expr->type = AWS_ENDPOINTS_EXPR_FUNCTION;
             out_expr->e.function.fn = AWS_ENDPOINTS_FN_LAST;
-            
+
             /* Resolve function name to enum */
             struct aws_byte_cursor fn_name = aws_byte_cursor_from_string(strings[fn_idx]);
             uint64_t hash = aws_hash_byte_cursor_ptr(&fn_name);
@@ -315,7 +315,8 @@ static int s_decode_value(
 
             /* Note: fn may remain AWS_ENDPOINTS_FN_LAST for new BDD functions (ite, coalesce, split) */
 
-            if (aws_array_list_init_dynamic(&out_expr->e.function.argv, allocator, argc, sizeof(struct aws_endpoints_expr))) {
+            if (aws_array_list_init_dynamic(
+                    &out_expr->e.function.argv, allocator, argc, sizeof(struct aws_endpoints_expr))) {
                 return AWS_OP_ERR;
             }
 
@@ -367,7 +368,8 @@ static int s_decode_value(
             }
 
             out_expr->type = AWS_ENDPOINTS_EXPR_OBJECT;
-            if (aws_array_list_init_dynamic(&out_expr->e.object, allocator, length, sizeof(struct aws_endpoints_kv_pair))) {
+            if (aws_array_list_init_dynamic(
+                    &out_expr->e.object, allocator, length, sizeof(struct aws_endpoints_kv_pair))) {
                 return AWS_OP_ERR;
             }
 
@@ -386,14 +388,14 @@ static int s_decode_value(
                     aws_array_list_deep_clean_up(&out_expr->e.object, s_on_kv_pair_array_element_clean_up);
                     return AWS_OP_ERR;
                 }
-                
+
                 if (s_decode_value(allocator, cursor, strings, string_count, pair.value)) {
                     aws_endpoints_expr_clean_up(pair.value);
                     aws_mem_release(allocator, pair.value);
                     aws_array_list_deep_clean_up(&out_expr->e.object, s_on_kv_pair_array_element_clean_up);
                     return AWS_OP_ERR;
                 }
-                
+
                 if (aws_array_list_push_back(&out_expr->e.object, &pair)) {
                     aws_endpoints_expr_clean_up(pair.value);
                     aws_mem_release(allocator, pair.value);
@@ -456,7 +458,7 @@ static int s_load_conditions(
         /* Construct FUNCTION expression from fn_idx and argc */
         cond.expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
         cond.expr.e.function.fn = AWS_ENDPOINTS_FN_LAST;
-        
+
         /* Resolve function name to enum */
         struct aws_byte_cursor fn_name = aws_byte_cursor_from_string(strings[fn_idx]);
         uint64_t hash = aws_hash_byte_cursor_ptr(&fn_name);
@@ -469,7 +471,8 @@ static int s_load_conditions(
 
         /* Note: fn may remain AWS_ENDPOINTS_FN_LAST for new BDD functions (ite, coalesce, split) */
 
-        if (aws_array_list_init_dynamic(&cond.expr.e.function.argv, allocator, argc, sizeof(struct aws_endpoints_expr))) {
+        if (aws_array_list_init_dynamic(
+                &cond.expr.e.function.argv, allocator, argc, sizeof(struct aws_endpoints_expr))) {
             goto error;
         }
 
@@ -554,8 +557,8 @@ static int s_serialize_value_to_json(struct aws_byte_buf *buf, const struct aws_
         case AWS_ENDPOINTS_EXPR_STRING:
             return s_append_json_escaped_string(buf, &value->e.string);
         case AWS_ENDPOINTS_EXPR_BOOLEAN: {
-            struct aws_byte_cursor bool_str = value->e.boolean ? 
-                aws_byte_cursor_from_c_str("true") : aws_byte_cursor_from_c_str("false");
+            struct aws_byte_cursor bool_str =
+                value->e.boolean ? aws_byte_cursor_from_c_str("true") : aws_byte_cursor_from_c_str("false");
             return aws_byte_buf_append_dynamic(buf, &bool_str);
         }
         case AWS_ENDPOINTS_EXPR_NUMBER: {
@@ -677,10 +680,12 @@ static int s_load_results(
 
             uint16_t property_count;
             if (s_read_u16(cursor, &property_count)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to read property count for result %d", (int)i);
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to read property count for result %d", (int)i);
                 goto error;
             }
-            AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Result %d has %d properties", (int)i, (int)property_count);
+            AWS_LOGF_DEBUG(
+                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Result %d has %d properties", (int)i, (int)property_count);
 
             if (aws_byte_buf_init(&result.data.endpoint.properties, allocator, 256)) {
                 goto error;
@@ -696,7 +701,11 @@ static int s_load_results(
             for (uint16_t j = 0; j < property_count; ++j) {
                 uint16_t key_idx;
                 if (s_read_u16(cursor, &key_idx) || key_idx >= string_count) {
-                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to read key index for property %d of result %d", (int)j, (int)i);
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                        "Failed to read key index for property %d of result %d",
+                        (int)j,
+                        (int)i);
                     aws_byte_buf_clean_up(&result.data.endpoint.properties);
                     goto error;
                 }
@@ -704,7 +713,11 @@ static int s_load_results(
                 /* Decode value */
                 struct aws_endpoints_expr value_expr;
                 if (s_decode_value(allocator, cursor, strings, string_count, &value_expr)) {
-                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to decode value for property %d of result %d", (int)j, (int)i);
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                        "Failed to decode value for property %d of result %d",
+                        (int)j,
+                        (int)i);
                     aws_byte_buf_clean_up(&result.data.endpoint.properties);
                     goto error;
                 }
@@ -839,7 +852,8 @@ static int s_load_nodes(
     }
 
     /* Allocate node array */
-    struct aws_endpoints_bdd_node *nodes = aws_mem_calloc(allocator, *out_node_count, sizeof(struct aws_endpoints_bdd_node));
+    struct aws_endpoints_bdd_node *nodes =
+        aws_mem_calloc(allocator, *out_node_count, sizeof(struct aws_endpoints_bdd_node));
     if (!nodes) {
         aws_byte_buf_clean_up(&decoded_buf);
         return AWS_OP_ERR;
@@ -914,21 +928,26 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load parameters");
         goto error;
     }
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Loaded %d parameters", (int)aws_hash_table_get_entry_count(&engine->parameters));
+    AWS_LOGF_DEBUG(
+        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+        "Loaded %d parameters",
+        (int)aws_hash_table_get_entry_count(&engine->parameters));
 
     /* Load conditions */
     if (s_load_conditions(allocator, &bytecode, engine->strings, engine->string_count, &engine->conditions)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load conditions");
         goto error;
     }
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Loaded %d conditions", (int)aws_array_list_length(&engine->conditions));
+    AWS_LOGF_DEBUG(
+        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Loaded %d conditions", (int)aws_array_list_length(&engine->conditions));
 
     /* Load results */
     if (s_load_results(allocator, &bytecode, engine->strings, engine->string_count, &engine->results)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load results");
         goto error;
     }
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Loaded %d results", (int)aws_array_list_length(&engine->results));
+    AWS_LOGF_DEBUG(
+        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Loaded %d results", (int)aws_array_list_length(&engine->results));
 
     /* Load nodes */
     if (s_load_nodes(allocator, &bytecode, &engine->root_ref, &engine->node_count, &engine->nodes)) {
@@ -943,7 +962,6 @@ error:
     aws_endpoints_bdd_engine_destroy(engine);
     return NULL;
 }
-
 
 static void aws_endpoints_bdd_engine_destroy(struct aws_endpoints_bdd_engine *engine) {
     if (!engine) {
@@ -963,7 +981,7 @@ static void aws_endpoints_bdd_engine_destroy(struct aws_endpoints_bdd_engine *en
 
     aws_hash_table_clean_up(&engine->parameters);
     aws_array_list_deep_clean_up(&engine->conditions, s_on_condition_array_element_clean_up);
-    
+
     for (size_t i = 0; i < aws_array_list_length(&engine->results); ++i) {
         struct aws_endpoints_bdd_result *r = NULL;
         aws_array_list_get_at_ptr(&engine->results, (void **)&r, i);

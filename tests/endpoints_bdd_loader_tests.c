@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0.
  */
 
-#include <aws/sdkutils/endpoints_bdd_engine.h>
-#include <aws/sdkutils/private/endpoints_types_impl.h>
-#include <aws/sdkutils/partitions.h>
 #include <aws/common/byte_buf.h>
+#include <aws/sdkutils/endpoints_bdd_engine.h>
+#include <aws/sdkutils/partitions.h>
+#include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/testing/aws_test_harness.h>
 
 AWS_TEST_CASE(endpoints_bdd_loader_basic, s_test_bdd_loader_basic)
@@ -21,13 +21,12 @@ static int s_test_bdd_loader_basic(struct aws_allocator *allocator, void *ctx) {
     struct aws_byte_buf partitions_buf;
     ASSERT_SUCCESS(aws_byte_buf_init_from_file(&partitions_buf, allocator, "sample_partitions.json"));
     struct aws_byte_cursor partitions_json = aws_byte_cursor_from_buf(&partitions_buf);
-    
-    struct aws_partitions_config *partitions = aws_partitions_config_new_from_string(
-        allocator, partitions_json);
+
+    struct aws_partitions_config *partitions = aws_partitions_config_new_from_string(allocator, partitions_json);
     ASSERT_NOT_NULL(partitions);
 
-    struct aws_endpoints_bdd_engine *engine = aws_endpoints_bdd_engine_new_from_bytecode(
-        allocator, aws_byte_cursor_from_buf(&bytecode), partitions);
+    struct aws_endpoints_bdd_engine *engine =
+        aws_endpoints_bdd_engine_new_from_bytecode(allocator, aws_byte_cursor_from_buf(&bytecode), partitions);
     if (!engine) {
         int error = aws_last_error();
         printf("Engine creation failed with error: %d (%s)\n", error, aws_error_name(error));
@@ -63,8 +62,8 @@ static int s_test_bdd_compiler_loader_roundtrip(struct aws_allocator *allocator,
     struct aws_partitions_config *partitions = aws_partitions_config_new_from_string(allocator, partitions_json);
     ASSERT_NOT_NULL(partitions);
 
-    struct aws_endpoints_bdd_engine *engine = aws_endpoints_bdd_engine_new_from_bytecode(
-        allocator, aws_byte_cursor_from_buf(&bytecode), partitions);
+    struct aws_endpoints_bdd_engine *engine =
+        aws_endpoints_bdd_engine_new_from_bytecode(allocator, aws_byte_cursor_from_buf(&bytecode), partitions);
     ASSERT_NOT_NULL(engine);
 
     ASSERT_TRUE(aws_byte_cursor_eq_c_str(&engine->version, "1.1"));
