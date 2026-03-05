@@ -473,7 +473,7 @@ static int s_load_conditions(
             goto error;
         }
 
-        for (uint16_t i = 0; i < argc; ++i) {
+        for (uint16_t arg_i = 0; arg_i < argc; ++arg_i) {
             struct aws_endpoints_expr arg;
             if (s_decode_value(allocator, cursor, strings, string_count, &arg)) {
                 aws_array_list_deep_clean_up(&cond.expr.e.function.argv, s_on_expr_array_element_clean_up);
