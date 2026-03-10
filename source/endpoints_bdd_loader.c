@@ -73,9 +73,7 @@ static int s_validate_magic_number(struct aws_byte_cursor *cursor) {
     return AWS_OP_SUCCESS;
 }
 
-static int s_load_string_table(
-    struct aws_byte_cursor *cursor,
-    struct aws_byte_cursor *out_blob) {
+static int s_load_string_table(struct aws_byte_cursor *cursor, struct aws_byte_cursor *out_blob) {
 
     uint32_t blob_size;
     if (s_read_u32(cursor, &blob_size)) {
@@ -91,10 +89,7 @@ static int s_load_string_table(
     return AWS_OP_SUCCESS;
 }
 
-static int s_read_string_ref(
-    struct aws_byte_cursor *cursor,
-    struct aws_byte_cursor blob,
-    struct aws_byte_cursor *out) {
+static int s_read_string_ref(struct aws_byte_cursor *cursor, struct aws_byte_cursor blob, struct aws_byte_cursor *out) {
 
     uint16_t offset, length;
     if (s_read_u16(cursor, &offset) || s_read_u16(cursor, &length)) {

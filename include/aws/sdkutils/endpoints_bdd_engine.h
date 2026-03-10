@@ -19,10 +19,10 @@ struct aws_endpoints_resolved_endpoint;
 AWS_EXTERN_C_BEGIN
 
 /**
- * Create a v1.1 BDD engine from bytecode.
+ * Create a BDD engine from bytecode.
  *
  * @param allocator Memory allocator
- * @param bytecode Binary bytecode buffer
+ * @param bytecode Bytecode buffer
  * @param partitions_config Partition configuration (acquired by engine)
  * @return New BDD engine or NULL on error
  */

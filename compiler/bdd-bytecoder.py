@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""BDD bytecode compiler: JSON -> binary bytecode with concatenated string blob."""
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0.
+
+"""BDD bytecode compiler: JSON -> bytecode with concatenated string blob."""
 
 import json
 import struct
