@@ -355,7 +355,7 @@ struct aws_endpoints_bdd_result {
     union {
         struct {
             struct aws_byte_cursor url;
-            struct aws_byte_buf properties;
+            struct aws_array_list properties; /* List of (aws_endpoints_kv_pair) */
         } endpoint;
         struct {
             struct aws_byte_cursor error;

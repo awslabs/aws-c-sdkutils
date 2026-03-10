@@ -27,10 +27,6 @@ static int s_test_bdd_loader_basic(struct aws_allocator *allocator, void *ctx) {
 
     struct aws_endpoints_bdd_engine *engine =
         aws_endpoints_bdd_engine_new_from_bytecode(allocator, aws_byte_cursor_from_buf(&bytecode), partitions);
-    if (!engine) {
-        int error = aws_last_error();
-        printf("Engine creation failed with error: %d (%s)\n", error, aws_error_name(error));
-    }
     ASSERT_NOT_NULL(engine);
 
     ASSERT_TRUE(aws_byte_cursor_eq_c_str(&engine->version, "1.1"));

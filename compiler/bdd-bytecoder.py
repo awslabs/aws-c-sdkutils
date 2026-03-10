@@ -26,6 +26,8 @@ class StringBlob:
             offset = len(self._blob)
             if offset > 0xFFFF:
                 raise ValueError(f"String blob offset {offset} exceeds uint16 max")
+            if len(encoded) > 0xFFFF:
+                raise ValueError(f"String length {len(encoded)} exceeds uint16 max")
             self._blob.extend(encoded)
             self._index[s] = (offset, len(encoded))
         return self._index[s]
@@ -135,7 +137,7 @@ def encode_value(buf, val, strings):
             write_string_ref(buf, *strings.add(k))
             encode_value(buf, v, strings)
     else:
-        buf += struct.pack("<B", 0)
+        raise ValueError(f"Unsupported value type: {type(val)}")
 
 
 def encode_conditions(buf, data, strings):
@@ -181,6 +183,8 @@ def encode_nodes(buf, data):
     buf += struct.pack("<iI", root_ref, node_count)
     nodes_b64 = data.get("nodes", "")
     encoded = nodes_b64.encode("ascii")
+    if len(encoded) > 0xFFFF:
+        raise ValueError(f"Base64 nodes blob length {len(encoded)} exceeds uint16 max")
     buf += struct.pack("<H", len(encoded))
     buf += encoded
 
@@ -293,6 +297,9 @@ def verify(bin_path):
                 for _ in range(n):
                     track_ref()
                     skip_value()
+            else:
+                print(f"ERROR: unknown value tag {tag} at offset {pos}", file=sys.stderr)
+                sys.exit(1)
 
         for _ in range(cond_count):
             pos += 1  # opcode
@@ -320,6 +327,7 @@ def verify(bin_path):
         # Nodes
         root_ref, node_count = read("<iI")
         nodes_len = read("<H")
+        pos += nodes_len
 
     except struct.error:
         print(f"ERROR: file truncated at offset {pos}", file=sys.stderr)

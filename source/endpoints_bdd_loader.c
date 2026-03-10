@@ -14,7 +14,7 @@
 #define BDD_MAGIC_NUMBER 0x45504452 /* "EPDR" */
 
 /* Forward declaration */
-static void aws_endpoints_bdd_engine_destroy(struct aws_endpoints_bdd_engine *engine);
+static void s_endpoints_bdd_engine_destroy(void *data);
 
 static void s_on_expr_array_element_clean_up(void *element) {
     struct aws_endpoints_expr *expr = element;
@@ -36,7 +36,7 @@ static void s_on_condition_array_element_clean_up(void *element) {
 
 static int s_read_u16(struct aws_byte_cursor *cursor, uint16_t *out) {
     if (cursor->len < 2) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
     *out = (uint16_t)cursor->ptr[0] | ((uint16_t)cursor->ptr[1] << 8);
     aws_byte_cursor_advance(cursor, 2);
@@ -45,7 +45,7 @@ static int s_read_u16(struct aws_byte_cursor *cursor, uint16_t *out) {
 
 static int s_read_u32(struct aws_byte_cursor *cursor, uint32_t *out) {
     if (cursor->len < 4) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
     *out = (uint32_t)cursor->ptr[0] | ((uint32_t)cursor->ptr[1] << 8) | ((uint32_t)cursor->ptr[2] << 16) |
            ((uint32_t)cursor->ptr[3] << 24);
@@ -77,11 +77,11 @@ static int s_load_string_table(struct aws_byte_cursor *cursor, struct aws_byte_c
 
     uint32_t blob_size;
     if (s_read_u32(cursor, &blob_size)) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     if (cursor->len < blob_size) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     *out_blob = aws_byte_cursor_from_array(cursor->ptr, blob_size);
@@ -93,10 +93,10 @@ static int s_read_string_ref(struct aws_byte_cursor *cursor, struct aws_byte_cur
 
     uint16_t offset, length;
     if (s_read_u16(cursor, &offset) || s_read_u16(cursor, &length)) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
     if ((size_t)offset + length > blob.len) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
     *out = aws_byte_cursor_from_array(blob.ptr + offset, length);
     return AWS_OP_SUCCESS;
@@ -115,7 +115,7 @@ static int s_load_parameters(
 
     uint16_t count;
     if (s_read_u16(cursor, &count)) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     if (aws_hash_table_init(
@@ -216,15 +216,8 @@ static int s_load_parameters(
 
 error:
     aws_hash_table_clean_up(out_parameters);
-    return AWS_OP_ERR;
+    return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
-
-/* Forward declaration for recursive value decoding */
-static int s_decode_value(
-    struct aws_allocator *allocator,
-    struct aws_byte_cursor *cursor,
-    struct aws_byte_cursor blob,
-    struct aws_endpoints_expr *out_expr);
 
 static int s_decode_value(
     struct aws_allocator *allocator,
@@ -233,13 +226,11 @@ static int s_decode_value(
     struct aws_endpoints_expr *out_expr) {
 
     if (cursor->len < 1) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "No bytes left to read value tag");
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     uint8_t tag = cursor->ptr[0];
     aws_byte_cursor_advance(cursor, 1);
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Decoding value with tag: %d", (int)tag);
 
     switch (tag) {
         case 0: /* None - represented as empty string */
@@ -420,11 +411,11 @@ static int s_load_conditions(
 
     uint16_t count;
     if (s_read_u16(cursor, &count)) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     if (aws_array_list_init_dynamic(out_conditions, allocator, count, sizeof(struct aws_endpoints_condition))) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     for (uint16_t i = 0; i < count; ++i) {
@@ -511,104 +502,8 @@ static int s_load_conditions(
     return AWS_OP_SUCCESS;
 
 error:
-    for (size_t i = 0; i < aws_array_list_length(out_conditions); ++i) {
-        struct aws_endpoints_condition *c = NULL;
-        aws_array_list_get_at_ptr(out_conditions, (void **)&c, i);
-        if (c) {
-            aws_endpoints_expr_clean_up(&c->expr);
-        }
-    }
-    aws_array_list_clean_up(out_conditions);
-    return AWS_OP_ERR;
-}
-
-static int s_append_json_escaped_string(struct aws_byte_buf *buf, const struct aws_byte_cursor *str) {
-    if (aws_byte_buf_append_byte_dynamic(buf, '"')) {
-        return AWS_OP_ERR;
-    }
-    for (size_t i = 0; i < str->len; i++) {
-        uint8_t c = str->ptr[i];
-        if (c == '"' || c == '\\') {
-            if (aws_byte_buf_append_byte_dynamic(buf, '\\') || aws_byte_buf_append_byte_dynamic(buf, c)) {
-                return AWS_OP_ERR;
-            }
-        } else if (c < 0x20) {
-            char escape[7];
-            snprintf(escape, sizeof(escape), "\\u%04x", c);
-            struct aws_byte_cursor esc_cur = aws_byte_cursor_from_c_str(escape);
-            if (aws_byte_buf_append_dynamic(buf, &esc_cur)) {
-                return AWS_OP_ERR;
-            }
-        } else {
-            if (aws_byte_buf_append_byte_dynamic(buf, c)) {
-                return AWS_OP_ERR;
-            }
-        }
-    }
-    return aws_byte_buf_append_byte_dynamic(buf, '"');
-}
-
-static int s_serialize_value_to_json(struct aws_byte_buf *buf, const struct aws_endpoints_expr *value) {
-    switch (value->type) {
-        case AWS_ENDPOINTS_EXPR_STRING:
-            return s_append_json_escaped_string(buf, &value->e.string);
-        case AWS_ENDPOINTS_EXPR_BOOLEAN: {
-            struct aws_byte_cursor bool_str =
-                value->e.boolean ? aws_byte_cursor_from_c_str("true") : aws_byte_cursor_from_c_str("false");
-            return aws_byte_buf_append_dynamic(buf, &bool_str);
-        }
-        case AWS_ENDPOINTS_EXPR_NUMBER: {
-            char num_buf[32];
-            int written = snprintf(num_buf, sizeof(num_buf), "%g", value->e.number);
-            if (written < 0 || written >= sizeof(num_buf)) {
-                return AWS_OP_ERR;
-            }
-            struct aws_byte_cursor num_cursor = aws_byte_cursor_from_array(num_buf, written);
-            return aws_byte_buf_append_dynamic(buf, &num_cursor);
-        }
-        case AWS_ENDPOINTS_EXPR_ARRAY: {
-            if (aws_byte_buf_append_byte_dynamic(buf, '[')) {
-                return AWS_OP_ERR;
-            }
-            size_t len = aws_array_list_length(&value->e.array);
-            for (size_t i = 0; i < len; ++i) {
-                struct aws_endpoints_expr *elem = NULL;
-                aws_array_list_get_at_ptr(&value->e.array, (void **)&elem, i);
-                if (i > 0 && aws_byte_buf_append_byte_dynamic(buf, ',')) {
-                    return AWS_OP_ERR;
-                }
-                if (s_serialize_value_to_json(buf, elem)) {
-                    return AWS_OP_ERR;
-                }
-            }
-            return aws_byte_buf_append_byte_dynamic(buf, ']');
-        }
-        case AWS_ENDPOINTS_EXPR_OBJECT: {
-            if (aws_byte_buf_append_byte_dynamic(buf, '{')) {
-                return AWS_OP_ERR;
-            }
-            size_t len = aws_array_list_length(&value->e.object);
-            for (size_t i = 0; i < len; ++i) {
-                struct aws_endpoints_kv_pair *pair = NULL;
-                aws_array_list_get_at_ptr(&value->e.object, (void **)&pair, i);
-                if (i > 0 && aws_byte_buf_append_byte_dynamic(buf, ',')) {
-                    return AWS_OP_ERR;
-                }
-                if (s_append_json_escaped_string(buf, &pair->key)) {
-                    return AWS_OP_ERR;
-                }
-                if (aws_byte_buf_append_byte_dynamic(buf, ':')) {
-                    return AWS_OP_ERR;
-                }
-                if (s_serialize_value_to_json(buf, pair->value)) {
-                    return AWS_OP_ERR;
-                }
-            }
-            return aws_byte_buf_append_byte_dynamic(buf, '}');
-        }
-        default:
-            return AWS_OP_ERR;
-    }
+    aws_array_list_deep_clean_up(out_conditions, s_on_condition_array_element_clean_up);
+    return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
 static int s_load_results(
@@ -619,16 +514,15 @@ static int s_load_results(
 
     uint16_t count;
     if (s_read_u16(cursor, &count)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to read result count");
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
-    AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Loading %d results", (int)count);
 
     if (aws_array_list_init_dynamic(out_results, allocator, count + 1, sizeof(struct aws_endpoints_bdd_result))) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
-    /* Insert NoMatchRule as results[0] */
+    /* Insert NoMatchRule as results[0]. This is a synthetic entry with a static
+     * string literal lifetime, unlike other results that reference the string blob. */
     struct aws_endpoints_bdd_result no_match;
     AWS_ZERO_STRUCT(no_match);
     no_match.type = AWS_ENDPOINTS_RESOLVED_ERROR;
@@ -645,7 +539,6 @@ static int s_load_results(
         }
         opcode = cursor->ptr[0];
         aws_byte_cursor_advance(cursor, 1);
-        AWS_LOGF_DEBUG(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Result %d opcode: 0x%02x", (int)i, opcode);
 
         struct aws_endpoints_bdd_result result;
         AWS_ZERO_STRUCT(result);
@@ -662,85 +555,41 @@ static int s_load_results(
 
             uint16_t property_count;
             if (s_read_u16(cursor, &property_count)) {
-                AWS_LOGF_ERROR(
-                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to read property count for result %d", (int)i);
-                goto error;
-            }
-            AWS_LOGF_DEBUG(
-                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Result %d has %d properties", (int)i, (int)property_count);
-
-            if (aws_byte_buf_init(&result.data.endpoint.properties, allocator, 256)) {
                 goto error;
             }
 
-            /* Encode properties as JSON object */
-            struct aws_byte_cursor open_brace = aws_byte_cursor_from_c_str("{");
-            if (aws_byte_buf_append_dynamic(&result.data.endpoint.properties, &open_brace)) {
-                aws_byte_buf_clean_up(&result.data.endpoint.properties);
+            if (aws_array_list_init_dynamic(
+                    &result.data.endpoint.properties, allocator, property_count, sizeof(struct aws_endpoints_kv_pair))) {
                 goto error;
             }
 
             for (uint16_t j = 0; j < property_count; ++j) {
-                struct aws_byte_cursor key_cur;
-                if (s_read_string_ref(cursor, blob, &key_cur)) {
-                    AWS_LOGF_ERROR(
-                        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-                        "Failed to read key for property %d of result %d",
-                        (int)j,
-                        (int)i);
-                    aws_byte_buf_clean_up(&result.data.endpoint.properties);
+                struct aws_endpoints_kv_pair pair;
+                pair.allocator = allocator;
+
+                if (s_read_string_ref(cursor, blob, &pair.key)) {
+                    aws_array_list_deep_clean_up(&result.data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
                     goto error;
                 }
 
-                /* Decode value */
-                struct aws_endpoints_expr value_expr;
-                if (s_decode_value(allocator, cursor, blob, &value_expr)) {
-                    AWS_LOGF_ERROR(
-                        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-                        "Failed to decode value for property %d of result %d",
-                        (int)j,
-                        (int)i);
-                    aws_byte_buf_clean_up(&result.data.endpoint.properties);
+                pair.value = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_expr));
+                if (!pair.value) {
+                    aws_array_list_deep_clean_up(&result.data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
                     goto error;
                 }
 
-                /* Add comma separator if not first property */
-                if (j > 0) {
-                    struct aws_byte_cursor comma = aws_byte_cursor_from_c_str(",");
-                    if (aws_byte_buf_append_dynamic(&result.data.endpoint.properties, &comma)) {
-                        aws_endpoints_expr_clean_up(&value_expr);
-                        aws_byte_buf_clean_up(&result.data.endpoint.properties);
-                        goto error;
-                    }
-                }
-
-                /* Add key with JSON escaping */
-                if (s_append_json_escaped_string(&result.data.endpoint.properties, &key_cur)) {
-                    aws_endpoints_expr_clean_up(&value_expr);
-                    aws_byte_buf_clean_up(&result.data.endpoint.properties);
-                    goto error;
-                }
-                struct aws_byte_cursor colon = aws_byte_cursor_from_c_str(":");
-                if (aws_byte_buf_append_dynamic(&result.data.endpoint.properties, &colon)) {
-                    aws_endpoints_expr_clean_up(&value_expr);
-                    aws_byte_buf_clean_up(&result.data.endpoint.properties);
+                if (s_decode_value(allocator, cursor, blob, pair.value)) {
+                    aws_mem_release(allocator, pair.value);
+                    aws_array_list_deep_clean_up(&result.data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
                     goto error;
                 }
 
-                /* Add value with proper serialization */
-                if (s_serialize_value_to_json(&result.data.endpoint.properties, &value_expr)) {
-                    aws_endpoints_expr_clean_up(&value_expr);
-                    aws_byte_buf_clean_up(&result.data.endpoint.properties);
+                if (aws_array_list_push_back(&result.data.endpoint.properties, &pair)) {
+                    aws_endpoints_expr_clean_up(pair.value);
+                    aws_mem_release(allocator, pair.value);
+                    aws_array_list_deep_clean_up(&result.data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
                     goto error;
                 }
-
-                aws_endpoints_expr_clean_up(&value_expr);
-            }
-
-            struct aws_byte_cursor close_brace = aws_byte_cursor_from_c_str("}");
-            if (aws_byte_buf_append_dynamic(&result.data.endpoint.properties, &close_brace)) {
-                aws_byte_buf_clean_up(&result.data.endpoint.properties);
-                goto error;
             }
 
         } else if (opcode == 0x21) { /* Error */
@@ -758,7 +607,8 @@ static int s_load_results(
 
         if (aws_array_list_push_back(out_results, &result)) {
             if (result.type == AWS_ENDPOINTS_RESOLVED_ENDPOINT) {
-                aws_byte_buf_clean_up(&result.data.endpoint.properties);
+                aws_array_list_deep_clean_up(
+                    &result.data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
             }
             goto error;
         }
@@ -771,11 +621,11 @@ error:
         struct aws_endpoints_bdd_result *r = NULL;
         aws_array_list_get_at_ptr(out_results, (void **)&r, i);
         if (r && r->type == AWS_ENDPOINTS_RESOLVED_ENDPOINT) {
-            aws_byte_buf_clean_up(&r->data.endpoint.properties);
+            aws_array_list_deep_clean_up(&r->data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
         }
     }
     aws_array_list_clean_up(out_results);
-    return AWS_OP_ERR;
+    return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
 static int s_load_nodes(
@@ -787,22 +637,22 @@ static int s_load_nodes(
 
     /* Read root reference */
     if (s_read_i32(cursor, out_root_ref)) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     /* Read node count */
     if (s_read_u32(cursor, out_node_count)) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     /* Read base64 blob length */
     uint16_t base64_length;
     if (s_read_u16(cursor, &base64_length)) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     if (cursor->len < base64_length) {
-        return AWS_OP_ERR;
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
     struct aws_byte_cursor base64_data = aws_byte_cursor_advance(cursor, base64_length);
@@ -870,13 +720,15 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     struct aws_byte_cursor bytecode,
     struct aws_partitions_config *partitions_config) {
 
+    AWS_PRECONDITION(allocator);
+
     struct aws_endpoints_bdd_engine *engine = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_bdd_engine));
     if (!engine) {
         return NULL;
     }
 
     engine->allocator = allocator;
-    aws_ref_count_init(&engine->ref_count, engine, (aws_simple_completion_callback *)aws_endpoints_bdd_engine_destroy);
+    aws_ref_count_init(&engine->ref_count, engine, s_endpoints_bdd_engine_destroy);
     engine->partitions_config = aws_partitions_config_acquire(partitions_config);
 
     /* Validate magic number */
@@ -934,14 +786,16 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     return engine;
 
 error:
-    aws_endpoints_bdd_engine_destroy(engine);
+    s_endpoints_bdd_engine_destroy(engine);
     return NULL;
 }
 
-static void aws_endpoints_bdd_engine_destroy(struct aws_endpoints_bdd_engine *engine) {
-    if (!engine) {
+static void s_endpoints_bdd_engine_destroy(void *data) {
+    if (data == NULL) {
         return;
     }
+
+    struct aws_endpoints_bdd_engine *engine = data;
 
     if (engine->partitions_config) {
         aws_partitions_config_release(engine->partitions_config);
@@ -954,7 +808,7 @@ static void aws_endpoints_bdd_engine_destroy(struct aws_endpoints_bdd_engine *en
         struct aws_endpoints_bdd_result *r = NULL;
         aws_array_list_get_at_ptr(&engine->results, (void **)&r, i);
         if (r && r->type == AWS_ENDPOINTS_RESOLVED_ENDPOINT) {
-            aws_byte_buf_clean_up(&r->data.endpoint.properties);
+            aws_array_list_deep_clean_up(&r->data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
         }
     }
     aws_array_list_clean_up(&engine->results);
@@ -967,6 +821,7 @@ static void aws_endpoints_bdd_engine_destroy(struct aws_endpoints_bdd_engine *en
 }
 
 struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_acquire(struct aws_endpoints_bdd_engine *engine) {
+    AWS_PRECONDITION(engine);
     if (engine) {
         aws_ref_count_acquire(&engine->ref_count);
     }
