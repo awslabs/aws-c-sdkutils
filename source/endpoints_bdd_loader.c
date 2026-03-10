@@ -559,7 +559,10 @@ static int s_load_results(
             }
 
             if (aws_array_list_init_dynamic(
-                    &result.data.endpoint.properties, allocator, property_count, sizeof(struct aws_endpoints_kv_pair))) {
+                    &result.data.endpoint.properties,
+                    allocator,
+                    property_count,
+                    sizeof(struct aws_endpoints_kv_pair))) {
                 goto error;
             }
 
@@ -607,8 +610,7 @@ static int s_load_results(
 
         if (aws_array_list_push_back(out_results, &result)) {
             if (result.type == AWS_ENDPOINTS_RESOLVED_ENDPOINT) {
-                aws_array_list_deep_clean_up(
-                    &result.data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
+                aws_array_list_deep_clean_up(&result.data.endpoint.properties, s_on_kv_pair_array_element_clean_up);
             }
             goto error;
         }
