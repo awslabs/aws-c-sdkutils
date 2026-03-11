@@ -26,6 +26,14 @@ AWS_SDKUTILS_API struct aws_partitions_config *aws_partitions_config_new_from_st
     struct aws_byte_cursor json);
 
 /*
+ * Create new partitions config from pre-compiled bytecode.
+ * In cases of failure NULL is returned and last error is set.
+ */
+AWS_SDKUTILS_API struct aws_partitions_config *aws_partitions_config_new_from_bytecode(
+    struct aws_allocator *allocator,
+    struct aws_byte_cursor bytecode);
+
+/*
  * Increment ref count
  */
 AWS_SDKUTILS_API struct aws_partitions_config *aws_partitions_config_acquire(struct aws_partitions_config *partitions);

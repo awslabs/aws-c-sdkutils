@@ -238,6 +238,10 @@ struct aws_partitions_config {
     struct aws_hash_table base_partitions;
 
     struct aws_string *version;
+
+    /* owned copy of bytecode string blob; name cursors in partition_info point here */
+    uint8_t *blob_copy;
+    size_t blob_len;
 };
 
 /*

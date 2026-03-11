@@ -101,6 +101,8 @@ add_test_case(endpoints_regex_misc_validation)
 
 add_test_case(endpoints_bdd_loader_basic)
 add_test_case(endpoints_bdd_compiler_loader_roundtrip)
+add_test_case(partitions_bytecode_loader_basic)
+add_test_case(partitions_bytecode_compiler_loader_roundtrip)
 
 set(TEST_BINARY_NAME ${PROJECT_NAME}-tests)
 generate_test_driver(${TEST_BINARY_NAME})
