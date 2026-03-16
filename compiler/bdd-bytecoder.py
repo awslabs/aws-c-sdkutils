@@ -2,7 +2,93 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0.
 
-"""BDD bytecode compiler: JSON -> bytecode with concatenated string blob."""
+"""
+BDD Bytecode Compiler: JSON -> binary bytecode format.
+
+BYTECODE FORMAT SPECIFICATION
+=============================
+All multi-byte integers are little-endian.
+
+TOP-LEVEL STRUCTURE:
+    [4 bytes]  Magic: 0x45504452 ("EPDR")
+    [String Blob Section]
+    [4 bytes]  Version string reference
+    [Parameters Section]
+    [Conditions Section]
+    [Results Section]
+    [Nodes Section]
+
+STRING BLOB SECTION:
+    [4 bytes]  blob_size (uint32)
+    [blob_size bytes]  Concatenated encoded strings, each terminated with a hardcoded terminator.
+
+STRING REFERENCE (used throughout):
+    [2 bytes]  offset (uint16) - byte offset into string blob
+    [2 bytes]  length (uint16) - string length in bytes
+    Note: (0, 0) represents empty/null string
+
+PARAMETERS SECTION:
+    [2 bytes]  count (uint16)
+    [for each parameter:]
+        [1 byte]   opcode: 0x01=string, 0x02=boolean
+        [4 bytes]  name string ref
+        [1 byte]   has_default: 0=no, 1=yes
+        [if has_default and string: 4 bytes string ref]
+        [if has_default and bool: 1 byte value]
+        [1 byte]   is_required: 0=no, 1=yes
+        [1 byte]   has_builtin: 0=no, 1=yes
+        [if has_builtin: 4 bytes builtin name string ref]
+
+CONDITIONS SECTION:
+    [2 bytes]  count (uint16)
+    [for each condition:]
+        [1 byte]   opcode: 0x10
+        [4 bytes]  function name string ref
+        [2 bytes]  argc (uint16)
+        [argc encoded values]
+        [1 byte]   has_assign: 0=no, 1=yes
+        [if has_assign: 4 bytes assign name string ref]
+
+RESULTS SECTION:
+    [2 bytes]  count (uint16)
+    Note: Loader inserts synthetic "NoMatchRule" at index 0; serialized results map to indices 1+
+    [for each result:]
+        Endpoint (opcode 0x20):
+            [1 byte]   opcode: 0x20
+            [4 bytes]  url string ref
+            [2 bytes]  property_count (uint16)
+            [for each property: 4 bytes key string ref + encoded value]
+        Error (opcode 0x21):
+            [1 byte]   opcode: 0x21
+            [4 bytes]  error message string ref
+
+VALUE ENCODING (recursive):
+    [1 byte]  tag
+    Tag 0 (None):     no additional data
+    Tag 1 (String):   [4 bytes] string ref
+    Tag 2 (Boolean):  [1 byte] value (0=false, 1=true)
+    Tag 3 (Integer):  [4 bytes] int32
+    Tag 4 (Reference):[4 bytes] variable name string ref
+    Tag 5 (Function): [4 bytes] fn name ref + [2 bytes] argc + [argc encoded values]
+    Tag 6 (Array):    [2 bytes] length + [length encoded values]
+    Tag 7 (Object):   [2 bytes] length + [for each: 4 bytes key ref + encoded value]
+
+NODES SECTION:
+    [4 bytes]  root_ref (int32) - root node reference
+    [4 bytes]  node_count (uint32)
+    [2 bytes]  base64_length (uint16)
+    [base64_length bytes]  Base64-encoded node array
+
+    Each node (after decoding) is 12 bytes:
+        [4 bytes]  condition_index (int32) - index into conditions array
+        [4 bytes]  high_ref (int32) - reference when condition is true
+        [4 bytes]  low_ref (int32) - reference when condition is false
+
+    Node references: positive = node index, negative = negated result index
+    (e.g., -1 = result[0], -2 = result[1])
+
+Use --verify flag to dump a human-readable summary of a compiled .bin file.
+"""
 
 import json
 import struct
@@ -17,6 +103,8 @@ class StringBlob:
     def __init__(self):
         self._blob = bytearray()
         self._index = {}  # str -> (offset, length)
+        # added for ease of debugging.
+        self._terminator = "$$"
 
     def add(self, s):
         if not s:
@@ -29,6 +117,7 @@ class StringBlob:
             if len(encoded) > 0xFFFF:
                 raise ValueError(f"String length {len(encoded)} exceeds uint16 max")
             self._blob.extend(encoded)
+            self._blob.extend(self._terminator)
             self._index[s] = (offset, len(encoded))
         return self._index[s]
 
@@ -95,10 +184,7 @@ def encode_parameters(buf, data, strings):
         has_default = dv is not None
         buf += struct.pack("<B", 1 if has_default else 0)
         if has_default:
-            if opcode == 0x01:
-                write_string_ref(buf, *strings.add(dv))
-            else:
-                buf += struct.pack("<B", 1 if dv else 0)
+            buf += struct.pack("<B", 1 if dv else 0)
         buf += struct.pack("<B", 1 if p.get("required") else 0)
         built_in = p.get("builtIn")
         buf += struct.pack("<B", 1 if built_in else 0)
