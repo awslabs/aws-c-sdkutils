@@ -13,6 +13,14 @@
 
 #define BDD_MAGIC_NUMBER 0x45504452 /* "EPDR" */
 
+enum bdd_opcode {
+    BDD_OP_PARAM_STRING = 0x01,
+    BDD_OP_PARAM_BOOL = 0x02,
+    BDD_OP_CONDITION = 0x10,
+    BDD_OP_RESULT_ENDPOINT = 0x20,
+    BDD_OP_RESULT_ERROR = 0x21,
+};
+
 /* Forward declaration */
 static void s_endpoints_bdd_engine_destroy(void *data);
 
@@ -137,7 +145,7 @@ static int s_load_parameters(
         opcode = cursor->ptr[0];
         aws_byte_cursor_advance(cursor, 1);
 
-        if (opcode != 0x01 && opcode != 0x02) {
+        if (opcode != BDD_OP_PARAM_STRING && opcode != BDD_OP_PARAM_BOOL) {
             goto error;
         }
 
@@ -146,7 +154,7 @@ static int s_load_parameters(
             goto error;
         }
         param->allocator = allocator;
-        param->type = (opcode == 0x01) ? AWS_ENDPOINTS_PARAMETER_STRING : AWS_ENDPOINTS_PARAMETER_BOOLEAN;
+        param->type = (opcode == BDD_OP_PARAM_STRING) ? AWS_ENDPOINTS_PARAMETER_STRING : AWS_ENDPOINTS_PARAMETER_BOOLEAN;
 
         if (s_read_string_ref(cursor, blob, &param->name)) {
             aws_mem_release(allocator, param);
@@ -426,7 +434,7 @@ static int s_load_conditions(
         opcode = cursor->ptr[0];
         aws_byte_cursor_advance(cursor, 1);
 
-        if (opcode != 0x10) {
+        if (opcode != BDD_OP_CONDITION) {
             goto error;
         }
 
@@ -543,7 +551,7 @@ static int s_load_results(
         struct aws_endpoints_bdd_result result;
         AWS_ZERO_STRUCT(result);
 
-        if (opcode == 0x20) { /* Endpoint */
+        if (opcode == BDD_OP_RESULT_ENDPOINT) { /* Endpoint */
             result.type = AWS_ENDPOINTS_RESOLVED_ENDPOINT;
 
             struct aws_byte_cursor url_cur;
@@ -595,7 +603,7 @@ static int s_load_results(
                 }
             }
 
-        } else if (opcode == 0x21) { /* Error */
+        } else if (opcode == BDD_OP_RESULT_ERROR) { /* Error */
             result.type = AWS_ENDPOINTS_RESOLVED_ERROR;
 
             struct aws_byte_cursor error_cur;

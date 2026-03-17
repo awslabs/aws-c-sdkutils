@@ -93,8 +93,17 @@ Use --verify flag to dump a human-readable summary of a compiled .bin file.
 import json
 import struct
 import sys
+from enum import IntEnum
 
 MAGIC = 0x45504452
+
+
+class Opcode(IntEnum):
+    PARAM_STRING = 0x01
+    PARAM_BOOL = 0x02
+    CONDITION = 0x10
+    RESULT_ENDPOINT = 0x20
+    RESULT_ERROR = 0x21
 
 
 class StringBlob:
@@ -177,7 +186,7 @@ def encode_parameters(buf, data, strings):
     buf += struct.pack("<H", len(params))
     for name, p in params.items():
         ptype = p.get("type", "string").lower()
-        opcode = 0x01 if ptype == "string" else 0x02
+        opcode = Opcode.PARAM_STRING if ptype == "string" else Opcode.PARAM_BOOL
         buf += struct.pack("<B", opcode)
         write_string_ref(buf, *strings.add(name))
         dv = p.get("default")
@@ -231,7 +240,7 @@ def encode_conditions(buf, data, strings):
     conditions = data.get("conditions", [])
     buf += struct.pack("<H", len(conditions))
     for c in conditions:
-        buf += struct.pack("<B", 0x10)
+        buf += struct.pack("<B", Opcode.CONDITION)
         write_string_ref(buf, *strings.add(c["fn"]))
         args = c.get("argv", [])
         buf += struct.pack("<H", len(args))
@@ -250,7 +259,7 @@ def encode_results(buf, data, strings):
     for r in results:
         if "endpoint" in r:
             ep = r["endpoint"]
-            buf += struct.pack("<B", 0x20)
+            buf += struct.pack("<B", Opcode.RESULT_ENDPOINT)
             write_string_ref(buf, *strings.add(ep.get("url", "")))
             props = ep.get("properties", {})
             buf += struct.pack("<H", len(props))
@@ -258,7 +267,7 @@ def encode_results(buf, data, strings):
                 write_string_ref(buf, *strings.add(k))
                 encode_value(buf, v, strings)
         elif "error" in r:
-            buf += struct.pack("<B", 0x21)
+            buf += struct.pack("<B", Opcode.RESULT_ERROR)
             write_string_ref(buf, *strings.add(r["error"]))
 
 
@@ -344,7 +353,7 @@ def verify(bin_path):
             track_ref()  # name
             has_def = read("<B")
             if has_def:
-                if opcode == 0x01:
+                if opcode == Opcode.PARAM_STRING:
                     track_ref()
                 else:
                     pos += 1
@@ -401,13 +410,13 @@ def verify(bin_path):
         result_count = read("<H")
         for _ in range(result_count):
             opcode = read("<B")
-            if opcode == 0x20:
+            if opcode == Opcode.RESULT_ENDPOINT:
                 track_ref()  # url ref
                 prop_count = read("<H")
                 for _ in range(prop_count):
                     track_ref()  # key ref
                     skip_value()
-            elif opcode == 0x21:
+            elif opcode == Opcode.RESULT_ERROR:
                 track_ref()  # error ref
 
         # Nodes
