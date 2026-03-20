@@ -420,8 +420,7 @@ static int s_parse_one_condition(
     cond->expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
     cond->expr.e.function.fn = s_resolve_fn(fn_name);
 
-    if (aws_array_list_init_dynamic(
-            &cond->expr.e.function.argv, allocator, argc, sizeof(struct aws_endpoints_expr))) {
+    if (aws_array_list_init_dynamic(&cond->expr.e.function.argv, allocator, argc, sizeof(struct aws_endpoints_expr))) {
         return AWS_OP_ERR;
     }
 
