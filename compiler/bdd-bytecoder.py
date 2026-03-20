@@ -89,6 +89,7 @@ NODES SECTION:
 Use --verify flag to dump a human-readable summary of a compiled .bin file.
 """
 
+import base64
 import json
 import struct
 import sys
@@ -243,12 +244,28 @@ def encode_results(buf, data, strings):
 
 
 def encode_nodes(buf, data):
-    """Emit root_ref (int32), node_count (uint32), then base64 nodes blob with uint16 length prefix."""
+    """Emit root_ref (int32), node_count (uint32), then base64 nodes blob with uint16 length prefix.
+    The source JSON has nodes in a base64 blob with little-endian int32s. We re-encode to big-endian."""
     root_ref = data.get("root", 0)
     node_count = data.get("nodeCount", 0)
     buf += struct.pack(">iI", root_ref, node_count)
+
     nodes_b64 = data.get("nodes", "")
-    encoded = nodes_b64.encode("ascii")
+    if not nodes_b64:
+        buf += struct.pack(">H", 0)
+        return
+
+    raw = base64.b64decode(nodes_b64)
+    if len(raw) != node_count * 12:
+        raise ValueError(f"Node blob size {len(raw)} != expected {node_count * 12}")
+
+    # Re-encode each int32 from little-endian to big-endian
+    be_buf = bytearray()
+    for i in range(0, len(raw), 4):
+        val = struct.unpack_from("<i", raw, i)[0]
+        be_buf += struct.pack(">i", val)
+
+    encoded = base64.b64encode(bytes(be_buf))
     if len(encoded) > 0xFFFF:
         raise ValueError(f"Base64 nodes blob length {len(encoded)} exceeds uint16 max")
     buf += struct.pack(">H", len(encoded))

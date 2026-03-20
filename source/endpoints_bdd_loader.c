@@ -137,7 +137,7 @@ static int s_parse_one_parameter(
     param->has_default_value = (has_default != 0);
 
     if (has_default) {
-        if (param->type == AWS_ENDPOINTS_PARAMETER_STRING) {
+        if (param->type == AWS_ENDPOINTS_PARAMETER_STRING || param->type == AWS_ENDPOINTS_PARAMETER_STRING_ARRAY) {
             struct aws_byte_cursor default_cur;
             if (s_read_string_ref(cursor, blob, &default_cur)) {
                 return AWS_OP_ERR;
