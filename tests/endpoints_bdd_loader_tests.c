@@ -66,7 +66,7 @@ static int s_test_bdd_compiler_loader_roundtrip(struct aws_allocator *allocator,
     ASSERT_UINT_EQUALS(2, aws_hash_table_get_entry_count(&engine->parameters));
     ASSERT_UINT_EQUALS(2, aws_array_list_length(&engine->conditions));
     ASSERT_UINT_EQUALS(3, aws_array_list_length(&engine->results));
-    ASSERT_UINT_EQUALS(3, engine->node_count);
+    ASSERT_UINT_EQUALS(3, aws_array_list_length(&engine->nodes));
 
     aws_endpoints_bdd_engine_release(engine);
     aws_partitions_config_release(partitions);

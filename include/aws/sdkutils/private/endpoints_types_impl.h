@@ -355,7 +355,7 @@ struct aws_endpoints_bdd_result {
     union {
         struct {
             struct aws_byte_cursor url;
-            struct aws_array_list properties; /* List of (aws_endpoints_kv_pair) */
+            struct aws_byte_cursor properties_json; /* Opaque JSON string */
         } endpoint;
         struct {
             struct aws_byte_cursor error;
@@ -380,8 +380,7 @@ struct aws_endpoints_bdd_engine {
     struct aws_array_list results;
 
     int32_t root_ref;
-    uint32_t node_count;
-    struct aws_endpoints_bdd_node *nodes;
+    struct aws_array_list nodes; /* List of (aws_endpoints_bdd_node) */
 };
 
 #endif /* AWS_SDKUTILS_ENDPOINTS_RULESET_TYPES_IMPL_H */

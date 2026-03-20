@@ -7,7 +7,7 @@ BDD Bytecode Compiler: JSON -> binary bytecode format.
 
 BYTECODE FORMAT SPECIFICATION
 =============================
-All multi-byte integers are little-endian.
+All multi-byte integers are big-endian (network byte order).
 
 TOP-LEVEL STRUCTURE:
     [4 bytes]  Magic: 0x45504452 ("EPDR")
@@ -20,7 +20,7 @@ TOP-LEVEL STRUCTURE:
 
 STRING BLOB SECTION:
     [4 bytes]  blob_size (uint32)
-    [blob_size bytes]  Concatenated encoded strings, each terminated with a hardcoded terminator.
+    [blob_size bytes]  Concatenated ASCII strings, each terminated with "$$".
 
 STRING REFERENCE (used throughout):
     [2 bytes]  offset (uint16) - byte offset into string blob
@@ -30,7 +30,7 @@ STRING REFERENCE (used throughout):
 PARAMETERS SECTION:
     [2 bytes]  count (uint16)
     [for each parameter:]
-        [1 byte]   opcode: 0x01=string, 0x02=boolean
+        [1 byte]   opcode: 0x01=string, 0x02=boolean, 0x03=string_array
         [4 bytes]  name string ref
         [1 byte]   has_default: 0=no, 1=yes
         [if has_default and string: 4 bytes string ref]
@@ -56,8 +56,7 @@ RESULTS SECTION:
         Endpoint (opcode 0x20):
             [1 byte]   opcode: 0x20
             [4 bytes]  url string ref
-            [2 bytes]  property_count (uint16)
-            [for each property: 4 bytes key string ref + encoded value]
+            [4 bytes]  properties_json string ref
         Error (opcode 0x21):
             [1 byte]   opcode: 0x21
             [4 bytes]  error message string ref
@@ -101,6 +100,7 @@ MAGIC = 0x45504452
 class Opcode(IntEnum):
     PARAM_STRING = 0x01
     PARAM_BOOL = 0x02
+    PARAM_STRING_ARRAY = 0x03
     CONDITION = 0x10
     RESULT_ENDPOINT = 0x20
     RESULT_ERROR = 0x21
@@ -112,22 +112,23 @@ class StringBlob:
     def __init__(self):
         self._blob = bytearray()
         self._index = {}  # str -> (offset, length)
-        # added for ease of debugging.
-        self._terminator = "$$"
+        self._terminator = b"$$"
 
     def add(self, s):
         if not s:
             return (0, 0)
         if s not in self._index:
-            encoded = s.encode("utf-8")
+            if not s.isascii():
+                raise ValueError(f"Non-ASCII string not supported: {s!r}")
+            raw = s.encode("ascii")
             offset = len(self._blob)
             if offset > 0xFFFF:
                 raise ValueError(f"String blob offset {offset} exceeds uint16 max")
-            if len(encoded) > 0xFFFF:
-                raise ValueError(f"String length {len(encoded)} exceeds uint16 max")
-            self._blob.extend(encoded)
+            if len(raw) > 0xFFFF:
+                raise ValueError(f"String length {len(raw)} exceeds uint16 max")
+            self._blob.extend(raw)
             self._blob.extend(self._terminator)
-            self._index[s] = (offset, len(encoded))
+            self._index[s] = (offset, len(raw))
         return self._index[s]
 
     def blob(self):
@@ -135,99 +136,37 @@ class StringBlob:
 
 
 def write_string_ref(buf, offset, length):
-    """Emit 4 bytes: uint16 offset + uint16 length into buf (mutates in-place)."""
-    buf.extend(struct.pack("<HH", offset, length))
-
-
-def collect_strings(data, strings):
-    """Pre-pass: register every string from the JSON into the StringBlob."""
-    v = data.get("version")
-    if v:
-        strings.add(v)
-    for name, p in data.get("parameters", {}).items():
-        strings.add(name)
-        if p.get("builtIn"):
-            strings.add(p["builtIn"])
-        dv = p.get("default")
-        if isinstance(dv, str):
-            strings.add(dv)
-    for c in data.get("conditions", []):
-        strings.add(c["fn"])
-        if "assign" in c:
-            strings.add(c["assign"])
-        for arg in c.get("argv", []):
-            _collect_value_strings(arg, strings)
-    for r in data.get("results", []):
-        if "endpoint" in r:
-            ep = r["endpoint"]
-            strings.add(ep.get("url", ""))
-            for k, v in ep.get("properties", {}).items():
-                strings.add(k)
-                _collect_value_strings(v, strings)
-        elif "error" in r:
-            strings.add(r["error"])
-
-
-def _collect_value_strings(val, strings):
-    if isinstance(val, str):
-        strings.add(val)
-    elif isinstance(val, dict):
-        for k, v in val.items():
-            strings.add(k)
-            _collect_value_strings(v, strings)
-    elif isinstance(val, list):
-        for v in val:
-            _collect_value_strings(v, strings)
-
-
-def encode_parameters(buf, data, strings):
-    """Emit parameter count (uint16) then each parameter record."""
-    params = data.get("parameters", {})
-    buf += struct.pack("<H", len(params))
-    for name, p in params.items():
-        ptype = p.get("type", "string").lower()
-        opcode = Opcode.PARAM_STRING if ptype == "string" else Opcode.PARAM_BOOL
-        buf += struct.pack("<B", opcode)
-        write_string_ref(buf, *strings.add(name))
-        dv = p.get("default")
-        has_default = dv is not None
-        buf += struct.pack("<B", 1 if has_default else 0)
-        if has_default:
-            buf += struct.pack("<B", 1 if dv else 0)
-        buf += struct.pack("<B", 1 if p.get("required") else 0)
-        built_in = p.get("builtIn")
-        buf += struct.pack("<B", 1 if built_in else 0)
-        if built_in:
-            write_string_ref(buf, *strings.add(built_in))
+    """Emit 4 bytes: uint16 offset + uint16 length (big-endian)."""
+    buf.extend(struct.pack(">HH", offset, length))
 
 
 def encode_value(buf, val, strings):
     """Recursively encode a value with type tag (0-7)."""
     if val is None:
-        buf += struct.pack("<B", 0)
+        buf += struct.pack(">B", 0)
     elif isinstance(val, bool):
-        buf += struct.pack("<BB", 2, 1 if val else 0)
+        buf += struct.pack(">BB", 2, 1 if val else 0)
     elif isinstance(val, str):
-        buf += struct.pack("<B", 1)
+        buf += struct.pack(">B", 1)
         write_string_ref(buf, *strings.add(val))
     elif isinstance(val, int):
-        buf += struct.pack("<Bi", 3, val)
+        buf += struct.pack(">Bi", 3, val)
     elif isinstance(val, dict) and "ref" in val:
-        buf += struct.pack("<B", 4)
+        buf += struct.pack(">B", 4)
         write_string_ref(buf, *strings.add(val["ref"]))
     elif isinstance(val, dict) and "fn" in val:
-        buf += struct.pack("<B", 5)
+        buf += struct.pack(">B", 5)
         write_string_ref(buf, *strings.add(val["fn"]))
         args = val.get("argv", [])
-        buf += struct.pack("<H", len(args))
+        buf += struct.pack(">H", len(args))
         for a in args:
             encode_value(buf, a, strings)
     elif isinstance(val, list):
-        buf += struct.pack("<BH", 6, len(val))
+        buf += struct.pack(">BH", 6, len(val))
         for item in val:
             encode_value(buf, item, strings)
     elif isinstance(val, dict):
-        buf += struct.pack("<BH", 7, len(val))
+        buf += struct.pack(">BH", 7, len(val))
         for k, v in val.items():
             write_string_ref(buf, *strings.add(k))
             encode_value(buf, v, strings)
@@ -235,77 +174,126 @@ def encode_value(buf, val, strings):
         raise ValueError(f"Unsupported value type: {type(val)}")
 
 
+def encode_parameters(buf, data, strings):
+    """Emit parameter count (uint16) then each parameter record."""
+    params = data.get("parameters", {})
+    buf += struct.pack(">H", len(params))
+    for name, p in params.items():
+        ptype = p.get("type", "string").lower()
+        if ptype == "string":
+            opcode = Opcode.PARAM_STRING
+        elif ptype == "boolean":
+            opcode = Opcode.PARAM_BOOL
+        elif ptype == "stringarray":
+            opcode = Opcode.PARAM_STRING_ARRAY
+        else:
+            raise ValueError(f"Unsupported parameter type: {ptype}")
+        buf += struct.pack(">B", opcode)
+        write_string_ref(buf, *strings.add(name))
+        dv = p.get("default")
+        has_default = dv is not None
+        buf += struct.pack(">B", 1 if has_default else 0)
+        if has_default:
+            if ptype == "boolean":
+                buf += struct.pack(">B", 1 if dv else 0)
+            else:
+                write_string_ref(buf, *strings.add(str(dv)))
+        buf += struct.pack(">B", 1 if p.get("required") else 0)
+        built_in = p.get("builtIn")
+        buf += struct.pack(">B", 1 if built_in else 0)
+        if built_in:
+            write_string_ref(buf, *strings.add(built_in))
+
+
 def encode_conditions(buf, data, strings):
     """Emit condition count (uint16) then each condition record."""
     conditions = data.get("conditions", [])
-    buf += struct.pack("<H", len(conditions))
+    buf += struct.pack(">H", len(conditions))
     for c in conditions:
-        buf += struct.pack("<B", Opcode.CONDITION)
+        buf += struct.pack(">B", Opcode.CONDITION)
         write_string_ref(buf, *strings.add(c["fn"]))
         args = c.get("argv", [])
-        buf += struct.pack("<H", len(args))
+        buf += struct.pack(">H", len(args))
         for a in args:
             encode_value(buf, a, strings)
         assign = c.get("assign")
-        buf += struct.pack("<B", 1 if assign else 0)
+        buf += struct.pack(">B", 1 if assign else 0)
         if assign:
             write_string_ref(buf, *strings.add(assign))
 
 
 def encode_results(buf, data, strings):
-    """Emit result count (uint16) then each result record. Index 0 = NoMatchRule (implicit), so first serialized result maps to index 1."""
+    """Emit result count (uint16) then each result record."""
     results = data.get("results", [])
-    buf += struct.pack("<H", len(results))
+    buf += struct.pack(">H", len(results))
     for r in results:
         if "endpoint" in r:
             ep = r["endpoint"]
-            buf += struct.pack("<B", Opcode.RESULT_ENDPOINT)
+            buf += struct.pack(">B", Opcode.RESULT_ENDPOINT)
             write_string_ref(buf, *strings.add(ep.get("url", "")))
+            # Store properties as opaque JSON string
             props = ep.get("properties", {})
-            buf += struct.pack("<H", len(props))
-            for k, v in props.items():
-                write_string_ref(buf, *strings.add(k))
-                encode_value(buf, v, strings)
+            props_json = json.dumps(props, separators=(",", ":")) if props else ""
+            write_string_ref(buf, *strings.add(props_json))
         elif "error" in r:
-            buf += struct.pack("<B", Opcode.RESULT_ERROR)
+            buf += struct.pack(">B", Opcode.RESULT_ERROR)
             write_string_ref(buf, *strings.add(r["error"]))
+        else:
+            raise ValueError(f"Unsupported result type: {r}")
 
 
 def encode_nodes(buf, data):
-    """Emit root_ref (int32), node_count (uint32), then the base64 nodes blob with uint16 length prefix."""
+    """Emit root_ref (int32), node_count (uint32), then base64 nodes blob with uint16 length prefix."""
     root_ref = data.get("root", 0)
     node_count = data.get("nodeCount", 0)
-    buf += struct.pack("<iI", root_ref, node_count)
+    buf += struct.pack(">iI", root_ref, node_count)
     nodes_b64 = data.get("nodes", "")
     encoded = nodes_b64.encode("ascii")
     if len(encoded) > 0xFFFF:
         raise ValueError(f"Base64 nodes blob length {len(encoded)} exceeds uint16 max")
-    buf += struct.pack("<H", len(encoded))
+    buf += struct.pack(">H", len(encoded))
     buf += encoded
 
 
-def encode(data, strings):
-    """Encoding pass: produce the full bytecode bytes."""
-    buf = bytearray()
-    # Magic
-    buf += struct.pack("<I", MAGIC)
-    # String blob section (must come before any string refs)
-    blob = strings.blob()
-    buf += struct.pack("<I", len(blob))
-    buf += blob
-    # Version string ref
+def encode(data):
+    """Single-pass: build all segments in memory, then assemble final bytecode."""
+    strings = StringBlob()
+
+    # Build each segment into its own buffer, strings accumulate as we go
+    version_buf = bytearray()
     v = data.get("version")
     off, ln = strings.add(v) if v else (0, 0)
-    write_string_ref(buf, off, ln)
-    # Parameters section
-    encode_parameters(buf, data, strings)
-    # Conditions section
-    encode_conditions(buf, data, strings)
-    # Results section
-    encode_results(buf, data, strings)
-    # Nodes section
-    encode_nodes(buf, data)
-    return bytes(buf)
+    write_string_ref(version_buf, off, ln)
+
+    params_buf = bytearray()
+    encode_parameters(params_buf, data, strings)
+
+    conditions_buf = bytearray()
+    encode_conditions(conditions_buf, data, strings)
+
+    results_buf = bytearray()
+    encode_results(results_buf, data, strings)
+
+    nodes_buf = bytearray()
+    encode_nodes(nodes_buf, data)
+
+    # Now assemble: magic + string blob + version + params + conditions + results + nodes
+    # Re-encode version ref since blob may have grown after initial version ref was written
+    version_buf = bytearray()
+    off, ln = strings.add(v) if v else (0, 0)
+    write_string_ref(version_buf, off, ln)
+
+    out = bytearray()
+    out += struct.pack(">I", MAGIC)
+    blob = strings.blob()
+    out += struct.pack(">I", len(blob))
+    out += blob
+    out += version_buf
+    out += params_buf
+    out += conditions_buf
+    out += results_buf
+    out += nodes_buf
+    return bytes(out)
 
 
 def verify(bin_path):
@@ -322,12 +310,12 @@ def verify(bin_path):
         return val[0] if len(val) == 1 else val
 
     try:
-        magic = read("<I")
+        magic = read(">I")
         if magic != MAGIC:
             print(f"ERROR: bad magic 0x{magic:08X} (expected 0x{MAGIC:08X})", file=sys.stderr)
             sys.exit(1)
 
-        blob_size = read("<I")
+        blob_size = read(">I")
         blob = data[pos:pos + blob_size]
         pos += blob_size
 
@@ -335,39 +323,39 @@ def verify(bin_path):
 
         def track_ref():
             nonlocal pos
-            off, ln = struct.unpack_from("<HH", data, pos)
+            off, ln = struct.unpack_from(">HH", data, pos)
             pos += 4
             if ln > 0:
                 string_refs.add((off, ln))
 
         # Version string ref
-        v_off, v_len = read("<HH")
+        v_off, v_len = read(">HH")
         if v_len > 0:
             string_refs.add((v_off, v_len))
-        version_str = blob[v_off:v_off + v_len].decode("utf-8") if v_len else ""
+        version_str = blob[v_off:v_off + v_len].decode("ascii") if v_len else ""
 
         # Parameters
-        param_count = read("<H")
+        param_count = read(">H")
         for _ in range(param_count):
-            opcode = read("<B")
+            opcode = read(">B")
             track_ref()  # name
-            has_def = read("<B")
+            has_def = read(">B")
             if has_def:
-                if opcode == Opcode.PARAM_STRING:
+                if opcode == Opcode.PARAM_STRING or opcode == Opcode.PARAM_STRING_ARRAY:
                     track_ref()
                 else:
                     pos += 1
             pos += 1  # required
-            has_bi = read("<B")
+            has_bi = read(">B")
             if has_bi:
-                track_ref()  # built_in ref
+                track_ref()
 
         # Conditions
-        cond_count = read("<H")
+        cond_count = read(">H")
 
         def skip_value():
             nonlocal pos
-            tag = read("<B")
+            tag = read(">B")
             if tag == 0:
                 pass
             elif tag == 1:
@@ -380,15 +368,15 @@ def verify(bin_path):
                 track_ref()
             elif tag == 5:
                 track_ref()
-                argc = read("<H")
+                argc = read(">H")
                 for _ in range(argc):
                     skip_value()
             elif tag == 6:
-                n = read("<H")
+                n = read(">H")
                 for _ in range(n):
                     skip_value()
             elif tag == 7:
-                n = read("<H")
+                n = read(">H")
                 for _ in range(n):
                     track_ref()
                     skip_value()
@@ -399,29 +387,26 @@ def verify(bin_path):
         for _ in range(cond_count):
             pos += 1  # opcode
             track_ref()  # fn ref
-            argc = read("<H")
+            argc = read(">H")
             for _ in range(argc):
                 skip_value()
-            has_assign = read("<B")
+            has_assign = read(">B")
             if has_assign:
                 track_ref()
 
         # Results
-        result_count = read("<H")
+        result_count = read(">H")
         for _ in range(result_count):
-            opcode = read("<B")
+            opcode = read(">B")
             if opcode == Opcode.RESULT_ENDPOINT:
                 track_ref()  # url ref
-                prop_count = read("<H")
-                for _ in range(prop_count):
-                    track_ref()  # key ref
-                    skip_value()
+                track_ref()  # properties json ref
             elif opcode == Opcode.RESULT_ERROR:
                 track_ref()  # error ref
 
         # Nodes
-        root_ref, node_count = read("<iI")
-        nodes_len = read("<H")
+        root_ref, node_count = read(">iI")
+        nodes_len = read(">H")
         pos += nodes_len
 
     except struct.error:
@@ -459,13 +444,7 @@ def main():
     with open(input_path) as f:
         data = json.load(f)
 
-    strings = StringBlob()
-
-    # String collection pass
-    collect_strings(data, strings)
-
-    # Encoding pass
-    bytecode = encode(data, strings)
+    bytecode = encode(data)
 
     with open(output_path, "wb") as f:
         f.write(bytecode)
