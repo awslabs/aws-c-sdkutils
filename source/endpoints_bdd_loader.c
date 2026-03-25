@@ -36,18 +36,6 @@ static void s_on_condition_array_element_clean_up(void *element) {
 }
 
 /*
- * Helper: read a big-endian i32 from cursor.
- */
-static int s_read_i32(struct aws_byte_cursor *cursor, int32_t *out) {
-    uint32_t val;
-    if (!aws_byte_cursor_read_be32(cursor, &val)) {
-        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
-    }
-    *out = (int32_t)val;
-    return AWS_OP_SUCCESS;
-}
-
-/*
  * Helper: resolve function name cursor to enum via hash lookup.
  */
 static enum aws_endpoints_fn_type s_resolve_fn(struct aws_byte_cursor fn_name) {
@@ -256,7 +244,7 @@ static int s_decode_value(
 
         case 3: { /* Integer */
             int32_t int_val;
-            if (s_read_i32(cursor, &int_val)) {
+            if (!aws_byte_cursor_read_be_i32(cursor, &int_val)) {
                 return AWS_OP_ERR;
             }
             out_expr->type = AWS_ENDPOINTS_EXPR_NUMBER;
@@ -560,7 +548,7 @@ static int s_load_nodes(
     int32_t *out_root_ref,
     struct aws_array_list *out_nodes) {
 
-    if (s_read_i32(cursor, out_root_ref)) {
+    if (!aws_byte_cursor_read_be_i32(cursor, out_root_ref)) {
         return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
@@ -609,8 +597,9 @@ static int s_load_nodes(
     struct aws_byte_cursor node_cursor = aws_byte_cursor_from_buf(&decoded_buf);
     for (uint32_t i = 0; i < node_count; ++i) {
         struct aws_endpoints_bdd_node node;
-        if (s_read_i32(&node_cursor, &node.condition_index) || s_read_i32(&node_cursor, &node.high_ref) ||
-            s_read_i32(&node_cursor, &node.low_ref)) {
+        if (!aws_byte_cursor_read_be_i32(&node_cursor, &node.condition_index) ||
+            !aws_byte_cursor_read_be_i32(&node_cursor, &node.high_ref) ||
+            !aws_byte_cursor_read_be_i32(&node_cursor, &node.low_ref)) {
             aws_array_list_clean_up(out_nodes);
             aws_byte_buf_clean_up(&decoded_buf);
             return AWS_OP_ERR;
