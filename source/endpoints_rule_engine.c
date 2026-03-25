@@ -348,6 +348,11 @@ static int s_resolve_expr(
             }
             break;
         }
+        case AWS_ENDPOINTS_EXPR_OBJECT: {
+            /* Object expressions are only used by the BDD engine, not the v1.0 tree engine. */
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Object expressions are not supported in v1.0 engine.");
+            goto on_error;
+        }
     }
 
     return AWS_OP_SUCCESS;
