@@ -360,7 +360,7 @@ int aws_path_through_json(
 
         if (has_index) {
             int64_t index;
-            
+
             if (aws_byte_cursor_utf8_parse_i64(index_cur, &index)) {
                 AWS_LOGF_ERROR(
                     AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,

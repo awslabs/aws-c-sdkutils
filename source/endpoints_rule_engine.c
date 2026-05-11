@@ -318,7 +318,7 @@ int aws_endpoints_path_through_array(
     }
 
     if (index < 0) {
-        index = aws_array_list_length(&value->v.array)  - index;
+        index = aws_array_list_length(&value->v.array) - index;
     }
 
     if (index < 0) {
@@ -724,11 +724,13 @@ int aws_endpoints_rule_engine_resolve(
 
         switch (rule->type) {
             case AWS_ENDPOINTS_RULE_ENDPOINT: {
-                struct aws_endpoints_resolved_endpoint *endpoint = aws_endpoints_resolved_endpoint_new(engine->allocator);
+                struct aws_endpoints_resolved_endpoint *endpoint =
+                    aws_endpoints_resolved_endpoint_new(engine->allocator);
                 endpoint->type = AWS_ENDPOINTS_RESOLVED_ENDPOINT;
 
                 struct aws_endpoints_value val;
-                if (aws_endpoints_resolve_expr(engine->allocator, rule->rule_data.endpoint.url_expr_ref, &state.scope, &val) ||
+                if (aws_endpoints_resolve_expr(
+                        engine->allocator, rule->rule_data.endpoint.url_expr_ref, &state.scope, &val) ||
                     val.type != AWS_ENDPOINTS_VALUE_STRING ||
                     aws_byte_buf_init_copy_from_cursor(
                         &endpoint->r.endpoint.url, engine->allocator, val.v.owning_cursor_string.cur)) {
@@ -755,7 +757,10 @@ int aws_endpoints_rule_engine_resolve(
                 }
 
                 if (aws_endpoints_resolve_headers(
-                        engine->allocator, &state.scope, &rule->rule_data.endpoint.headers, &endpoint->r.endpoint.headers)) {
+                        engine->allocator,
+                        &state.scope,
+                        &rule->rule_data.endpoint.headers,
+                        &endpoint->r.endpoint.headers)) {
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated headers.");
                     result = AWS_OP_ERR;
                     goto on_done;
@@ -769,7 +774,8 @@ int aws_endpoints_rule_engine_resolve(
                 error->type = AWS_ENDPOINTS_RESOLVED_ERROR;
 
                 struct aws_endpoints_value val;
-                if (aws_endpoints_resolve_expr(engine->allocator, rule->rule_data.error.error_expr_ref, &state.scope, &val) ||
+                if (aws_endpoints_resolve_expr(
+                        engine->allocator, rule->rule_data.error.error_expr_ref, &state.scope, &val) ||
                     val.type != AWS_ENDPOINTS_VALUE_STRING ||
                     aws_byte_buf_init_copy_from_cursor(
                         &error->r.error, engine->allocator, val.v.owning_cursor_string.cur)) {

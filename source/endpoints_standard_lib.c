@@ -24,8 +24,7 @@ static int s_resolve_fn_is_set(
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
-    if (args.argc != 1 ||
-        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value)) {
+    if (args.argc != 1 || aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for isSet.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -71,8 +70,7 @@ static int s_resolve_fn_get_attr(
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
     struct aws_endpoints_value argv_path = {0};
-    if (args.argc != 2 ||
-        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value) ||
+    if (args.argc != 2 || aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value) ||
         aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_STRING, &argv_path)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for get attr.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
@@ -154,7 +152,7 @@ static int s_resolve_fn_substring(
         } else {
             out_value->v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, substring);
         }
-        
+
     } else {
         size_t r_start = input_value.v.owning_cursor_string.cur.len - (size_t)stop_value.v.number;
         size_t r_stop = input_value.v.owning_cursor_string.cur.len - (size_t)start_value.v.number;
@@ -304,9 +302,8 @@ static int s_resolve_fn_split(
             struct aws_endpoints_value val = {
                 .is_ref = false,
                 .type = AWS_ENDPOINTS_VALUE_STRING,
-                .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, substr)
-            };
-            
+                .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, substr)};
+
             aws_array_list_push_back(&out_value->v.array, &val);
         } else {
             has_leftover_str = false;
@@ -320,9 +317,8 @@ static int s_resolve_fn_split(
             struct aws_endpoints_value val = {
                 .is_ref = false,
                 .type = AWS_ENDPOINTS_VALUE_STRING,
-                .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, input)
-            };
-            
+                .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, input)};
+
             aws_array_list_push_back(&out_value->v.array, &val);
         }
     }
@@ -425,8 +421,7 @@ static int s_resolve_fn_parse_url(
     struct aws_uri uri;
     struct aws_json_value *root = NULL;
     struct aws_endpoints_value argv_url = {0};
-    if (args.argc != 1 ||
-        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_url)) {
+    if (args.argc != 1 || aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_url)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for parse url.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -785,8 +780,8 @@ static standard_lib_function_fn *s_resolve_fn_vt[AWS_ENDPOINTS_FN_LAST] = {
     [AWS_ENDPOINTS_FN_STRING_EQUALS] = s_resolve_fn_string_equals,
     [AWS_ENDPOINTS_FN_BOOLEAN_EQUALS] = s_resolve_fn_boolean_equals,
     [AWS_ENDPOINTS_FN_COALESCE] = s_resolve_fn_coalesce,
-    [AWS_ENDPOINTS_FN_SPLIT]= s_resolve_fn_split,
-    [AWS_ENDPOINTS_FN_ITE]= s_resolve_fn_ite,
+    [AWS_ENDPOINTS_FN_SPLIT] = s_resolve_fn_split,
+    [AWS_ENDPOINTS_FN_ITE] = s_resolve_fn_ite,
     [AWS_ENDPOINTS_FN_URI_ENCODE] = s_resolve_fn_uri_encode,
     [AWS_ENDPOINTS_FN_PARSE_URL] = s_resolve_fn_parse_url,
     [AWS_ENDPOINTS_FN_IS_VALID_HOST_LABEL] = s_resolve_is_valid_host_label,

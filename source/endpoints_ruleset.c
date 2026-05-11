@@ -334,7 +334,8 @@ static int s_parse_expr(
     /* TODO: this recurses. in practical circumstances depth will never be high,
     but we should still consider doing iterative approach */
     if (aws_json_value_is_string(node) && !aws_json_value_get_string(node, &expr->e.string)) {
-        expr->type = s_is_template_string(expr->e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
+        expr->type =
+            s_is_template_string(expr->e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
         return AWS_OP_SUCCESS;
     } else if (aws_json_value_is_number(node) && !aws_json_value_get_number(node, &expr->e.number)) {
         expr->type = AWS_ENDPOINTS_EXPR_NUMBER;
@@ -680,7 +681,8 @@ static int s_parse_endpoints_rule_data_endpoint(
     if (url_node == NULL || aws_json_value_is_string(url_node)) {
         struct aws_endpoints_expr expr = {0};
         aws_json_value_get_string(url_node, &expr.e.string);
-        expr.type = s_is_template_string(expr.e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
+        expr.type =
+            s_is_template_string(expr.e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
         aws_array_list_push_back(&ruleset->exprs, &expr);
         data_rule->url_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
     } else {
@@ -760,7 +762,8 @@ static int s_parse_endpoints_rule_data_error(
 
     if (aws_json_value_is_string(error_node)) {
         aws_json_value_get_string(error_node, &expr.e.string);
-        expr.type = s_is_template_string(expr.e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
+        expr.type =
+            s_is_template_string(expr.e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
         aws_array_list_push_back(&ruleset->exprs, &expr);
         data_rule->error_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
 
@@ -966,7 +969,8 @@ static int s_init_ruleset_from_json(
         goto on_error;
     }
 
-    aws_array_list_init_dynamic(&ruleset->exprs, allocator, s_expr_array_initial_size, sizeof(struct aws_endpoints_expr));
+    aws_array_list_init_dynamic(
+        &ruleset->exprs, allocator, s_expr_array_initial_size, sizeof(struct aws_endpoints_expr));
 
     aws_hash_table_init(
         &ruleset->parameters,

@@ -45,8 +45,8 @@ struct aws_json_value;
 
 enum {
     AWS_ENDPOINTS_MAX_ELEMENTS_EXPR_ARRAY = 8,
-    AWS_ENDPOINTS_MAX_ELEMENTS_ARGV = 5, 
-}; 
+    AWS_ENDPOINTS_MAX_ELEMENTS_ARGV = 5,
+};
 
 enum aws_endpoints_rule_type { AWS_ENDPOINTS_RULE_ENDPOINT, AWS_ENDPOINTS_RULE_ERROR, AWS_ENDPOINTS_RULE_TREE };
 
@@ -142,7 +142,7 @@ struct aws_endpoints_ruleset {
     /* map of (aws_byte_cursor *) -> (aws_endpoints_parameter *) */
     struct aws_hash_table parameters;
 
-    /* list of (aws_endpoints_expr) 
+    /* list of (aws_endpoints_expr)
      * Note: list of all exprs in the ruleset, and evething else indexes into this list
      * done this way to avoid circural ref between function and expr and to avoid a lot of smaller allocations
      */
@@ -359,7 +359,7 @@ void aws_endpoints_value_clean_up(struct aws_endpoints_value *aws_endpoints_valu
 int aws_endpoints_argv_expect(
     struct aws_allocator *allocator,
     struct aws_endpoints_resolution_scope *scope,
-    struct aws_endpoints_args args, 
+    struct aws_endpoints_args args,
     size_t idx,
     enum aws_endpoints_value_type expected_type,
     struct aws_endpoints_value *out_value);
@@ -370,7 +370,7 @@ void aws_endpoints_rule_engine_init(void);
 int aws_endpoints_dispatch_standard_lib_fn_resolve(
     enum aws_endpoints_fn_type type,
     struct aws_allocator *allocator,
-    struct aws_endpoints_args args, 
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value);
 
@@ -392,8 +392,10 @@ struct resolve_template_callback_data {
     struct aws_endpoints_resolution_scope *scope;
 };
 
-int aws_endpoints_resolve_template(struct aws_byte_cursor template,
-        void *user_data, struct aws_owning_cursor *out_cursor);
+int aws_endpoints_resolve_template(
+    struct aws_byte_cursor template,
+    void *user_data,
+    struct aws_owning_cursor *out_cursor);
 
 int aws_endpoints_resolve_expr(
     struct aws_allocator *allocator,
@@ -417,7 +419,7 @@ bool aws_endpoints_is_value_truthy(const struct aws_endpoints_value *value);
 ******************************
 */
 
-enum {AWS_BDD_MAX_EXPRS = 2048};
+enum { AWS_BDD_MAX_EXPRS = 2048 };
 
 struct aws_endpoints_bdd_node {
     int32_t condition_index;

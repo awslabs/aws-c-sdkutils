@@ -330,7 +330,10 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
 }
 
-int aws_endpoints_resolve_template(struct aws_byte_cursor template, void *user_data, struct aws_owning_cursor *out_cursor) {
+int aws_endpoints_resolve_template(
+    struct aws_byte_cursor template,
+    void *user_data,
+    struct aws_owning_cursor *out_cursor) {
 
     struct resolve_template_callback_data *data = user_data;
 
@@ -580,7 +583,7 @@ int aws_endpoints_argv_expect(
 
     AWS_ZERO_STRUCT(*out_value);
     struct aws_endpoints_value argv_value = {0};
-    
+
     if (idx >= args.argc) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to parse argv");
         goto on_error;
