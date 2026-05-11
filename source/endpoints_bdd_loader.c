@@ -455,7 +455,6 @@ static void s_on_expr_element_clean_up(void *data) {
 static void s_callback_headers_destroy(void *data) {
     struct aws_array_list *array = data;
     struct aws_allocator *alloc = array->alloc;
-    aws_array_list_deep_clean_up(array, s_on_expr_element_clean_up);
     aws_array_list_clean_up(array);
     aws_mem_release(alloc, array);
 }

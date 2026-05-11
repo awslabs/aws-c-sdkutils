@@ -151,7 +151,6 @@ static void s_callback_endpoints_parameter_destroy(void *data) {
 static void s_callback_headers_destroy(void *data) {
     struct aws_array_list *array = data;
     struct aws_allocator *alloc = array->alloc;
-    aws_array_list_deep_clean_up(array, s_on_expr_element_clean_up);
     aws_array_list_clean_up(array);
     aws_mem_release(alloc, array);
 }
@@ -629,7 +628,7 @@ static int s_on_header_element(
     }
 
     aws_array_list_push_back(&wrapper->ruleset->exprs, &expr);
-    uint16_t ref = aws_array_list_length(&wrapper->ruleset->exprs);
+    uint16_t ref = aws_array_list_length(&wrapper->ruleset->exprs) - 1;
     aws_array_list_push_back(wrapper->array, &ref);
     return AWS_OP_SUCCESS;
 }
