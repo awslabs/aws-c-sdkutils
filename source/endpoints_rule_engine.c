@@ -312,7 +312,7 @@ int aws_endpoints_path_through_array(
         goto on_error;
     }
 
-    if (index >= aws_array_list_length(&value->v.array)) {
+    if (index >= (int64_t)aws_array_list_length(&value->v.array)) {
         out_value->type = AWS_ENDPOINTS_VALUE_NONE;
         return AWS_OP_SUCCESS;
     }
