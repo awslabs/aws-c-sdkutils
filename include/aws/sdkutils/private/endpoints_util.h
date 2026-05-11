@@ -77,6 +77,7 @@ typedef int(aws_endpoints_template_resolve_fn)(
     struct aws_byte_cursor template_cursor,
     void *user_data,
     struct aws_owning_cursor *out_resolved);
+
 /*
  * Resolve templated string and write it out to buf.
  * Will parse templated values (i.e. values enclosed in {}) and replace them with

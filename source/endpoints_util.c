@@ -359,14 +359,25 @@ int aws_path_through_json(
         }
 
         if (has_index) {
-            uint64_t index;
-            if (aws_byte_cursor_utf8_parse_u64(index_cur, &index)) {
+            int64_t index;
+            
+            if (aws_byte_cursor_utf8_parse_i64(index_cur, &index)) {
                 AWS_LOGF_ERROR(
                     AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
                     "Failed to parse index: " PRInSTR,
                     AWS_BYTE_CURSOR_PRI(index_cur));
                 goto on_error;
             }
+
+            if (index < 0) {
+                index = aws_json_get_array_size(*out_value) - index;
+            }
+
+            if (index < 0) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected negaive index");
+                goto on_error;
+            }
+
             *out_value = aws_json_get_array_element(*out_value, (size_t)index);
             if (NULL == *out_value) {
                 aws_reset_error();

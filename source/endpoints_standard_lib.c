@@ -18,14 +18,14 @@ static struct aws_byte_cursor s_scheme_https = AWS_BYTE_CUR_INIT_FROM_STRING_LIT
 
 static int s_resolve_fn_is_set(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
-    if (aws_array_list_length(argv) != 1 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value)) {
+    if (args.argc != 1 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for isSet.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -41,14 +41,14 @@ on_done:
 
 static int s_resolve_fn_not(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
-    if (aws_array_list_length(argv) != 1 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_value)) {
+    if (args.argc != 1 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for not.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -64,16 +64,16 @@ on_done:
 
 static int s_resolve_fn_get_attr(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
     struct aws_endpoints_value argv_path = {0};
-    if (aws_array_list_length(argv) != 2 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_STRING, &argv_path)) {
+    if (args.argc != 2 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_STRING, &argv_path)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for get attr.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -108,7 +108,7 @@ on_done:
 
 static int s_resolve_fn_substring(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
@@ -117,11 +117,11 @@ static int s_resolve_fn_substring(
     struct aws_endpoints_value start_value = {0};
     struct aws_endpoints_value stop_value = {0};
     struct aws_endpoints_value reverse_value = {0};
-    if (aws_array_list_length(argv) != 4 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &input_value) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_NUMBER, &start_value) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 2, AWS_ENDPOINTS_VALUE_NUMBER, &stop_value) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 3, AWS_ENDPOINTS_VALUE_BOOLEAN, &reverse_value)) {
+    if (args.argc != 4 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &input_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_NUMBER, &start_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 2, AWS_ENDPOINTS_VALUE_NUMBER, &stop_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 3, AWS_ENDPOINTS_VALUE_BOOLEAN, &reverse_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for substring.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -149,7 +149,12 @@ static int s_resolve_fn_substring(
         };
 
         out_value->type = AWS_ENDPOINTS_VALUE_STRING;
-        out_value->v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, substring);
+        if (input_value.is_ref) {
+            out_value->v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(substring);
+        } else {
+            out_value->v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, substring);
+        }
+        
     } else {
         size_t r_start = input_value.v.owning_cursor_string.cur.len - (size_t)stop_value.v.number;
         size_t r_stop = input_value.v.owning_cursor_string.cur.len - (size_t)start_value.v.number;
@@ -159,7 +164,11 @@ static int s_resolve_fn_substring(
             .len = r_stop - r_start,
         };
         out_value->type = AWS_ENDPOINTS_VALUE_STRING;
-        out_value->v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, substring);
+        if (input_value.is_ref) {
+            out_value->v.owning_cursor_string = aws_endpoints_non_owning_cursor_create(substring);
+        } else {
+            out_value->v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, substring);
+        }
     }
 
 on_done:
@@ -172,16 +181,16 @@ on_done:
 
 static int s_resolve_fn_string_equals(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value_1 = {0};
     struct aws_endpoints_value argv_value_2 = {0};
-    if (aws_array_list_length(argv) != 2 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value_1) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_STRING, &argv_value_2)) {
+    if (args.argc != 2 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value_1) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_STRING, &argv_value_2)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve stringEquals.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -199,16 +208,16 @@ on_done:
 
 static int s_resolve_fn_boolean_equals(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value_1 = {0};
     struct aws_endpoints_value argv_value_2 = {0};
-    if (aws_array_list_length(argv) != 2 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_value_1) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_value_2)) {
+    if (args.argc != 2 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_value_1) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_value_2)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve booleanEquals.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -223,17 +232,157 @@ on_done:
     return result;
 }
 
+static int s_resolve_fn_coalesce(
+    struct aws_allocator *allocator,
+    struct aws_endpoints_args args,
+    struct aws_endpoints_resolution_scope *scope,
+    struct aws_endpoints_value *out_value) {
+
+    int result = AWS_OP_SUCCESS;
+    bool is_out_set = false;
+
+    for (size_t i = 0; i < args.argc; ++i) {
+        struct aws_endpoints_value argv_value = {0};
+        if (aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve coalesce.");
+            result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+            goto on_done;
+        }
+
+        if (argv_value.type != AWS_ENDPOINTS_VALUE_NONE) {
+            *out_value = argv_value;
+            is_out_set = true;
+            break;
+        } else {
+            aws_endpoints_value_clean_up(&argv_value);
+        }
+    }
+
+    if (!is_out_set) {
+        out_value->type = AWS_ENDPOINTS_VALUE_NONE;
+    }
+
+on_done:
+    return result;
+}
+
+static int s_resolve_fn_split(
+    struct aws_allocator *allocator,
+    struct aws_endpoints_args args,
+    struct aws_endpoints_resolution_scope *scope,
+    struct aws_endpoints_value *out_value) {
+
+    int result = AWS_OP_SUCCESS;
+    struct aws_endpoints_value input_value = {0};
+    struct aws_endpoints_value delim_value = {0};
+    struct aws_endpoints_value limit_value = {0};
+    if (args.argc != 3 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &input_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_STRING, &delim_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 2, AWS_ENDPOINTS_VALUE_NUMBER, &limit_value)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for split.");
+        result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        goto on_done;
+    }
+
+    for (size_t idx = 0; idx < input_value.v.owning_cursor_string.cur.len; ++idx) {
+        if (input_value.v.owning_cursor_string.cur.ptr[idx] > 127) {
+            out_value->type = AWS_ENDPOINTS_VALUE_NONE;
+            goto on_done;
+        }
+    }
+
+    aws_array_list_init_dynamic(&out_value->v.array, allocator, 10, sizeof(struct aws_endpoints_value));
+
+    size_t limit = (size_t)limit_value.v.number;
+    struct aws_byte_cursor input = input_value.v.owning_cursor_object.cur;
+    struct aws_byte_cursor delim = delim_value.v.owning_cursor_object.cur;
+    struct aws_byte_cursor substr = {0};
+    bool has_leftover_str = true;
+    for (int32_t count = 0; count < limit; ++count) {
+        if (aws_byte_cursor_next_split_on_cursor(&input, delim, &substr)) {
+            struct aws_endpoints_value val = {
+                .is_ref = false,
+                .type = AWS_ENDPOINTS_VALUE_STRING,
+                .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, substr)
+            };
+            
+            aws_array_list_push_back(&out_value->v.array, &val);
+        } else {
+            has_leftover_str = false;
+            break;
+        }
+    }
+
+    if (has_leftover_str) {
+        if (aws_byte_cursor_next_split_on_cursor(&input, delim, &substr)) {
+            aws_byte_cursor_advance(&input, input.ptr - substr.ptr);
+            struct aws_endpoints_value val = {
+                .is_ref = false,
+                .type = AWS_ENDPOINTS_VALUE_STRING,
+                .v.owning_cursor_object = aws_endpoints_owning_cursor_from_cursor(allocator, input)
+            };
+            
+            aws_array_list_push_back(&out_value->v.array, &val);
+        }
+    }
+
+on_done:
+    aws_endpoints_value_clean_up(&input_value);
+    aws_endpoints_value_clean_up(&delim_value);
+    aws_endpoints_value_clean_up(&limit_value);
+    return result;
+}
+
+static int s_resolve_fn_ite(
+    struct aws_allocator *allocator,
+    struct aws_endpoints_args args,
+    struct aws_endpoints_resolution_scope *scope,
+    struct aws_endpoints_value *out_value) {
+
+    int result = AWS_OP_SUCCESS;
+    struct aws_endpoints_value cond_value = {0};
+    struct aws_endpoints_value true_value = {0};
+    struct aws_endpoints_value false_value = {0};
+    if (args.argc != 3 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_BOOLEAN, &cond_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_ANY, &true_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 2, AWS_ENDPOINTS_VALUE_ANY, &false_value)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve ite.");
+        result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        goto on_done;
+    }
+
+    if (cond_value.type != AWS_ENDPOINTS_VALUE_BOOLEAN) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected cond type in ite.");
+        result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        goto on_done;
+    }
+
+    if (cond_value.v.boolean == true) {
+        *out_value = true_value;
+        aws_endpoints_value_clean_up(&false_value);
+    } else {
+        *out_value = false_value;
+        aws_endpoints_value_clean_up(&true_value);
+    }
+
+on_done:
+    aws_endpoints_value_clean_up(&cond_value);
+    return result;
+}
+
 static int s_resolve_fn_uri_encode(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_byte_buf buf = {0};
     struct aws_endpoints_value argv_value = {0};
-    if (aws_array_list_length(argv) != 1 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value)) {
+    if (args.argc != 1 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve parameter to uri encode.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -268,7 +417,7 @@ static bool s_is_uri_ip(struct aws_byte_cursor host, bool is_uri_encoded) {
 
 static int s_resolve_fn_parse_url(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
@@ -276,8 +425,8 @@ static int s_resolve_fn_parse_url(
     struct aws_uri uri;
     struct aws_json_value *root = NULL;
     struct aws_endpoints_value argv_url = {0};
-    if (aws_array_list_length(argv) != 1 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_url)) {
+    if (args.argc != 1 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_url)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for parse url.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -393,15 +542,15 @@ on_done:
 
 static int s_resolve_is_valid_host_label(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     struct aws_endpoints_value argv_value = {0};
     struct aws_endpoints_value argv_allow_subdomains = {0};
-    if (aws_array_list_length(argv) != 2 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
+    if (args.argc != 2 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve not.");
         goto on_error;
     }
@@ -422,15 +571,15 @@ on_error:
 
 static int s_resolve_fn_aws_partition(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_region = {0};
 
-    if (aws_array_list_length(argv) != 1 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_region)) {
+    if (args.argc != 1 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_region)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve arguments for partitions.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -487,15 +636,15 @@ on_done:
 
 static int s_resolve_fn_aws_parse_arn(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_json_value *object = NULL;
     struct aws_endpoints_value argv_value = {0};
-    if (aws_array_list_length(argv) != 1 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value)) {
+    if (args.argc != 1 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve parseArn.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -586,16 +735,16 @@ on_done:
 
 static int s_resolve_is_virtual_hostable_s3_bucket(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
     struct aws_endpoints_value argv_allow_subdomains = {0};
-    if (aws_array_list_length(argv) != 2 ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value) ||
-        aws_endpoints_argv_expect(allocator, scope, argv, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
+    if (args.argc != 2 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for isVirtualHostableS3Bucket.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -624,7 +773,7 @@ on_done:
 
 typedef int(standard_lib_function_fn)(
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value);
 
@@ -635,6 +784,9 @@ static standard_lib_function_fn *s_resolve_fn_vt[AWS_ENDPOINTS_FN_LAST] = {
     [AWS_ENDPOINTS_FN_SUBSTRING] = s_resolve_fn_substring,
     [AWS_ENDPOINTS_FN_STRING_EQUALS] = s_resolve_fn_string_equals,
     [AWS_ENDPOINTS_FN_BOOLEAN_EQUALS] = s_resolve_fn_boolean_equals,
+    [AWS_ENDPOINTS_FN_COALESCE] = s_resolve_fn_coalesce,
+    [AWS_ENDPOINTS_FN_SPLIT]= s_resolve_fn_split,
+    [AWS_ENDPOINTS_FN_ITE]= s_resolve_fn_ite,
     [AWS_ENDPOINTS_FN_URI_ENCODE] = s_resolve_fn_uri_encode,
     [AWS_ENDPOINTS_FN_PARSE_URL] = s_resolve_fn_parse_url,
     [AWS_ENDPOINTS_FN_IS_VALID_HOST_LABEL] = s_resolve_is_valid_host_label,
@@ -646,8 +798,8 @@ static standard_lib_function_fn *s_resolve_fn_vt[AWS_ENDPOINTS_FN_LAST] = {
 int aws_endpoints_dispatch_standard_lib_fn_resolve(
     enum aws_endpoints_fn_type type,
     struct aws_allocator *allocator,
-    struct aws_array_list *argv,
+    struct aws_endpoints_args args,
     struct aws_endpoints_resolution_scope *scope,
     struct aws_endpoints_value *out_value) {
-    return s_resolve_fn_vt[type](allocator, argv, scope, out_value);
+    return s_resolve_fn_vt[type](allocator, args, scope, out_value);
 }
