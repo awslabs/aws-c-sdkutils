@@ -299,7 +299,7 @@ static int s_resolve_fn_split(
     struct aws_byte_cursor delim = delim_value.v.owning_cursor_object.cur;
     struct aws_byte_cursor substr = {0};
     bool has_leftover_str = true;
-    for (int32_t count = 0; count < limit; ++count) {
+    for (size_t count = 0; count < limit; ++count) {
         if (aws_byte_cursor_next_split_on_cursor(&input, delim, &substr)) {
             struct aws_endpoints_value val = {
                 .is_ref = false,
