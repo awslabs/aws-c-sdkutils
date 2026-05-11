@@ -45,11 +45,6 @@ static void s_on_rule_array_element_clean_up(void *element) {
     aws_endpoints_rule_clean_up(rule);
 }
 
-static void s_on_expr_array_element_clean_up(void *element) {
-    struct aws_endpoints_expr *expr = element;
-    aws_endpoints_expr_clean_up(expr);
-}
-
 struct aws_partition_info *aws_partition_info_new(struct aws_allocator *allocator, struct aws_byte_cursor name) {
     AWS_PRECONDITION(allocator);
     struct aws_partition_info *partition_info = aws_mem_calloc(allocator, 1, sizeof(struct aws_partition_info));
