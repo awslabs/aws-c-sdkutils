@@ -520,7 +520,7 @@ int aws_endpoints_resolve_headers(
             }
 
             if (aws_endpoints_resolve_expr(allocator, ref, scope, &value) || value.type != AWS_ENDPOINTS_VALUE_STRING) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve header expr. %zu", value.type);
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve header expr.");
                 goto on_error;
             }
 
