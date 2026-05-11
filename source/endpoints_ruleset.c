@@ -300,7 +300,7 @@ static int s_on_expr_element(
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
     }
 
-    uint16_t ref_idx = aws_array_list_length(&wrapper->ruleset->exprs);
+    uint16_t ref_idx = (uint16_t)aws_array_list_length(&wrapper->ruleset->exprs);
     aws_array_list_push_back(&wrapper->ruleset->exprs, &expr);
 
     if (AWS_UNLIKELY(idx >= wrapper->len)) {
@@ -345,8 +345,8 @@ static int s_parse_expr(
     } else if (aws_json_value_is_array(node)) {
         expr->type = AWS_ENDPOINTS_EXPR_ARRAY;
         size_t num_elements = aws_json_get_array_size(node);
-        expr->e.array.len = num_elements;
-        if (s_init_ref_array_from_json(ruleset, node, expr->e.array.ptr, num_elements, s_on_expr_element)) {
+        expr->e.array.len = (uint16_t)num_elements;
+        if (s_init_ref_array_from_json(ruleset, node, expr->e.array.ptr, (uint16_t)num_elements, s_on_expr_element)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse array value type.");
             goto on_error;
         }
