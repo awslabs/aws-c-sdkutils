@@ -33,10 +33,10 @@ static void s_on_condition_array_element_clean_up(void *element) {
 static void s_on_resutls_array_element_clean_up(void *element) {
     struct aws_endpoints_bdd_result *result = element;
     switch (result->type) {
-        case AWS_ENDPOINTS_RULE_ENDPOINT:
+        case AWS_ENDPOINTS_RESOLVED_ENDPOINT:
             aws_endpoints_rule_data_endpoint_clean_up(&result->data.endpoint);
             break;
-        case AWS_ENDPOINTS_RULE_ERROR:
+        case AWS_ENDPOINTS_RESOLVED_ERROR:
             aws_endpoints_rule_data_error_clean_up(&result->data.error);
             break;
         default:
