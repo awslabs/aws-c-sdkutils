@@ -421,7 +421,7 @@ static int s_parse_function(
         goto on_error;
     }
 
-    function->args.argc = aws_json_get_array_size(argv_node);
+    function->args.argc = (uint16_t)aws_json_get_array_size(argv_node);
 
     if (s_init_ref_array_from_json(ruleset, argv_node, function->args.argv, function->args.argc, s_on_expr_element)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse argv.");
@@ -594,7 +594,7 @@ static int s_on_condition_element(
     }
 
     aws_array_list_push_back(&wrapper->ruleset->exprs, &expr);
-    condition.expr_ref = aws_array_list_length(&wrapper->ruleset->exprs) - 1;
+    condition.expr_ref = (uint16_t)aws_array_list_length(&wrapper->ruleset->exprs) - 1;
 
     struct aws_json_value *assign_node = aws_json_value_get_from_object_c_str(condition_node, "assign");
     if (assign_node != NULL && aws_json_value_get_string(assign_node, &condition.assign)) {
@@ -628,7 +628,7 @@ static int s_on_header_element(
     }
 
     aws_array_list_push_back(&wrapper->ruleset->exprs, &expr);
-    uint16_t ref = aws_array_list_length(&wrapper->ruleset->exprs) - 1;
+    uint16_t ref = (uint16_t)aws_array_list_length(&wrapper->ruleset->exprs) - 1;
     aws_array_list_push_back(wrapper->array, &ref);
     return AWS_OP_SUCCESS;
 }
@@ -682,7 +682,7 @@ static int s_parse_endpoints_rule_data_endpoint(
         aws_json_value_get_string(url_node, &expr.e.string);
         expr.type = s_is_template_string(expr.e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
         aws_array_list_push_back(&ruleset->exprs, &expr);
-        data_rule->url_expr_ref = aws_array_list_length(&ruleset->exprs) - 1;
+        data_rule->url_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
     } else {
         struct aws_byte_cursor reference;
         if (s_try_parse_reference(url_node, &reference)) {
@@ -704,7 +704,7 @@ static int s_parse_endpoints_rule_data_endpoint(
         }
 
         aws_array_list_push_back(&ruleset->exprs, &expr);
-        data_rule->url_expr_ref = aws_array_list_length(&ruleset->exprs) - 1;
+        data_rule->url_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
     }
 
     struct aws_json_value *properties_node = aws_json_value_get_from_object_c_str(rule_node, "properties");
@@ -762,7 +762,7 @@ static int s_parse_endpoints_rule_data_error(
         aws_json_value_get_string(error_node, &expr.e.string);
         expr.type = s_is_template_string(expr.e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
         aws_array_list_push_back(&ruleset->exprs, &expr);
-        data_rule->error_expr_ref = aws_array_list_length(&ruleset->exprs) - 1;
+        data_rule->error_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
 
         return AWS_OP_SUCCESS;
     }
@@ -776,7 +776,7 @@ static int s_parse_endpoints_rule_data_error(
         expr.type = AWS_ENDPOINTS_EXPR_REFERENCE;
         expr.e.reference = reference;
         aws_array_list_push_back(&ruleset->exprs, &expr);
-        data_rule->error_expr_ref = aws_array_list_length(&ruleset->exprs) - 1;
+        data_rule->error_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
         return AWS_OP_SUCCESS;
     }
 
@@ -786,7 +786,7 @@ static int s_parse_endpoints_rule_data_error(
     }
 
     aws_array_list_push_back(&ruleset->exprs, &expr);
-    data_rule->error_expr_ref = aws_array_list_length(&ruleset->exprs) - 1;
+    data_rule->error_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
 
     return AWS_OP_SUCCESS;
 
