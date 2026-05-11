@@ -382,7 +382,7 @@ static int s_parse_function(
     struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *node,
     struct aws_endpoints_function *function) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(node);
 
     AWS_ZERO_STRUCT(*function);
