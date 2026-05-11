@@ -230,7 +230,7 @@ static int s_init_members_from_json(
     struct aws_json_value *node,
     struct aws_hash_table *table,
     aws_json_on_member_encountered_const_fn *member_fn) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(node);
     AWS_PRECONDITION(table);
 
@@ -753,7 +753,7 @@ static int s_parse_endpoints_rule_data_error(
     struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *error_node,
     struct aws_endpoints_rule_data_error *data_rule) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(error_node);
     AWS_PRECONDITION(data_rule);
 
