@@ -447,11 +447,6 @@ error:
     return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
-static void s_on_expr_element_clean_up(void *data) {
-    struct aws_endpoints_expr *expr = data;
-    aws_endpoints_expr_clean_up(expr);
-}
-
 static void s_callback_headers_destroy(void *data) {
     struct aws_array_list *array = data;
     struct aws_allocator *alloc = array->alloc;
