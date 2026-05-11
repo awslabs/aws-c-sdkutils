@@ -106,7 +106,7 @@ static int s_init_top_level_scope(
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(context);
     AWS_PRECONDITION(ruleset);
-    AWS_PRECONDITION(scope);
+    AWS_PRECONDITION(state);
 
     state->rule_idx = 0;
     state->rules = &ruleset->rules;
