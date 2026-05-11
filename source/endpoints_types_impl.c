@@ -148,6 +148,7 @@ void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr) {
 
     switch (expr->type) {
         case AWS_ENDPOINTS_EXPR_STRING:
+        case AWS_ENDPOINTS_EXPR_TEMPLATE_STRING:
         case AWS_ENDPOINTS_EXPR_BOOLEAN:
         case AWS_ENDPOINTS_EXPR_NUMBER:
         case AWS_ENDPOINTS_EXPR_REFERENCE:

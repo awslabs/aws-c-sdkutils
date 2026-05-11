@@ -1016,6 +1016,7 @@ static void s_endpoints_ruleset_destroy(void *data) {
     aws_hash_table_clean_up(&ruleset->parameters);
 
     aws_array_list_deep_clean_up(&ruleset->rules, s_on_rule_array_element_clean_up);
+    aws_array_list_deep_clean_up(&ruleset->exprs, s_on_expr_element_clean_up);
 
     aws_json_value_destroy(ruleset->json_root);
 
