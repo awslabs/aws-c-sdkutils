@@ -13,6 +13,9 @@ AWS_TEST_CASE(endpoints_bdd_loader_basic, s_test_bdd_loader_basic)
 static int s_test_bdd_loader_basic(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
+    struct aws_allocator *default_allocator = aws_default_allocator();
+    allocator = default_allocator;
+
     aws_sdkutils_library_init(allocator);
 
     struct aws_byte_buf bytecode;
