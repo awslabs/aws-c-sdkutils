@@ -188,7 +188,7 @@ on_error:
 }
 
 static void s_state_clean_up(struct aws_endpoints_resolution_state *state) {
-    AWS_PRECONDITION(scope);
+    AWS_PRECONDITION(state);
 
     aws_hash_table_clean_up(&state->scope.values);
     aws_array_list_clean_up(&state->added_keys);
