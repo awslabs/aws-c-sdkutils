@@ -1296,9 +1296,11 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
             }
 
             aws_byte_cursor_advance(&current_position, line_cursor.len + 1);
-            ++context.current_line_number;
+            ++context.current_line_number;parse_error
         }
     }
+
+    AWS_LOGF_DEBUG(0 , "fooo got here");
 
     return profile_collection;
 
