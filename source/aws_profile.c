@@ -1291,6 +1291,7 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
             s_parse_and_apply_line_to_profile_collection(&context, &line_cursor);
             if (context.parse_error == AWS_ERROR_SDKUTILS_PARSE_FATAL) {
                 AWS_LOGF_WARN(AWS_LS_SDKUTILS_PROFILE, "Fatal error while parsing aws profile collection");
+                aws_raise_error(context.parse_error);
                 goto cleanup;
             }
 
