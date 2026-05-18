@@ -1298,13 +1298,17 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
             aws_byte_cursor_advance(&current_position, line_cursor.len + 1);
             ++context.current_line_number;
         }
+
+        AWS_LOGF_DEBUG(0, "fooo finished parsing %d %d", context.parse_error, aws_last_error());
     }
 
-    AWS_LOGF_DEBUG(0 , "fooo got here");
+    
+    AWS_LOGF_DEBUG(0, "fooo got here");
 
     return profile_collection;
 
 cleanup:
+    AWS_LOGF_DEBUG(0, "fooo not here");
     s_aws_profile_collection_destroy_internal(profile_collection);
 
     return NULL;
