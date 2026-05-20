@@ -43,9 +43,11 @@ struct aws_json_value;
 ******************************
 */
 
+/* Note: following are rather arbitraty limits on different arrays, so that we can do a statically sized 
+    array instead of dynamic arrays for perf reasons. */
 enum {
-    AWS_ENDPOINTS_MAX_ELEMENTS_EXPR_ARRAY = 8,
-    AWS_ENDPOINTS_MAX_ELEMENTS_ARGV = 5,
+    AWS_ENDPOINTS_MAX_ELEMENTS_EXPR_ARRAY = 8, /* how many elements can be in parameter array, typically 1-2 elements. */
+    AWS_ENDPOINTS_MAX_ELEMENTS_ARGV = 5, /* how many args can be passed to a function. current std lib max is 4 args */
 };
 
 enum aws_endpoints_rule_type { AWS_ENDPOINTS_RULE_ENDPOINT, AWS_ENDPOINTS_RULE_ERROR, AWS_ENDPOINTS_RULE_TREE };
@@ -149,6 +151,7 @@ struct aws_endpoints_ruleset {
     struct aws_array_list exprs;
 };
 
+/* Wrapper to hold function args (input exprs refs and number of inputs). */
 struct aws_endpoints_args {
     uint16_t argv[AWS_ENDPOINTS_MAX_ELEMENTS_ARGV];
     uint16_t argc;
@@ -419,14 +422,17 @@ bool aws_endpoints_is_value_truthy(const struct aws_endpoints_value *value);
 ******************************
 */
 
+/* static sizing for expr array. Note: current rulesets max out at about half of that. */
 enum { AWS_BDD_MAX_EXPRS = 2048 };
 
+/* nodes array for bdd flow. */
 struct aws_endpoints_bdd_node {
     int32_t condition_index;
     int32_t high_ref;
     int32_t low_ref;
 };
 
+/* bdd result. note: basically rewraps regular result in a new structure. */
 struct aws_endpoints_bdd_result {
     enum aws_endpoints_resolved_endpoint_type type;
     union {
@@ -443,6 +449,7 @@ struct aws_endpoints_bdd_engine {
 
     struct aws_byte_cursor version;
 
+    /* string segment. basically blob of all strings in ruleset that everything else indexes to. */
     struct aws_byte_cursor string_blob;
 
     struct aws_hash_table parameters;
@@ -450,6 +457,7 @@ struct aws_endpoints_bdd_engine {
     struct aws_array_list conditions;
     struct aws_endpoints_condition *conditions_ptr;
 
+    /* array of all exprs in the program. everything else indexes into this. */
     struct aws_endpoints_expr expr_ptr[AWS_BDD_MAX_EXPRS];
     uint16_t expr_len;
 
