@@ -43,10 +43,11 @@ struct aws_json_value;
 ******************************
 */
 
-/* Note: following are rather arbitraty limits on different arrays, so that we can do a statically sized 
+/* Note: following are rather arbitraty limits on different arrays, so that we can do a statically sized
     array instead of dynamic arrays for perf reasons. */
 enum {
-    AWS_ENDPOINTS_MAX_ELEMENTS_EXPR_ARRAY = 8, /* how many elements can be in parameter array, typically 1-2 elements. */
+    AWS_ENDPOINTS_MAX_ELEMENTS_EXPR_ARRAY =
+        8,                               /* how many elements can be in parameter array, typically 1-2 elements. */
     AWS_ENDPOINTS_MAX_ELEMENTS_ARGV = 5, /* how many args can be passed to a function. current std lib max is 4 args */
 };
 

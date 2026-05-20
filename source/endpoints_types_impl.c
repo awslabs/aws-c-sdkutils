@@ -22,7 +22,6 @@ void aws_endpoints_rule_engine_init(void) {
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_SUBSTRING] = aws_hash_c_string("substring");
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_STRING_EQUALS] = aws_hash_c_string("stringEquals");
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_BOOLEAN_EQUALS] = aws_hash_c_string("booleanEquals");
-    aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_COALESCE] = aws_hash_c_string("coalesce");
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_SPLIT] = aws_hash_c_string("split");
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_ITE] = aws_hash_c_string("ite");
     aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_COALESCE] = aws_hash_c_string("coalesce");
