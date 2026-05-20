@@ -616,7 +616,8 @@ static int s_load_nodes(
         for (uint32_t i = 0; i < node_count; ++i) {
             struct aws_endpoints_bdd_node node;
             if (!aws_byte_cursor_read_le_i32(&data, &node.condition_index) ||
-                !aws_byte_cursor_read_le_i32(&data, &node.high_ref) || !aws_byte_cursor_read_le_i32(&data, &node.low_ref)) {
+                !aws_byte_cursor_read_le_i32(&data, &node.high_ref) ||
+                !aws_byte_cursor_read_le_i32(&data, &node.low_ref)) {
                 aws_array_list_clean_up(out_nodes);
                 return AWS_OP_ERR;
             }
