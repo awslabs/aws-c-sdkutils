@@ -260,7 +260,7 @@ def encode_results(buf, data, strings):
 
 def encode_nodes(buf, data):
     """Emit root_ref (int32), node_count (uint32), then base64 nodes blob with uint16 length prefix.
-    The source JSON has nodes in a base64 blob with little-endian int32s. We re-encode to big-endian."""
+    The source JSON has nodes in a base64 blob with big-endian int32s. We re-encode to little-endian."""
     root_ref = data.get("root", 0)
     node_count = data.get("nodeCount", 0)
     buf += struct.pack("<iI", root_ref, node_count)
