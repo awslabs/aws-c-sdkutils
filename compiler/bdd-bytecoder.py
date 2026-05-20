@@ -145,7 +145,7 @@ class StringBlob:
 
 
 def write_string_ref(buf, offset, length):
-    """Emit 4 bytes: uint16 offset + uint16 length (big-endian)."""
+    """Emit 4 bytes: uint16 offset + uint16 length (little-endian)."""
     buf.extend(struct.pack("<HH", offset, length))
 
 
