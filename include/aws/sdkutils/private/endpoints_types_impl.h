@@ -143,8 +143,8 @@ struct aws_endpoints_ruleset {
     struct aws_hash_table parameters;
 
     /* list of (aws_endpoints_expr)
-     * Note: list of all exprs in the ruleset, and evething else indexes into this list
-     * done this way to avoid circural ref between function and expr and to avoid a lot of smaller allocations
+     * Note: all exprs in the ruleset, and everything else indexes into this list
+     * done this way to avoid circular ref between function and expr and to avoid a lot of smaller allocations
      */
     struct aws_array_list exprs;
 };
