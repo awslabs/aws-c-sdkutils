@@ -1,0 +1,327 @@
+/**
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0.
+ */
+
+#include <aws/sdkutils/endpoints_bdd_engine.h>
+#include <aws/sdkutils/private/endpoints_types_impl.h>
+
+struct aws_endpoints_bdd_engine_state {
+    struct aws_endpoints_resolution_scope scope;
+
+    struct aws_endpoints_bdd_engine *engine;
+};
+
+static void s_scope_value_destroy_cb(void *data) {
+    struct aws_endpoints_scope_value *value = data;
+    aws_endpoints_scope_value_destroy(value);
+}
+
+/* TODO: does it need to be deep copy */
+static int s_deep_copy_context_to_state(
+    struct aws_allocator *allocator,
+    const struct aws_endpoints_request_context *context,
+    struct aws_endpoints_bdd_engine_state *state) {
+
+    struct aws_endpoints_scope_value *new_value = NULL;
+
+    for (struct aws_hash_iter iter = aws_hash_iter_begin(&context->values); !aws_hash_iter_done(&iter);
+         aws_hash_iter_next(&iter)) {
+
+        struct aws_endpoints_scope_value *context_value = (struct aws_endpoints_scope_value *)iter.element.value;
+
+        new_value = aws_endpoints_scope_value_new(allocator, context_value->name.cur);
+        if (aws_endpoints_deep_copy_parameter_value(allocator, &context_value->value, &new_value->value)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to deep copy value.");
+            goto on_error;
+        }
+
+        if (aws_hash_table_put(&state->scope.values, &new_value->name.cur, new_value, NULL)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to add deep copy to scope.");
+            goto on_error;
+        }
+    }
+
+    return AWS_OP_SUCCESS;
+
+on_error:
+    aws_endpoints_scope_value_destroy(new_value);
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+}
+
+static int s_init_state(
+    struct aws_allocator *allocator,
+    const struct aws_endpoints_request_context *context,
+    struct aws_endpoints_bdd_engine *engine,
+    struct aws_endpoints_bdd_engine_state *state) {
+    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(context);
+    AWS_PRECONDITION(ruleset);
+    AWS_PRECONDITION(scope);
+
+    state->scope.partitions = engine->partitions_config;
+    state->engine = engine;
+    aws_array_list_init_static_from_initialized(
+        &state->scope.expr_index, engine->expr_ptr, engine->expr_len, sizeof(struct aws_endpoints_expr));
+
+    if (aws_hash_table_init(
+            &state->scope.values,
+            allocator,
+            100,
+            aws_hash_byte_cursor_ptr,
+            aws_endpoints_byte_cursor_eq,
+            NULL,
+            s_scope_value_destroy_cb)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to init request context values.");
+        goto on_error;
+    }
+
+    if (s_deep_copy_context_to_state(allocator, context, state)) {
+        goto on_error;
+    }
+
+    /* Add defaults to the top level scope. */
+    for (struct aws_hash_iter iter = aws_hash_iter_begin(&engine->parameters); !aws_hash_iter_done(&iter);
+         aws_hash_iter_next(&iter)) {
+        const struct aws_byte_cursor key = *(const struct aws_byte_cursor *)iter.element.key;
+        struct aws_endpoints_parameter *value = (struct aws_endpoints_parameter *)iter.element.value;
+
+        /* Skip non-required values, since they cannot have default values. */
+        if (!value->is_required) {
+            continue;
+        }
+
+        struct aws_hash_element *existing = NULL;
+        if (aws_hash_table_find(&state->scope.values, &key, &existing)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to init request context values.");
+            return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+        }
+
+        if (existing == NULL) {
+            if (!value->has_default_value) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "No value or default for required parameter.");
+                goto on_error;
+            }
+
+            struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, key);
+            AWS_ASSERT(val);
+
+            switch (value->type) {
+                case AWS_ENDPOINTS_PARAMETER_STRING:
+                case AWS_ENDPOINTS_PARAMETER_BOOLEAN:
+                case AWS_ENDPOINTS_PARAMETER_STRING_ARRAY:
+                    val->value = value->default_value;
+                    val->value.is_ref = true;
+                    break;
+                default:
+                    AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected parameter type.");
+                    aws_endpoints_scope_value_destroy(val);
+                    goto on_error;
+            }
+
+            if (aws_hash_table_put(&state->scope.values, &val->name.cur, val, NULL)) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to add value to top level scope.");
+                aws_endpoints_scope_value_destroy(val);
+                goto on_error;
+            }
+        }
+    }
+
+    return AWS_OP_SUCCESS;
+
+on_error:
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+}
+
+static int s_resolve_one_condition(
+    struct aws_allocator *allocator,
+    struct aws_endpoints_condition *condition,
+    struct aws_endpoints_bdd_engine_state *state,
+    bool *out_is_truthy) {
+
+    struct aws_endpoints_scope_value *scope_value = NULL;
+
+    struct aws_endpoints_value val;
+    if (aws_endpoints_resolve_expr(allocator, condition->expr_ref, &state->scope, &val)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve expr.");
+        goto on_error;
+    }
+
+    *out_is_truthy = aws_endpoints_is_value_truthy(&val);
+
+    /* Note: assigning value is skipped if condition is falsy, since nothing can
+    use it and that avoids adding value and then removing it from scope right away. */
+    if (*out_is_truthy && condition->assign.len > 0) {
+        /* If condition assigns a value, push it to scope and let scope
+        handle value memory. */
+        scope_value = aws_endpoints_scope_value_new(allocator, condition->assign);
+        scope_value->value = val;
+
+        int was_created = 1;
+        if (aws_hash_table_put(&state->scope.values, &scope_value->name.cur, scope_value, &was_created)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to set assigned variable.");
+            goto on_error;
+        }
+
+        /* Shadowing existing values is prohibited. */
+        if (!was_created) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Assigned variable shadows existing one.");
+            goto on_error;
+        }
+    } else {
+        /* Otherwise clean up temp value */
+        aws_endpoints_value_clean_up(&val);
+    }
+
+    return AWS_OP_SUCCESS;
+
+on_error:
+    aws_endpoints_scope_value_destroy(scope_value);
+    /* Only cleanup value if mem ownership was not transferred to scope value. */
+    if (scope_value == NULL) {
+        aws_endpoints_value_clean_up(&val);
+    }
+
+    *out_is_truthy = false;
+    return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+}
+
+static void s_state_clean_up(struct aws_endpoints_bdd_engine_state *state) {
+    AWS_PRECONDITION(scope);
+
+    aws_hash_table_clean_up(&state->scope.values);
+}
+
+static int32_t s_result_bound = 100000000;
+
+int aws_endpoints_bdd_engine_resolve(
+    struct aws_endpoints_bdd_engine *engine,
+    const struct aws_endpoints_request_context *context,
+    struct aws_endpoints_resolved_endpoint **out_resolved_endpoint) {
+
+    int result = AWS_OP_SUCCESS;
+    struct aws_endpoints_bdd_engine_state state = {0};
+    if (s_init_state(engine->allocator, context, engine, &state)) {
+        result = AWS_OP_ERR;
+        goto on_done;
+    }
+
+    int32_t current_ref = engine->root_ref;
+
+    while (current_ref != 1 && current_ref != -1 && /* terminal no match */
+           current_ref < s_result_bound) {
+
+        bool is_complement = current_ref < 0;
+        int32_t node_index = (is_complement ? -current_ref : current_ref) - 1;
+
+        struct aws_endpoints_bdd_node *node;
+        if (aws_array_list_get_at_ptr(&engine->nodes, (void **)&node, node_index)) {
+            result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+            goto on_done;
+        }
+
+        int32_t condition_index = node->condition_index;
+        struct aws_endpoints_condition *current_condition;
+
+        if (aws_array_list_get_at_ptr(&engine->conditions, (void **)&current_condition, condition_index)) {
+            result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+            goto on_done;
+        }
+
+        bool is_thruthy = false;
+        if (s_resolve_one_condition(engine->allocator, current_condition, &state, &is_thruthy)) {
+            result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+            goto on_done;
+        }
+
+        if (is_complement ^ is_thruthy) {
+            current_ref = node->high_ref;
+        } else {
+            current_ref = node->low_ref;
+        }
+    }
+
+    /* eval terminal result */
+    if (current_ref == 1 || current_ref == -1) { /* no match */
+        result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RULESET_EXHAUSTED);
+        goto on_done;
+    }
+
+    if (current_ref < s_result_bound) {
+        result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        goto on_done;
+    }
+
+    int32_t result_idx = (current_ref - s_result_bound);
+    struct aws_endpoints_bdd_result eval_result;
+    if (aws_array_list_get_at(&engine->results, &eval_result, result_idx)) {
+        result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        goto on_done;
+    }
+
+    if (eval_result.type == AWS_ENDPOINTS_RESOLVED_ENDPOINT) {
+        struct aws_endpoints_resolved_endpoint *endpoint = aws_endpoints_resolved_endpoint_new(engine->allocator);
+        endpoint->type = AWS_ENDPOINTS_RESOLVED_ENDPOINT;
+
+        struct aws_endpoints_value val;
+        if (aws_endpoints_resolve_expr(engine->allocator, eval_result.data.endpoint.url_expr_ref, &state.scope, &val) ||
+            val.type != AWS_ENDPOINTS_VALUE_STRING ||
+            aws_byte_buf_init_copy_from_cursor(
+                &endpoint->r.endpoint.url, engine->allocator, val.v.owning_cursor_string.cur)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated url.");
+            result = AWS_OP_ERR;
+            goto on_done;
+        }
+
+        aws_endpoints_value_clean_up(&val);
+
+        struct resolve_template_callback_data data = {.allocator = engine->allocator, .scope = &state.scope};
+
+        if (eval_result.data.endpoint.properties.len > 0 &&
+            aws_byte_buf_init_from_resolved_templated_string(
+                engine->allocator,
+                &endpoint->r.endpoint.properties,
+                aws_byte_cursor_from_buf(&eval_result.data.endpoint.properties),
+                aws_endpoints_resolve_template,
+                &data,
+                true)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated properties.");
+            result = AWS_OP_ERR;
+            goto on_done;
+        }
+
+        if (aws_endpoints_resolve_headers(
+                engine->allocator, &state.scope, &eval_result.data.endpoint.headers, &endpoint->r.endpoint.headers)) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated headers.");
+            result = AWS_OP_ERR;
+            goto on_done;
+        }
+
+        *out_resolved_endpoint = endpoint;
+        goto on_done;
+    } else if (eval_result.type == AWS_ENDPOINTS_RESOLVED_ERROR) {
+        struct aws_endpoints_resolved_endpoint *error = aws_endpoints_resolved_endpoint_new(engine->allocator);
+        error->type = AWS_ENDPOINTS_RESOLVED_ERROR;
+
+        struct aws_endpoints_value val;
+        if (aws_endpoints_resolve_expr(engine->allocator, eval_result.data.error.error_expr_ref, &state.scope, &val) ||
+            val.type != AWS_ENDPOINTS_VALUE_STRING ||
+            aws_byte_buf_init_copy_from_cursor(&error->r.error, engine->allocator, val.v.owning_cursor_string.cur)) {
+            aws_endpoints_value_clean_up(&val);
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated url.");
+            result = AWS_OP_ERR;
+            goto on_done;
+        }
+
+        aws_endpoints_value_clean_up(&val);
+        *out_resolved_endpoint = error;
+        goto on_done;
+    } else {
+        result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        goto on_done;
+    }
+
+on_done:
+    s_state_clean_up(&state);
+    return result;
+}

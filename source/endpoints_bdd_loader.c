@@ -602,6 +602,12 @@ static int s_load_nodes(
         return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
+    uint8_t padding = 0;
+    if (!aws_byte_cursor_read_u8(cursor, &padding)) {
+        return AWS_OP_ERR;
+    }
+    aws_byte_cursor_advance(cursor, padding);
+
     struct aws_byte_cursor data = aws_byte_cursor_advance(cursor, data_length);
 
     size_t expected_size = node_count * 12; /* 3 int32s per node */
@@ -641,9 +647,6 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
 
     AWS_PRECONDITION(allocator);
 
-    // clock_t begin_load = clock();
-
-    // clock_t begin_engine = clock();
     struct aws_endpoints_bdd_engine *engine = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_bdd_engine));
     if (!engine) {
         return NULL;
@@ -653,74 +656,41 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     aws_ref_count_init(&engine->ref_count, engine, s_endpoints_bdd_engine_destroy);
     engine->partitions_config = aws_partitions_config_acquire(partitions_config);
 
-    // clock_t end_engine = clock();
-    // double time_taken_engine = (((double)(end_engine - begin_engine)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD engine in(ms): %f", time_taken_engine);
-
-    // clock_t begin_magic = clock();
     if (s_validate_magic_number(&bytecode)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to validate magic number");
         goto error;
     }
-    // clock_t end_magic = clock();
-    // double time_taken_magic = (((double)(end_magic - begin_magic)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD magic in(ms): %f", time_taken_magic);
 
-    // clock_t begin_string = clock();
     if (s_load_string_table(&bytecode, &engine->string_blob)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load string table");
         goto error;
     }
-    // clock_t end_string = clock();
-    // double time_taken_string = (((double)(end_string - begin_string)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD string table in(ms): %f", time_taken_string);
 
-    // clock_t begin_version = clock();
     struct aws_byte_cursor version_cur;
     if (s_read_string_ref(&bytecode, engine->string_blob, &version_cur)) {
         goto error;
     }
     engine->version = version_cur;
 
-    // clock_t end_version = clock();
-    // double time_taken_version = (((double)(end_version - begin_version)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD version in(ms): %f", time_taken_version);
-
-    // clock_t begin_param = clock();
     if (s_load_parameters(allocator, &bytecode, engine->string_blob, &engine->parameters)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load parameters");
         goto error;
     }
-    // clock_t end_param = clock();
-    // double time_taken_param = (((double)(end_param - begin_param)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD param in(ms): %f", time_taken_param);
 
-    // clock_t begin_conds = clock();
     if (s_load_conditions(engine, &bytecode, engine->string_blob, &engine->conditions, &engine->conditions_ptr)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load conditions");
         goto error;
     }
-    // clock_t end_conds = clock();
-    // double time_taken_conds = (((double)(end_conds - begin_conds)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD conds in(ms): %f", time_taken_conds);
 
-    // clock_t begin_res = clock();
     if (s_load_results(engine, &bytecode, engine->string_blob, &engine->results)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load results");
         goto error;
     }
-    // clock_t end_res = clock();
-    // double time_taken_res = (((double)(end_res - begin_res)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD res in(ms): %f", time_taken_res);
 
-    // clock_t begin_nodes = clock();
     if (s_load_nodes(allocator, &bytecode, &engine->root_ref, &engine->nodes)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load nodes");
         goto error;
     }
-    // clock_t end_nodes = clock();
-    // double time_taken_nodes = (((double)(end_nodes - begin_nodes)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD nodes in(ms): %f", time_taken_nodes);
 
     AWS_LOGF_DEBUG(
         AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
@@ -729,10 +699,6 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
         (int)aws_array_list_length(&engine->conditions),
         (int)aws_array_list_length(&engine->results),
         (int)aws_array_list_length(&engine->nodes));
-
-    // clock_t end_load = clock();
-    // double time_taken_load = (((double)(end_load - begin_load)) / 1000);
-    // AWS_LOGF_INFO(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "BDD load in(ms): %f", time_taken_load);
 
     return engine;
 

@@ -102,6 +102,10 @@ add_test_case(endpoints_regex_misc_validation)
 add_test_case(endpoints_bdd_loader_basic)
 add_test_case(endpoints_bdd_compiler_loader_roundtrip)
 
+add_test_case(endpoints_bdd_basic)
+add_test_case(endpoints_bdd_s3_express)
+add_test_case(endpoints_bdd_s3_fips)
+
 set(TEST_BINARY_NAME ${PROJECT_NAME}-tests)
 generate_test_driver(${TEST_BINARY_NAME})
 
