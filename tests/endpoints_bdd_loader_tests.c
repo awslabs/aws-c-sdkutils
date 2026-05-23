@@ -16,7 +16,7 @@ static int s_test_bdd_loader_basic(struct aws_allocator *allocator, void *ctx) {
     aws_sdkutils_library_init(allocator);
 
     struct aws_byte_buf bytecode;
-    ASSERT_SUCCESS(aws_byte_buf_init_from_file(&bytecode, allocator, "bdd\\endpoint-bdd-encoded.bin"));
+    ASSERT_SUCCESS(aws_byte_buf_init_from_file(&bytecode, allocator, "bdd/endpoint-bdd-encoded.bin"));
 
     struct aws_byte_buf partitions_buf;
     ASSERT_SUCCESS(aws_byte_buf_init_from_file(&partitions_buf, allocator, "sample_partitions.json"));

@@ -56,8 +56,8 @@ static int s_init_state(
     struct aws_endpoints_bdd_engine_state *state) {
     AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(context);
-    AWS_PRECONDITION(ruleset);
-    AWS_PRECONDITION(scope);
+    AWS_PRECONDITION(engine);
+    AWS_PRECONDITION(state);
 
     state->scope.partitions = engine->partitions_config;
     state->engine = engine;
@@ -187,7 +187,7 @@ on_error:
 }
 
 static void s_state_clean_up(struct aws_endpoints_bdd_engine_state *state) {
-    AWS_PRECONDITION(scope);
+    AWS_PRECONDITION(state);
 
     aws_hash_table_clean_up(&state->scope.values);
 }
