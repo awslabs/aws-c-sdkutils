@@ -200,7 +200,8 @@ int aws_endpoints_bdd_engine_resolve(
     struct aws_endpoints_resolved_endpoint **out_resolved_endpoint) {
 
     int result = AWS_OP_SUCCESS;
-    struct aws_endpoints_bdd_engine_state state = {0};
+    struct aws_endpoints_bdd_engine_state state;
+    AWS_ZERO_STRUCT(state);
     if (s_init_state(engine->allocator, context, engine, &state)) {
         result = AWS_OP_ERR;
         goto on_done;
