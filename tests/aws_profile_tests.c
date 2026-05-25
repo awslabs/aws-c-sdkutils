@@ -1070,7 +1070,7 @@ AWS_TEST_CASE(aws_profile_invalid_property_names_ignored_test, s_aws_profile_inv
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_all_valid_profile_characters_profile,
-    "[profile ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_]");
+    "[profile ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_/.%@:+]");
 
 static int s_aws_profile_all_valid_profile_characters_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
@@ -1083,11 +1083,11 @@ static int s_aws_profile_all_valid_profile_characters_test(struct aws_allocator 
     EXPECT_SECTION(
         profile_collection,
         AWS_PROFILE_SECTION_TYPE_PROFILE,
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_/.%@:+");
     EXPECT_PROPERTY_COUNT(
         profile_collection,
         AWS_PROFILE_SECTION_TYPE_PROFILE,
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_/.%@:+",
         0);
 
     aws_profile_collection_destroy(profile_collection);
@@ -1102,7 +1102,7 @@ AWS_TEST_CASE(aws_profile_all_valid_profile_characters_test, s_aws_profile_all_v
  */
 AWS_STATIC_STRING_FROM_LITERAL(
     s_all_valid_property_characters_profile,
-    "[profile foo]\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_ = value");
+    "[profile foo]\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_/.%@:+ = value");
 
 static int s_aws_profile_all_valid_property_characters_test(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
@@ -1118,7 +1118,7 @@ static int s_aws_profile_all_valid_property_characters_test(struct aws_allocator
         profile_collection,
         AWS_PROFILE_SECTION_TYPE_PROFILE,
         "foo",
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_/.%@:+",
         "value");
 
     aws_profile_collection_destroy(profile_collection);
