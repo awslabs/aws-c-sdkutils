@@ -88,8 +88,7 @@ static struct test_vector s_success_vectors[] = {
         .expected_output = "hello",
         .expected_decoded_length = 5,
         .num_trailers = 0,
-        .expected_trailers = {
-        },
+        .expected_trailers = {{0}},
     },
 };
 

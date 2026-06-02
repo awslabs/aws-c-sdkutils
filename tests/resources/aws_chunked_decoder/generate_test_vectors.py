@@ -49,12 +49,15 @@ def main():
         print(f"        .expected_output = \"{out}\",")
         print(f"        .expected_decoded_length = {decoded_len},")
         print(f"        .num_trailers = {len(trailers)},")
-        print(f"        .expected_trailers = {{")
-        for t in trailers:
-            name = escape_c_string(t["name"])
-            value = escape_c_string(t["value"])
-            print(f"            {{\"{name}\", \"{value}\"}},")
-        print(f"        }},")
+        if trailers:
+            print(f"        .expected_trailers = {{")
+            for t in trailers:
+                name = escape_c_string(t["name"])
+                value = escape_c_string(t["value"])
+                print(f"            {{\"{name}\", \"{value}\"}},")
+            print(f"        }},")
+        else:
+            print(f"        .expected_trailers = {{{{0}}}},")
         print(f"    }},")
     print("};")
     print()
