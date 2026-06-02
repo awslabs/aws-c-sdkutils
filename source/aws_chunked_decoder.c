@@ -284,14 +284,17 @@ static int s_parse_trailer_line(struct aws_chunked_decoder *decoder, struct aws_
         return AWS_OP_SUCCESS;
     }
 
-    uint8_t *colon = memchr(line.ptr, ':', line.len);
-    if (colon == NULL) {
+    /* Split on first ':' — value is everything after the first colon (may contain more colons).
+     * Per RFC 7230 § 3.2: header-field = field-name ":" OWS field-value OWS
+     * Trim optional whitespace from value only; field-name must not contain whitespace. */
+    struct aws_byte_cursor name = {0};
+    if (!aws_byte_cursor_next_split(&line, ':', &name) || name.len == line.len) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_GENERAL, "id=%p: malformed trailer line, no colon separator", (void *)decoder);
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
     }
-
-    struct aws_byte_cursor name = {.ptr = line.ptr, .len = (size_t)(colon - line.ptr)};
-    struct aws_byte_cursor value = {.ptr = colon + 1, .len = line.len - name.len - 1};
+    /* Advance past "name:" to get value */
+    struct aws_byte_cursor value = line;
+    aws_byte_cursor_advance(&value, name.len + 1);
     value = aws_byte_cursor_trim_pred(&value, aws_isspace);
 
     if (decoder->on_trailer) {
