@@ -270,7 +270,9 @@ AWS_TEST_CASE(aws_chunked_decoder_split_all_at_once, s_test_split_all_at_once)
 static int s_test_split_all_at_once(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
     for (size_t i = 0; i < NUM_SUCCESS_VECTORS; ++i) {
-        ASSERT_SUCCESS(s_run_vector_with_split(allocator, &s_success_vectors[i], 0));
+        ASSERT_SUCCESS(
+            s_run_vector_with_split(allocator, &s_success_vectors[i], 0),
+            "vector[%zu] failed (all at once): %s", i, s_success_vectors[i].description);
     }
     return AWS_OP_SUCCESS;
 }
@@ -279,7 +281,9 @@ AWS_TEST_CASE(aws_chunked_decoder_split_one_byte, s_test_split_one_byte)
 static int s_test_split_one_byte(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
     for (size_t i = 0; i < NUM_SUCCESS_VECTORS; ++i) {
-        ASSERT_SUCCESS(s_run_vector_with_split(allocator, &s_success_vectors[i], 1));
+        ASSERT_SUCCESS(
+            s_run_vector_with_split(allocator, &s_success_vectors[i], 1),
+            "vector[%zu] failed (one byte): %s", i, s_success_vectors[i].description);
     }
     return AWS_OP_SUCCESS;
 }
@@ -288,7 +292,9 @@ AWS_TEST_CASE(aws_chunked_decoder_split_two_bytes, s_test_split_two_bytes)
 static int s_test_split_two_bytes(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
     for (size_t i = 0; i < NUM_SUCCESS_VECTORS; ++i) {
-        ASSERT_SUCCESS(s_run_vector_with_split(allocator, &s_success_vectors[i], 2));
+        ASSERT_SUCCESS(
+            s_run_vector_with_split(allocator, &s_success_vectors[i], 2),
+            "vector[%zu] failed (two bytes): %s", i, s_success_vectors[i].description);
     }
     return AWS_OP_SUCCESS;
 }
@@ -313,7 +319,7 @@ static int s_test_error_vectors(struct aws_allocator *allocator, void *ctx) {
         aws_byte_buf_init(&output, allocator, 64);
 
         struct aws_byte_cursor input = aws_byte_cursor_from_c_str(s_error_vectors[i].input);
-        ASSERT_FAILS(aws_chunked_decoder_process(decoder, input, &output));
+        ASSERT_FAILS(aws_chunked_decoder_process(decoder, input, &output), "error vector[%zu] should have failed: %s", i, s_error_vectors[i].description);
 
         aws_byte_buf_clean_up(&output);
         aws_chunked_decoder_destroy(decoder);
