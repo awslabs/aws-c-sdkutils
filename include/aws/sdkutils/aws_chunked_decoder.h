@@ -4,7 +4,6 @@
  */
 #ifndef AWS_SDKUTILS_AWS_CHUNKED_DECODER_H
 #define AWS_SDKUTILS_AWS_CHUNKED_DECODER_H
-#pragma once
 
 #include <aws/sdkutils/sdkutils.h>
 
@@ -15,7 +14,7 @@ AWS_PUSH_SANE_WARNING_LEVEL
 struct aws_chunked_decoder;
 
 /**
- * Callback invoked when a trailer is parsed.
+ * Callback invoked once per trailer parsed (may be called multiple times if multiple trailers present).
  * name and value are cursors into internal scratch memory — caller must copy if needed beyond this call.
  * Return AWS_OP_SUCCESS to continue, or AWS_OP_ERR to abort decoding.
  */

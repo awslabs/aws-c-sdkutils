@@ -174,24 +174,32 @@ static int s_test_callback_error(struct aws_allocator *allocator, void *ctx) {
 /* === Data-driven test harness === */
 
 struct trailer_capture {
-    struct aws_byte_buf name;
-    struct aws_byte_buf value;
+    struct aws_byte_buf names[4];
+    struct aws_byte_buf values[4];
+    int call_count;
 };
 
 static int s_capture_trailer(struct aws_byte_cursor name, struct aws_byte_cursor value, void *user_data) {
     struct trailer_capture *cap = user_data;
-    aws_byte_buf_append_dynamic(&cap->name, &name);
-    aws_byte_buf_append_dynamic(&cap->value, &value);
+    int i = cap->call_count;
+    aws_byte_buf_append_dynamic(&cap->names[i], &name);
+    aws_byte_buf_append_dynamic(&cap->values[i], &value);
+    cap->call_count++;
     return AWS_OP_SUCCESS;
 }
+
+struct expected_trailer {
+    const char *name;
+    const char *value;
+};
 
 struct test_vector {
     const char *description;
     const char *input;
     const char *expected_output;
-    const char *expected_trailer_name;
-    const char *expected_trailer_value;
     uint64_t expected_decoded_length;
+    int num_trailers;
+    struct expected_trailer expected_trailers[4];
 };
 
 struct error_vector {
@@ -206,8 +214,10 @@ static int s_run_vector_with_split(struct aws_allocator *allocator, struct test_
 
     struct trailer_capture cap;
     AWS_ZERO_STRUCT(cap);
-    aws_byte_buf_init(&cap.name, allocator, 64);
-    aws_byte_buf_init(&cap.value, allocator, 64);
+    for (int i = 0; i < 4; ++i) {
+        aws_byte_buf_init(&cap.names[i], allocator, 64);
+        aws_byte_buf_init(&cap.values[i], allocator, 64);
+    }
 
     struct aws_chunked_decoder_options options = {
         .allocator = allocator,
@@ -238,15 +248,20 @@ static int s_run_vector_with_split(struct aws_allocator *allocator, struct test_
     ASSERT_UINT_EQUALS(expected_len, output.len);
     ASSERT_BIN_ARRAYS_EQUALS(vector->expected_output, expected_len, output.buffer, output.len);
 
-    size_t name_len = strlen(vector->expected_trailer_name);
-    ASSERT_BIN_ARRAYS_EQUALS(vector->expected_trailer_name, name_len, cap.name.buffer, cap.name.len);
-
-    size_t value_len = strlen(vector->expected_trailer_value);
-    ASSERT_BIN_ARRAYS_EQUALS(vector->expected_trailer_value, value_len, cap.value.buffer, cap.value.len);
+    ASSERT_INT_EQUALS(vector->num_trailers, cap.call_count);
+    for (int i = 0; i < vector->num_trailers; ++i) {
+        size_t name_len = strlen(vector->expected_trailers[i].name);
+        ASSERT_BIN_ARRAYS_EQUALS(vector->expected_trailers[i].name, name_len, cap.names[i].buffer, cap.names[i].len);
+        size_t value_len = strlen(vector->expected_trailers[i].value);
+        ASSERT_BIN_ARRAYS_EQUALS(
+            vector->expected_trailers[i].value, value_len, cap.values[i].buffer, cap.values[i].len);
+    }
 
     aws_byte_buf_clean_up(&output);
-    aws_byte_buf_clean_up(&cap.name);
-    aws_byte_buf_clean_up(&cap.value);
+    for (int i = 0; i < 4; ++i) {
+        aws_byte_buf_clean_up(&cap.names[i]);
+        aws_byte_buf_clean_up(&cap.values[i]);
+    }
     aws_chunked_decoder_destroy(decoder);
     return AWS_OP_SUCCESS;
 }
