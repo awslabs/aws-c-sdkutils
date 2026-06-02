@@ -72,6 +72,25 @@ static struct test_vector s_success_vectors[] = {
             {"second-trailer", "value2"},
         },
     },
+    {
+        .description = "empty data (zero-length content)",
+        .input = "0;chunk-signature=UNSIGNED-PAYLOAD\r\ntrailer-key:abc==\r\n\r\n",
+        .expected_output = "",
+        .expected_decoded_length = 0,
+        .num_trailers = 1,
+        .expected_trailers = {
+            {"trailer-key", "abc=="},
+        },
+    },
+    {
+        .description = "no trailer (terminal chunk followed by empty line)",
+        .input = "5;chunk-signature=UNSIGNED-PAYLOAD\r\nhello\r\n0;chunk-signature=UNSIGNED-PAYLOAD\r\n\r\n",
+        .expected_output = "hello",
+        .expected_decoded_length = 5,
+        .num_trailers = 0,
+        .expected_trailers = {
+        },
+    },
 };
 
 static struct error_vector s_error_vectors[] = {
@@ -99,6 +118,11 @@ static struct error_vector s_error_vectors[] = {
         .description = "decoded content length mismatch (expected 100, actual 5)",
         .input = "5;chunk-signature=UNSIGNED-PAYLOAD\r\nhello\r\n0;chunk-signature=UNSIGNED-PAYLOAD\r\ntrailer-key:abc==\r\n\r\n",
         .expected_decoded_length = 100,
+    },
+    {
+        .description = "multiple zero-size chunks (malformed - only one terminal chunk allowed)",
+        .input = "0;chunk-signature=UNSIGNED-PAYLOAD\r\n0;chunk-signature=UNSIGNED-PAYLOAD\r\n\r\n",
+        .expected_decoded_length = 0,
     },
 };
 

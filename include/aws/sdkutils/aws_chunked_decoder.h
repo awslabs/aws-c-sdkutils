@@ -25,8 +25,8 @@ struct aws_chunked_decoder_options {
     struct aws_allocator *allocator;
     aws_chunked_decoder_on_trailer_fn *on_trailer;
     void *user_data;
-    /* Expected decoded content length. If non-zero, decoder verifies total decoded bytes match. */
-    uint64_t expected_content_length;
+    /* If non-NULL, decoder verifies total decoded bytes match this value. */
+    const uint64_t *expected_content_length;
 };
 
 AWS_EXTERN_C_BEGIN

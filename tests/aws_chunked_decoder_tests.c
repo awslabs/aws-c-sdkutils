@@ -223,7 +223,7 @@ static int s_run_vector_with_split(struct aws_allocator *allocator, struct test_
         .allocator = allocator,
         .on_trailer = s_capture_trailer,
         .user_data = &cap,
-        .expected_content_length = vector->expected_decoded_length,
+        .expected_content_length = &vector->expected_decoded_length,
     };
     struct aws_chunked_decoder *decoder = aws_chunked_decoder_new(&options);
 
@@ -297,9 +297,15 @@ AWS_TEST_CASE(aws_chunked_decoder_error_vectors, s_test_error_vectors)
 static int s_test_error_vectors(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
     for (size_t i = 0; i < NUM_ERROR_VECTORS; ++i) {
+        /* Only set expected_content_length if the vector has a non-zero value
+         * (0 means "not specified" for error vectors that don't test length mismatch) */
+        const uint64_t *expected_len = NULL;
+        if (s_error_vectors[i].expected_decoded_length > 0) {
+            expected_len = &s_error_vectors[i].expected_decoded_length;
+        }
         struct aws_chunked_decoder_options options = {
             .allocator = allocator,
-            .expected_content_length = s_error_vectors[i].expected_decoded_length,
+            .expected_content_length = expected_len,
         };
         struct aws_chunked_decoder *decoder = aws_chunked_decoder_new(&options);
 
