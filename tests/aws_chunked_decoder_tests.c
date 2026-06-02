@@ -68,33 +68,7 @@ static int s_test_permanent_error(struct aws_allocator *allocator, void *ctx) {
 }
 
 /* Tests scratch buffer with partial chunk-size line */
-AWS_TEST_CASE(aws_chunked_decoder_partial_line_split, s_test_partial_line_split)
-static int s_test_partial_line_split(struct aws_allocator *allocator, void *ctx) {
-    (void)ctx;
-
-    struct aws_chunked_decoder_options options = {.allocator = allocator};
-    struct aws_chunked_decoder *decoder = aws_chunked_decoder_new(&options);
-
-    struct aws_byte_buf output;
-    aws_byte_buf_init(&output, allocator, 64);
-
-    struct aws_byte_cursor part1 = aws_byte_cursor_from_c_str("5;chunk-sig");
-    ASSERT_SUCCESS(aws_chunked_decoder_process(decoder, part1, &output));
-
-    struct aws_byte_cursor part2 = aws_byte_cursor_from_c_str("nature=UNSIGNED-PAYLOAD\r\n");
-    ASSERT_SUCCESS(aws_chunked_decoder_process(decoder, part2, &output));
-
-    /* Verify decoder parsed size=5 by feeding data bytes */
-    struct aws_byte_cursor data = aws_byte_cursor_from_c_str("hello");
-    ASSERT_SUCCESS(aws_chunked_decoder_process(decoder, data, &output));
-    ASSERT_UINT_EQUALS(5, output.len);
-
-    aws_byte_buf_clean_up(&output);
-    aws_chunked_decoder_destroy(decoder);
-    return AWS_OP_SUCCESS;
-}
-
-/* Tests max line length cap */
+/* Tests max line length cap (can't easily express 1100+ byte input in JSON) */
 AWS_TEST_CASE(aws_chunked_decoder_line_too_long, s_test_line_too_long)
 static int s_test_line_too_long(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
@@ -116,33 +90,6 @@ static int s_test_line_too_long(struct aws_allocator *allocator, void *ctx) {
 }
 
 /* Tests split within chunk data bytes */
-AWS_TEST_CASE(aws_chunked_decoder_split_mid_data, s_test_split_mid_data)
-static int s_test_split_mid_data(struct aws_allocator *allocator, void *ctx) {
-    (void)ctx;
-
-    struct aws_chunked_decoder_options options = {.allocator = allocator};
-    struct aws_chunked_decoder *decoder = aws_chunked_decoder_new(&options);
-
-    struct aws_byte_buf output;
-    aws_byte_buf_init(&output, allocator, 64);
-
-    struct aws_byte_cursor part1 = aws_byte_cursor_from_c_str("5;chunk-signature=UNSIGNED-PAYLOAD\r\n");
-    ASSERT_SUCCESS(aws_chunked_decoder_process(decoder, part1, &output));
-
-    struct aws_byte_cursor part2 = aws_byte_cursor_from_c_str("hel");
-    ASSERT_SUCCESS(aws_chunked_decoder_process(decoder, part2, &output));
-    ASSERT_UINT_EQUALS(3, output.len);
-
-    struct aws_byte_cursor part3 = aws_byte_cursor_from_c_str("lo\r\n0;chunk-signature=UNSIGNED-PAYLOAD\r\n");
-    ASSERT_SUCCESS(aws_chunked_decoder_process(decoder, part3, &output));
-    ASSERT_UINT_EQUALS(5, output.len);
-    ASSERT_BIN_ARRAYS_EQUALS("hello", 5, output.buffer, output.len);
-
-    aws_byte_buf_clean_up(&output);
-    aws_chunked_decoder_destroy(decoder);
-    return AWS_OP_SUCCESS;
-}
-
 /* Tests that on_trailer callback error propagates */
 static int s_error_trailer(struct aws_byte_cursor name, struct aws_byte_cursor value, void *user_data) {
     (void)name;
@@ -272,7 +219,9 @@ static int s_test_split_all_at_once(struct aws_allocator *allocator, void *ctx) 
     for (size_t i = 0; i < NUM_SUCCESS_VECTORS; ++i) {
         ASSERT_SUCCESS(
             s_run_vector_with_split(allocator, &s_success_vectors[i], 0),
-            "vector[%zu] failed (all at once): %s", i, s_success_vectors[i].description);
+            "vector[%zu] failed (all at once): %s",
+            i,
+            s_success_vectors[i].description);
     }
     return AWS_OP_SUCCESS;
 }
@@ -283,7 +232,9 @@ static int s_test_split_one_byte(struct aws_allocator *allocator, void *ctx) {
     for (size_t i = 0; i < NUM_SUCCESS_VECTORS; ++i) {
         ASSERT_SUCCESS(
             s_run_vector_with_split(allocator, &s_success_vectors[i], 1),
-            "vector[%zu] failed (one byte): %s", i, s_success_vectors[i].description);
+            "vector[%zu] failed (one byte): %s",
+            i,
+            s_success_vectors[i].description);
     }
     return AWS_OP_SUCCESS;
 }
@@ -294,7 +245,9 @@ static int s_test_split_two_bytes(struct aws_allocator *allocator, void *ctx) {
     for (size_t i = 0; i < NUM_SUCCESS_VECTORS; ++i) {
         ASSERT_SUCCESS(
             s_run_vector_with_split(allocator, &s_success_vectors[i], 2),
-            "vector[%zu] failed (two bytes): %s", i, s_success_vectors[i].description);
+            "vector[%zu] failed (two bytes): %s",
+            i,
+            s_success_vectors[i].description);
     }
     return AWS_OP_SUCCESS;
 }
@@ -319,7 +272,11 @@ static int s_test_error_vectors(struct aws_allocator *allocator, void *ctx) {
         aws_byte_buf_init(&output, allocator, 64);
 
         struct aws_byte_cursor input = aws_byte_cursor_from_c_str(s_error_vectors[i].input);
-        ASSERT_FAILS(aws_chunked_decoder_process(decoder, input, &output), "error vector[%zu] should have failed: %s", i, s_error_vectors[i].description);
+        ASSERT_FAILS(
+            aws_chunked_decoder_process(decoder, input, &output),
+            "error vector[%zu] should have failed: %s",
+            i,
+            s_error_vectors[i].description);
 
         aws_byte_buf_clean_up(&output);
         aws_chunked_decoder_destroy(decoder);
