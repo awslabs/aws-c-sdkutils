@@ -222,8 +222,7 @@ static int s_state_chunk_data(
     }
 
     struct aws_byte_cursor data = aws_byte_cursor_advance(input, to_copy);
-    if (aws_byte_buf_append(output_buf, &data)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_GENERAL, "id=%p: output buffer too small", (void *)decoder);
+    if (aws_byte_buf_append_dynamic(output_buf, &data)) {
         return AWS_OP_ERR;
     }
 
