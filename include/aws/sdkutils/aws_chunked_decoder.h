@@ -19,10 +19,8 @@ struct aws_chunked_decoder;
  * name and value are cursors into internal scratch memory — caller must copy if needed beyond this call.
  * Return AWS_OP_SUCCESS to continue, or AWS_OP_ERR to abort decoding.
  */
-typedef int(aws_chunked_decoder_on_trailer_fn)(
-    struct aws_byte_cursor name,
-    struct aws_byte_cursor value,
-    void *user_data);
+typedef int(
+    aws_chunked_decoder_on_trailer_fn)(struct aws_byte_cursor name, struct aws_byte_cursor value, void *user_data);
 
 struct aws_chunked_decoder_options {
     struct aws_allocator *allocator;
@@ -38,8 +36,7 @@ AWS_EXTERN_C_BEGIN
  * Create a new aws-chunked decoder.
  */
 AWS_SDKUTILS_API
-struct aws_chunked_decoder *aws_chunked_decoder_new(
-    const struct aws_chunked_decoder_options *options);
+struct aws_chunked_decoder *aws_chunked_decoder_new(const struct aws_chunked_decoder_options *options);
 
 /**
  * Destroy the decoder and free all internal resources.

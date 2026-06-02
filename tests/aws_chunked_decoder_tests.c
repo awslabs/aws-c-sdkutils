@@ -155,17 +155,15 @@ AWS_TEST_CASE(aws_chunked_decoder_callback_error, s_test_callback_error)
 static int s_test_callback_error(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
 
-    struct aws_chunked_decoder_options options = {
-        .allocator = allocator, .on_trailer = s_error_trailer};
+    struct aws_chunked_decoder_options options = {.allocator = allocator, .on_trailer = s_error_trailer};
     struct aws_chunked_decoder *decoder = aws_chunked_decoder_new(&options);
 
     struct aws_byte_buf output;
     aws_byte_buf_init(&output, allocator, 64);
 
-    struct aws_byte_cursor input = aws_byte_cursor_from_c_str(
-        "0;chunk-signature=UNSIGNED-PAYLOAD\r\n"
-        "x-amz-wire-checksum-crc32:abc==\r\n"
-        "\r\n");
+    struct aws_byte_cursor input = aws_byte_cursor_from_c_str("0;chunk-signature=UNSIGNED-PAYLOAD\r\n"
+                                                              "x-amz-wire-checksum-crc32:abc==\r\n"
+                                                              "\r\n");
     ASSERT_FAILS(aws_chunked_decoder_process(decoder, input, &output));
 
     aws_byte_buf_clean_up(&output);
@@ -204,10 +202,7 @@ struct error_vector {
 
 #include "aws_chunked_decoder_test_vectors.inc"
 
-static int s_run_vector_with_split(
-    struct aws_allocator *allocator,
-    struct test_vector *vector,
-    size_t split_size) {
+static int s_run_vector_with_split(struct aws_allocator *allocator, struct test_vector *vector, size_t split_size) {
 
     struct trailer_capture cap;
     AWS_ZERO_STRUCT(cap);

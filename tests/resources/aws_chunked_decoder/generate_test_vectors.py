@@ -68,8 +68,10 @@ def main():
         print(f"    }},")
     print("};")
     print()
-    print(f"#define NUM_SUCCESS_VECTORS (sizeof(s_success_vectors) / sizeof(s_success_vectors[0]))")
-    print(f"#define NUM_ERROR_VECTORS (sizeof(s_error_vectors) / sizeof(s_error_vectors[0]))")
+    print(
+        f"#define NUM_SUCCESS_VECTORS (sizeof(s_success_vectors) / sizeof(s_success_vectors[0]))")
+    print(
+        f"#define NUM_ERROR_VECTORS (sizeof(s_error_vectors) / sizeof(s_error_vectors[0]))")
 
 
 if __name__ == "__main__":

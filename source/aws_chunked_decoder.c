@@ -42,11 +42,26 @@ struct aws_chunked_decoder {
 };
 
 /* Forward declarations */
-static int s_state_chunk_size_line(struct aws_chunked_decoder *decoder, struct aws_byte_cursor *input, struct aws_byte_buf *output_buf);
-static int s_state_chunk_data(struct aws_chunked_decoder *decoder, struct aws_byte_cursor *input, struct aws_byte_buf *output_buf);
-static int s_state_chunk_data_crlf(struct aws_chunked_decoder *decoder, struct aws_byte_cursor *input, struct aws_byte_buf *output_buf);
-static int s_state_trailer_line(struct aws_chunked_decoder *decoder, struct aws_byte_cursor *input, struct aws_byte_buf *output_buf);
-static int s_state_done(struct aws_chunked_decoder *decoder, struct aws_byte_cursor *input, struct aws_byte_buf *output_buf);
+static int s_state_chunk_size_line(
+    struct aws_chunked_decoder *decoder,
+    struct aws_byte_cursor *input,
+    struct aws_byte_buf *output_buf);
+static int s_state_chunk_data(
+    struct aws_chunked_decoder *decoder,
+    struct aws_byte_cursor *input,
+    struct aws_byte_buf *output_buf);
+static int s_state_chunk_data_crlf(
+    struct aws_chunked_decoder *decoder,
+    struct aws_byte_cursor *input,
+    struct aws_byte_buf *output_buf);
+static int s_state_trailer_line(
+    struct aws_chunked_decoder *decoder,
+    struct aws_byte_cursor *input,
+    struct aws_byte_buf *output_buf);
+static int s_state_done(
+    struct aws_chunked_decoder *decoder,
+    struct aws_byte_cursor *input,
+    struct aws_byte_buf *output_buf);
 
 /* Append to scratch, using reserve to grow if needed. Returns error if max length exceeded. */
 static int s_scratch_append(struct aws_chunked_decoder *decoder, struct aws_byte_cursor data) {
@@ -81,8 +96,7 @@ static int s_state_chunk_size_line(
     (void)output_buf;
 
     /* Check if \r might be at end of scratch from previous call */
-    bool cr_in_scratch = decoder->scratch.len > 0 &&
-                         decoder->scratch.buffer[decoder->scratch.len - 1] == '\r';
+    bool cr_in_scratch = decoder->scratch.len > 0 && decoder->scratch.buffer[decoder->scratch.len - 1] == '\r';
 
     /* If scratch ends with \r and input starts with \n, we found the CRLF */
     if (cr_in_scratch && input->len > 0 && input->ptr[0] == '\n') {
@@ -125,8 +139,7 @@ static int s_state_chunk_size_line(
         }
 
         if (size == 0) {
-            if (decoder->expected_content_length > 0 &&
-                decoder->total_decoded != decoder->expected_content_length) {
+            if (decoder->expected_content_length > 0 && decoder->total_decoded != decoder->expected_content_length) {
                 return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
             }
             decoder->state = s_state_trailer_line;
@@ -165,8 +178,7 @@ process_line:
         }
 
         if (size == 0) {
-            if (decoder->expected_content_length > 0 &&
-                decoder->total_decoded != decoder->expected_content_length) {
+            if (decoder->expected_content_length > 0 && decoder->total_decoded != decoder->expected_content_length) {
                 return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
             }
             decoder->state = s_state_trailer_line;
@@ -256,8 +268,7 @@ static int s_state_trailer_line(
     (void)output_buf;
 
     /* Handle split CRLF: scratch ends with \r, input starts with \n */
-    bool cr_in_scratch = decoder->scratch.len > 0 &&
-                         decoder->scratch.buffer[decoder->scratch.len - 1] == '\r';
+    bool cr_in_scratch = decoder->scratch.len > 0 && decoder->scratch.buffer[decoder->scratch.len - 1] == '\r';
 
     if (cr_in_scratch && input->len > 0 && input->ptr[0] == '\n') {
         aws_byte_cursor_advance(input, 1);
@@ -312,36 +323,35 @@ static int s_state_trailer_line(
     input->len = 0;
     return AWS_OP_SUCCESS;
 
-process_line:
-    {
-        struct aws_byte_cursor line = aws_byte_cursor_from_buf(&decoder->scratch);
-        if (line.len == 0) {
-            decoder->is_done = true;
-            decoder->state = s_state_done;
-            decoder->scratch.len = 0;
-            return AWS_OP_SUCCESS;
-        }
-
-        /* Find colon */
-        uint8_t *colon = memchr(line.ptr, ':', line.len);
-        if (colon == NULL) {
-            return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
-        }
-
-        struct aws_byte_cursor name = {.ptr = line.ptr, .len = (size_t)(colon - line.ptr)};
-        struct aws_byte_cursor value = {.ptr = colon + 1, .len = line.len - name.len - 1};
-        value = aws_byte_cursor_trim_pred(&value, aws_isspace);
-
-        if (decoder->on_trailer) {
-            if (decoder->on_trailer(name, value, decoder->user_data)) {
-                decoder->scratch.len = 0;
-                return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
-            }
-        }
-
+process_line: {
+    struct aws_byte_cursor line = aws_byte_cursor_from_buf(&decoder->scratch);
+    if (line.len == 0) {
+        decoder->is_done = true;
+        decoder->state = s_state_done;
         decoder->scratch.len = 0;
         return AWS_OP_SUCCESS;
     }
+
+    /* Find colon */
+    uint8_t *colon = memchr(line.ptr, ':', line.len);
+    if (colon == NULL) {
+        return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
+    }
+
+    struct aws_byte_cursor name = {.ptr = line.ptr, .len = (size_t)(colon - line.ptr)};
+    struct aws_byte_cursor value = {.ptr = colon + 1, .len = line.len - name.len - 1};
+    value = aws_byte_cursor_trim_pred(&value, aws_isspace);
+
+    if (decoder->on_trailer) {
+        if (decoder->on_trailer(name, value, decoder->user_data)) {
+            decoder->scratch.len = 0;
+            return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
+        }
+    }
+
+    decoder->scratch.len = 0;
+    return AWS_OP_SUCCESS;
+}
 }
 
 static int s_state_done(
@@ -356,14 +366,12 @@ static int s_state_done(
     return AWS_OP_SUCCESS;
 }
 
-struct aws_chunked_decoder *aws_chunked_decoder_new(
-    const struct aws_chunked_decoder_options *options) {
+struct aws_chunked_decoder *aws_chunked_decoder_new(const struct aws_chunked_decoder_options *options) {
 
     AWS_PRECONDITION(options);
     AWS_PRECONDITION(options->allocator);
 
-    struct aws_chunked_decoder *decoder =
-        aws_mem_calloc(options->allocator, 1, sizeof(struct aws_chunked_decoder));
+    struct aws_chunked_decoder *decoder = aws_mem_calloc(options->allocator, 1, sizeof(struct aws_chunked_decoder));
 
     decoder->alloc = options->allocator;
     decoder->state = s_state_chunk_size_line;
