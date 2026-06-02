@@ -11,6 +11,11 @@
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/private/endpoints_util.h>
 
+enum {
+    /* initial size of the expr array. start off fairly high to avoid relocating too many times */
+    s_expr_array_initial_size = 256
+};
+
 /* parameter types */
 static struct aws_byte_cursor s_string_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("string");
 static struct aws_byte_cursor s_boolean_type_cur = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("boolean");
@@ -146,7 +151,6 @@ static void s_callback_endpoints_parameter_destroy(void *data) {
 static void s_callback_headers_destroy(void *data) {
     struct aws_array_list *array = data;
     struct aws_allocator *alloc = array->alloc;
-    aws_array_list_deep_clean_up(array, s_on_expr_element_clean_up);
     aws_array_list_clean_up(array);
     aws_mem_release(alloc, array);
 }
@@ -154,21 +158,56 @@ static void s_callback_headers_destroy(void *data) {
 struct array_parser_wrapper {
     struct aws_allocator *allocator;
     struct aws_array_list *array;
+    struct aws_endpoints_ruleset *ruleset;
 };
 
-static int s_init_array_from_json(
-    struct aws_allocator *allocator,
+static int s_init_arraylist_from_json(
+    struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *value_node,
     struct aws_array_list *values,
     aws_json_on_value_encountered_const_fn *value_fn) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(values);
     AWS_PRECONDITION(value_node);
     AWS_PRECONDITION(value_fn);
 
     struct array_parser_wrapper wrapper = {
-        .allocator = allocator,
+        .allocator = ruleset->allocator,
         .array = values,
+        .ruleset = ruleset,
+    };
+
+    if (aws_json_const_iterate_array(value_node, value_fn, &wrapper)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to iterate through array.");
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
+    }
+
+    return AWS_OP_SUCCESS;
+}
+
+struct ref_array_parser_wrapper {
+    struct aws_allocator *allocator;
+    uint16_t *ref_ptr;
+    uint16_t len;
+    struct aws_endpoints_ruleset *ruleset;
+};
+
+static int s_init_ref_array_from_json(
+    struct aws_endpoints_ruleset *ruleset,
+    const struct aws_json_value *value_node,
+    uint16_t *ref_ptr,
+    uint16_t len,
+    aws_json_on_value_encountered_const_fn *value_fn) {
+    AWS_PRECONDITION(ruleset);
+    AWS_PRECONDITION(ref_ptr);
+    AWS_PRECONDITION(value_node);
+    AWS_PRECONDITION(value_fn);
+
+    struct ref_array_parser_wrapper wrapper = {
+        .allocator = ruleset->allocator,
+        .ref_ptr = ref_ptr,
+        .len = len,
+        .ruleset = ruleset,
     };
 
     if (aws_json_const_iterate_array(value_node, value_fn, &wrapper)) {
@@ -182,20 +221,22 @@ static int s_init_array_from_json(
 struct member_parser_wrapper {
     struct aws_allocator *allocator;
     struct aws_hash_table *table;
+    struct aws_endpoints_ruleset *ruleset;
 };
 
 static int s_init_members_from_json(
-    struct aws_allocator *allocator,
+    struct aws_endpoints_ruleset *ruleset,
     struct aws_json_value *node,
     struct aws_hash_table *table,
     aws_json_on_member_encountered_const_fn *member_fn) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(node);
     AWS_PRECONDITION(table);
 
     struct member_parser_wrapper wrapper = {
-        .allocator = allocator,
+        .allocator = ruleset->allocator,
         .table = table,
+        .ruleset = ruleset,
     };
 
     if (aws_json_const_iterate_object(node, member_fn, &wrapper)) {
@@ -213,7 +254,7 @@ static int s_init_members_from_json(
 */
 
 static int s_parse_function(
-    struct aws_allocator *allocator,
+    struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *node,
     struct aws_endpoints_function *function);
 
@@ -237,7 +278,7 @@ static int s_try_parse_reference(const struct aws_json_value *node, struct aws_b
 }
 
 static int s_parse_expr(
-    struct aws_allocator *allocator,
+    struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *node,
     struct aws_endpoints_expr *expr);
 
@@ -251,24 +292,40 @@ static int s_on_expr_element(
     AWS_PRECONDITION(value_node);
     AWS_PRECONDITION(user_data);
 
-    struct array_parser_wrapper *wrapper = user_data;
+    struct ref_array_parser_wrapper *wrapper = user_data;
 
     struct aws_endpoints_expr expr;
-    if (s_parse_expr(wrapper->allocator, value_node, &expr)) {
+    if (s_parse_expr(wrapper->ruleset, value_node, &expr)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse expr.");
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
     }
 
-    aws_array_list_push_back(wrapper->array, &expr);
+    uint16_t ref_idx = (uint16_t)aws_array_list_length(&wrapper->ruleset->exprs);
+    aws_array_list_push_back(&wrapper->ruleset->exprs, &expr);
+
+    if (AWS_UNLIKELY(idx >= wrapper->len)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected ref idx.");
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
+    }
+    wrapper->ref_ptr[idx] = ref_idx;
 
     return AWS_OP_SUCCESS;
 }
 
+static bool s_is_template_string(struct aws_byte_cursor cur) {
+    for (size_t i = 0; i < cur.len; ++i) {
+        if (cur.ptr[i] == '{') {
+            return true;
+        }
+    }
+    return false;
+}
+
 static int s_parse_expr(
-    struct aws_allocator *allocator,
+    struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *node,
     struct aws_endpoints_expr *expr) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(node);
     AWS_PRECONDITION(expr);
 
@@ -277,7 +334,8 @@ static int s_parse_expr(
     /* TODO: this recurses. in practical circumstances depth will never be high,
     but we should still consider doing iterative approach */
     if (aws_json_value_is_string(node) && !aws_json_value_get_string(node, &expr->e.string)) {
-        expr->type = AWS_ENDPOINTS_EXPR_STRING;
+        expr->type =
+            s_is_template_string(expr->e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
         return AWS_OP_SUCCESS;
     } else if (aws_json_value_is_number(node) && !aws_json_value_get_number(node, &expr->e.number)) {
         expr->type = AWS_ENDPOINTS_EXPR_NUMBER;
@@ -288,8 +346,8 @@ static int s_parse_expr(
     } else if (aws_json_value_is_array(node)) {
         expr->type = AWS_ENDPOINTS_EXPR_ARRAY;
         size_t num_elements = aws_json_get_array_size(node);
-        aws_array_list_init_dynamic(&expr->e.array, allocator, num_elements, sizeof(struct aws_endpoints_expr));
-        if (s_init_array_from_json(allocator, node, &expr->e.array, s_on_expr_element)) {
+        expr->e.array.len = (uint16_t)num_elements;
+        if (s_init_ref_array_from_json(ruleset, node, expr->e.array.ptr, (uint16_t)num_elements, s_on_expr_element)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse array value type.");
             goto on_error;
         }
@@ -308,7 +366,7 @@ static int s_parse_expr(
     }
 
     expr->type = AWS_ENDPOINTS_EXPR_FUNCTION;
-    if (s_parse_function(allocator, node, &expr->e.function)) {
+    if (s_parse_function(ruleset, node, &expr->e.function)) {
         goto on_error;
     }
 
@@ -321,10 +379,10 @@ on_error:
 }
 
 static int s_parse_function(
-    struct aws_allocator *allocator,
+    struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *node,
     struct aws_endpoints_function *function) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(node);
 
     AWS_ZERO_STRUCT(*function);
@@ -364,10 +422,9 @@ static int s_parse_function(
         goto on_error;
     }
 
-    size_t num_args = aws_json_get_array_size(argv_node);
-    aws_array_list_init_dynamic(&function->argv, allocator, num_args, sizeof(struct aws_endpoints_expr));
+    function->args.argc = (uint16_t)aws_json_get_array_size(argv_node);
 
-    if (s_init_array_from_json(allocator, argv_node, &function->argv, s_on_expr_element)) {
+    if (s_init_ref_array_from_json(ruleset, argv_node, function->args.argv, function->args.argc, s_on_expr_element)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse argv.");
         goto on_error;
     }
@@ -375,7 +432,6 @@ static int s_parse_function(
     return AWS_OP_SUCCESS;
 
 on_error:
-    aws_endpoints_function_clean_up(function);
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
 }
 
@@ -530,11 +586,16 @@ static int s_on_condition_element(
     struct aws_endpoints_condition condition;
     AWS_ZERO_STRUCT(condition);
 
-    condition.expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
-    if (s_parse_function(wrapper->allocator, condition_node, &condition.expr.e.function)) {
+    struct aws_endpoints_expr expr = {0};
+    expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
+
+    if (s_parse_function(wrapper->ruleset, condition_node, &expr.e.function)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse function.");
         goto on_error;
     }
+
+    aws_array_list_push_back(&wrapper->ruleset->exprs, &expr);
+    condition.expr_ref = (uint16_t)aws_array_list_length(&wrapper->ruleset->exprs) - 1;
 
     struct aws_json_value *assign_node = aws_json_value_get_from_object_c_str(condition_node, "assign");
     if (assign_node != NULL && aws_json_value_get_string(assign_node, &condition.assign)) {
@@ -562,12 +623,14 @@ static int s_on_header_element(
     struct array_parser_wrapper *wrapper = user_data;
 
     struct aws_endpoints_expr expr;
-    if (s_parse_expr(wrapper->allocator, value, &expr)) {
+    if (s_parse_expr(wrapper->ruleset, value, &expr)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Unexpected format for header element.");
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
     }
 
-    aws_array_list_push_back(wrapper->array, &expr);
+    aws_array_list_push_back(&wrapper->ruleset->exprs, &expr);
+    uint16_t ref = (uint16_t)aws_array_list_length(&wrapper->ruleset->exprs) - 1;
+    aws_array_list_push_back(wrapper->array, &ref);
     return AWS_OP_SUCCESS;
 }
 
@@ -589,8 +652,8 @@ static int s_on_headers_key(
 
     size_t num_elements = aws_json_get_array_size(value);
     struct aws_array_list *headers = aws_mem_calloc(wrapper->allocator, 1, sizeof(struct aws_array_list));
-    aws_array_list_init_dynamic(headers, wrapper->allocator, num_elements, sizeof(struct aws_endpoints_expr));
-    if (s_init_array_from_json(wrapper->allocator, value, headers, s_on_header_element)) {
+    aws_array_list_init_dynamic(headers, wrapper->allocator, num_elements, sizeof(uint16_t));
+    if (s_init_arraylist_from_json(wrapper->ruleset, value, headers, s_on_header_element)) {
         goto on_error;
     }
 
@@ -606,18 +669,22 @@ on_error:
 }
 
 static int s_parse_endpoints_rule_data_endpoint(
-    struct aws_allocator *allocator,
+    struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *rule_node,
     struct aws_endpoints_rule_data_endpoint *data_rule) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(rule_node);
     AWS_PRECONDITION(data_rule);
 
-    data_rule->allocator = allocator;
+    data_rule->allocator = ruleset->allocator;
     struct aws_json_value *url_node = aws_json_value_get_from_object_c_str(rule_node, "url");
     if (url_node == NULL || aws_json_value_is_string(url_node)) {
-        data_rule->url.type = AWS_ENDPOINTS_EXPR_STRING;
-        aws_json_value_get_string(url_node, &data_rule->url.e.string);
+        struct aws_endpoints_expr expr = {0};
+        aws_json_value_get_string(url_node, &expr.e.string);
+        expr.type =
+            s_is_template_string(expr.e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
+        aws_array_list_push_back(&ruleset->exprs, &expr);
+        data_rule->url_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
     } else {
         struct aws_byte_cursor reference;
         if (s_try_parse_reference(url_node, &reference)) {
@@ -625,21 +692,26 @@ static int s_parse_endpoints_rule_data_endpoint(
             goto on_error;
         }
 
+        struct aws_endpoints_expr expr = {0};
+
         if (reference.len > 0) {
-            data_rule->url.type = AWS_ENDPOINTS_EXPR_REFERENCE;
-            data_rule->url.e.reference = reference;
+            expr.type = AWS_ENDPOINTS_EXPR_REFERENCE;
+            expr.e.reference = reference;
         } else {
-            data_rule->url.type = AWS_ENDPOINTS_EXPR_FUNCTION;
-            if (s_parse_function(allocator, url_node, &data_rule->url.e.function)) {
+            expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
+            if (s_parse_function(ruleset, url_node, &expr.e.function)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to function.");
                 goto on_error;
             }
         }
+
+        aws_array_list_push_back(&ruleset->exprs, &expr);
+        data_rule->url_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
     }
 
     struct aws_json_value *properties_node = aws_json_value_get_from_object_c_str(rule_node, "properties");
     if (properties_node != NULL) {
-        aws_byte_buf_init(&data_rule->properties, allocator, 0);
+        aws_byte_buf_init(&data_rule->properties, ruleset->allocator, 0);
 
         if (aws_byte_buf_append_json_string(properties_node, &data_rule->properties)) {
             aws_byte_buf_clean_up(&data_rule->properties);
@@ -655,7 +727,7 @@ static int s_parse_endpoints_rule_data_endpoint(
      */
     aws_hash_table_init(
         &data_rule->headers,
-        allocator,
+        ruleset->allocator,
         20,
         aws_hash_string,
         aws_hash_callback_string_eq,
@@ -665,7 +737,7 @@ static int s_parse_endpoints_rule_data_endpoint(
     struct aws_json_value *headers_node = aws_json_value_get_from_object_c_str(rule_node, "headers");
     if (headers_node != NULL) {
 
-        if (s_init_members_from_json(allocator, headers_node, &data_rule->headers, s_on_headers_key)) {
+        if (s_init_members_from_json(ruleset, headers_node, &data_rule->headers, s_on_headers_key)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract headers.");
             goto on_error;
         }
@@ -679,16 +751,21 @@ on_error:
 }
 
 static int s_parse_endpoints_rule_data_error(
-    struct aws_allocator *allocator,
+    struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *error_node,
     struct aws_endpoints_rule_data_error *data_rule) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(error_node);
     AWS_PRECONDITION(data_rule);
 
+    struct aws_endpoints_expr expr = {0};
+
     if (aws_json_value_is_string(error_node)) {
-        data_rule->error.type = AWS_ENDPOINTS_EXPR_STRING;
-        aws_json_value_get_string(error_node, &data_rule->error.e.string);
+        aws_json_value_get_string(error_node, &expr.e.string);
+        expr.type =
+            s_is_template_string(expr.e.string) ? AWS_ENDPOINTS_EXPR_TEMPLATE_STRING : AWS_ENDPOINTS_EXPR_STRING;
+        aws_array_list_push_back(&ruleset->exprs, &expr);
+        data_rule->error_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
 
         return AWS_OP_SUCCESS;
     }
@@ -699,15 +776,20 @@ static int s_parse_endpoints_rule_data_error(
     }
 
     if (reference.len > 0) {
-        data_rule->error.type = AWS_ENDPOINTS_EXPR_REFERENCE;
-        data_rule->error.e.reference = reference;
+        expr.type = AWS_ENDPOINTS_EXPR_REFERENCE;
+        expr.e.reference = reference;
+        aws_array_list_push_back(&ruleset->exprs, &expr);
+        data_rule->error_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
         return AWS_OP_SUCCESS;
     }
 
-    data_rule->error.type = AWS_ENDPOINTS_EXPR_FUNCTION;
-    if (s_parse_function(allocator, error_node, &data_rule->error.e.function)) {
+    expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
+    if (s_parse_function(ruleset, error_node, &expr.e.function)) {
         goto on_error;
     }
+
+    aws_array_list_push_back(&ruleset->exprs, &expr);
+    data_rule->error_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
 
     return AWS_OP_SUCCESS;
 
@@ -724,10 +806,10 @@ static int s_on_rule_element(
     void *user_data);
 
 static int s_parse_endpoints_rule_data_tree(
-    struct aws_allocator *allocator,
+    struct aws_endpoints_ruleset *ruleset,
     const struct aws_json_value *rule_node,
     struct aws_endpoints_rule_data_tree *rule_data) {
-    AWS_PRECONDITION(allocator);
+    AWS_PRECONDITION(ruleset);
     AWS_PRECONDITION(rule_node);
     AWS_PRECONDITION(rule_data);
 
@@ -738,8 +820,8 @@ static int s_parse_endpoints_rule_data_tree(
     }
 
     size_t num_rules = aws_json_get_array_size(rules_node);
-    aws_array_list_init_dynamic(&rule_data->rules, allocator, num_rules, sizeof(struct aws_endpoints_rule));
-    if (s_init_array_from_json(allocator, rules_node, &rule_data->rules, s_on_rule_element)) {
+    aws_array_list_init_dynamic(&rule_data->rules, ruleset->allocator, num_rules, sizeof(struct aws_endpoints_rule));
+    if (s_init_arraylist_from_json(ruleset, rules_node, &rule_data->rules, s_on_rule_element)) {
         aws_endpoints_rule_data_tree_clean_up(rule_data);
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse rules.");
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
@@ -794,7 +876,7 @@ static int s_on_rule_element(
     aws_array_list_init_dynamic(
         &rule.conditions, wrapper->allocator, num_conditions, sizeof(struct aws_endpoints_condition));
 
-    if (s_init_array_from_json(wrapper->allocator, conditions_node, &rule.conditions, s_on_condition_element)) {
+    if (s_init_arraylist_from_json(wrapper->ruleset, conditions_node, &rule.conditions, s_on_condition_element)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract conditions.");
         goto on_error;
     }
@@ -803,7 +885,7 @@ static int s_on_rule_element(
         case AWS_ENDPOINTS_RULE_ENDPOINT: {
             struct aws_json_value *endpoint_node = aws_json_value_get_from_object_c_str(value, "endpoint");
             if (endpoint_node == NULL ||
-                s_parse_endpoints_rule_data_endpoint(wrapper->allocator, endpoint_node, &rule.rule_data.endpoint)) {
+                s_parse_endpoints_rule_data_endpoint(wrapper->ruleset, endpoint_node, &rule.rule_data.endpoint)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract endpoint rule data.");
                 goto on_error;
             }
@@ -812,14 +894,14 @@ static int s_on_rule_element(
         case AWS_ENDPOINTS_RULE_ERROR: {
             struct aws_json_value *error_node = aws_json_value_get_from_object_c_str(value, "error");
             if (error_node == NULL ||
-                s_parse_endpoints_rule_data_error(wrapper->allocator, error_node, &rule.rule_data.error)) {
+                s_parse_endpoints_rule_data_error(wrapper->ruleset, error_node, &rule.rule_data.error)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract error rule data.");
                 goto on_error;
             }
             break;
         }
         case AWS_ENDPOINTS_RULE_TREE: {
-            if (s_parse_endpoints_rule_data_tree(wrapper->allocator, value, &rule.rule_data.tree)) {
+            if (s_parse_endpoints_rule_data_tree(wrapper->ruleset, value, &rule.rule_data.tree)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract tree rule data.");
                 goto on_error;
             }
@@ -887,6 +969,9 @@ static int s_init_ruleset_from_json(
         goto on_error;
     }
 
+    aws_array_list_init_dynamic(
+        &ruleset->exprs, allocator, s_expr_array_initial_size, sizeof(struct aws_endpoints_expr));
+
     aws_hash_table_init(
         &ruleset->parameters,
         allocator,
@@ -898,7 +983,7 @@ static int s_init_ruleset_from_json(
 
     struct aws_json_value *parameters_node = aws_json_value_get_from_object_c_str(root, "parameters");
     if (parameters_node == NULL ||
-        s_init_members_from_json(allocator, parameters_node, &ruleset->parameters, s_on_parameter_key)) {
+        s_init_members_from_json(ruleset, parameters_node, &ruleset->parameters, s_on_parameter_key)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract parameters.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
         goto on_error;
@@ -912,7 +997,7 @@ static int s_init_ruleset_from_json(
     }
     size_t num_rules = aws_json_get_array_size(rules_node);
     aws_array_list_init_dynamic(&ruleset->rules, allocator, num_rules, sizeof(struct aws_endpoints_rule));
-    if (s_init_array_from_json(allocator, rules_node, &ruleset->rules, s_on_rule_element)) {
+    if (s_init_arraylist_from_json(ruleset, rules_node, &ruleset->rules, s_on_rule_element)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to extract rules.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_PARSE_FAILED);
         goto on_error;
@@ -934,6 +1019,7 @@ static void s_endpoints_ruleset_destroy(void *data) {
     aws_hash_table_clean_up(&ruleset->parameters);
 
     aws_array_list_deep_clean_up(&ruleset->rules, s_on_rule_array_element_clean_up);
+    aws_array_list_deep_clean_up(&ruleset->exprs, s_on_expr_element_clean_up);
 
     aws_json_value_destroy(ruleset->json_root);
 
