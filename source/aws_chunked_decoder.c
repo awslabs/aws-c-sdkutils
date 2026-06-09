@@ -58,7 +58,7 @@ struct aws_chunked_decoder {
     bool has_error;
 };
 
-/* Append to scratch, using reserve to grow if needed. Returns error if max length exceeded. */
+/* Append to scratch, using lazy allocation on first use. Returns error if max length exceeded. */
 static int s_scratch_append(struct aws_chunked_decoder *decoder, struct aws_byte_cursor data) {
     size_t new_len = decoder->scratch.len + data.len;
     if (new_len > AWS_CHUNKED_DECODER_MAX_LINE_LENGTH) {
@@ -66,9 +66,7 @@ static int s_scratch_append(struct aws_chunked_decoder *decoder, struct aws_byte
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
     }
     if (decoder->scratch.capacity == 0) {
-        aws_byte_buf_init(&decoder->scratch, decoder->alloc, new_len);
-    } else {
-        aws_byte_buf_reserve(&decoder->scratch, new_len);
+        aws_byte_buf_init(&decoder->scratch, decoder->alloc, AWS_CHUNKED_DECODER_MAX_LINE_LENGTH);
     }
     return aws_byte_buf_append_dynamic(&decoder->scratch, &data);
 }
