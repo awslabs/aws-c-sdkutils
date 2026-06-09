@@ -332,8 +332,10 @@ int aws_endpoints_path_through_array(
         goto on_error;
     }
 
-    *out_value = *val;
-    out_value->is_ref = true;
+    if (aws_endpoints_deep_copy_parameter_value(allocator, val, out_value)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to copy resolved value");
+        goto on_error;
+    }
 
     return AWS_OP_SUCCESS;
 
