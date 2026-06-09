@@ -605,7 +605,8 @@ void aws_profile_collection_destroy(struct aws_profile_collection *profile_colle
     aws_profile_collection_release(profile_collection);
 }
 
-static void s_aws_profile_collection_destroy_internal(struct aws_profile_collection *profile_collection) {
+static void s_aws_profile_collection_destroy_internal(void *user_data) {
+    struct aws_profile_collection *profile_collection = user_data;
     for (int i = 0; i < AWS_PROFILE_SECTION_TYPE_COUNT; i++) {
         aws_hash_table_clean_up(&profile_collection->sections[i]);
     }
