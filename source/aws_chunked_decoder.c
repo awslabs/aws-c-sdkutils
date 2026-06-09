@@ -22,11 +22,20 @@ typedef int(aws_chunked_decoder_state_fn)(
     struct aws_byte_cursor *input,
     struct aws_byte_buf *output_buf);
 
+/* State enum for debugging and tracking (mirrors function pointer) */
+enum aws_chunked_decoder_state {
+    AWS_CHUNKED_DECODER_STATE_CHUNK_SIZE_LINE,
+    AWS_CHUNKED_DECODER_STATE_CHUNK_DATA,
+    AWS_CHUNKED_DECODER_STATE_CHUNK_DATA_CRLF,
+    AWS_CHUNKED_DECODER_STATE_TRAILER_LINE,
+    AWS_CHUNKED_DECODER_STATE_DONE,
+};
+
 struct aws_chunked_decoder {
     struct aws_allocator *alloc;
 
-    /* State machine */
-    aws_chunked_decoder_state_fn *state;
+    /* State machine — dispatch via s_state_functions[state] */
+    enum aws_chunked_decoder_state state;
 
     /* Scratch buffer for partial metadata lines */
     struct aws_byte_buf scratch;
@@ -48,28 +57,6 @@ struct aws_chunked_decoder {
     bool is_done;
     bool has_error;
 };
-
-/* Forward declarations */
-static int s_state_chunk_size_line(
-    struct aws_chunked_decoder *decoder,
-    struct aws_byte_cursor *input,
-    struct aws_byte_buf *output_buf);
-static int s_state_chunk_data(
-    struct aws_chunked_decoder *decoder,
-    struct aws_byte_cursor *input,
-    struct aws_byte_buf *output_buf);
-static int s_state_chunk_data_crlf(
-    struct aws_chunked_decoder *decoder,
-    struct aws_byte_cursor *input,
-    struct aws_byte_buf *output_buf);
-static int s_state_trailer_line(
-    struct aws_chunked_decoder *decoder,
-    struct aws_byte_cursor *input,
-    struct aws_byte_buf *output_buf);
-static int s_state_done(
-    struct aws_chunked_decoder *decoder,
-    struct aws_byte_cursor *input,
-    struct aws_byte_buf *output_buf);
 
 /* Append to scratch, using reserve to grow if needed. Returns error if max length exceeded. */
 static int s_scratch_append(struct aws_chunked_decoder *decoder, struct aws_byte_cursor data) {
@@ -118,9 +105,11 @@ static int s_getline(
     /* Scan input for CRLF */
     struct aws_byte_cursor found;
     if (aws_byte_cursor_find_exact(input, &s_crlf, &found) == AWS_OP_SUCCESS) {
-        size_t crlf_pos = (size_t)(found.ptr - input->ptr) + 2;
-        struct aws_byte_cursor before_crlf = aws_byte_cursor_advance(input, crlf_pos);
-        before_crlf.len -= 2;
+        /* found.len is from CRLF to end of input, so line content is everything before */
+        size_t line_len = input->len - found.len;
+        struct aws_byte_cursor before_crlf = aws_byte_cursor_advance(input, line_len);
+        /* consume the CRLF itself */
+        aws_byte_cursor_advance(input, 2);
 
         if (decoder->scratch.len > 0) {
             if (s_scratch_append(decoder, before_crlf)) {
@@ -135,11 +124,10 @@ static int s_getline(
     }
 
     /* No CRLF — buffer and wait */
-    if (s_scratch_append(decoder, *input)) {
+    struct aws_byte_cursor remaining = aws_byte_cursor_advance(input, input->len);
+    if (s_scratch_append(decoder, remaining)) {
         return AWS_OP_ERR;
     }
-    input->ptr += input->len;
-    input->len = 0;
     return AWS_OP_SUCCESS;
 }
 
@@ -170,12 +158,12 @@ static int s_parse_chunk_size_line(struct aws_chunked_decoder *decoder, struct a
             return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
         }
         AWS_LOGF_TRACE(AWS_LS_SDKUTILS_GENERAL, "id=%p: terminal chunk, transitioning to trailers", (void *)decoder);
-        decoder->state = s_state_trailer_line;
+        decoder->state = AWS_CHUNKED_DECODER_STATE_TRAILER_LINE;
     } else {
         AWS_LOGF_TRACE(AWS_LS_SDKUTILS_GENERAL, "id=%p: chunk size=%" PRIu64, (void *)decoder, size);
         decoder->chunk_size = size;
         decoder->chunk_processed = 0;
-        decoder->state = s_state_chunk_data;
+        decoder->state = AWS_CHUNKED_DECODER_STATE_CHUNK_DATA;
     }
     return AWS_OP_SUCCESS;
 }
@@ -230,7 +218,7 @@ static int s_state_chunk_data(
     decoder->total_decoded += to_copy;
     if (decoder->chunk_processed == decoder->chunk_size) {
         decoder->chunk_processed = 0; /* reused as CRLF byte index in next state */
-        decoder->state = s_state_chunk_data_crlf;
+        decoder->state = AWS_CHUNKED_DECODER_STATE_CHUNK_DATA_CRLF;
     }
     return AWS_OP_SUCCESS;
 }
@@ -261,7 +249,7 @@ static int s_state_chunk_data_crlf(
     }
 
     if (decoder->chunk_processed == 2) {
-        decoder->state = s_state_chunk_size_line;
+        decoder->state = AWS_CHUNKED_DECODER_STATE_CHUNK_SIZE_LINE;
     }
     return AWS_OP_SUCCESS;
 }
@@ -279,7 +267,7 @@ static int s_parse_trailer_line(struct aws_chunked_decoder *decoder, struct aws_
             (void *)decoder,
             decoder->total_decoded);
         decoder->is_done = true;
-        decoder->state = s_state_done;
+        decoder->state = AWS_CHUNKED_DECODER_STATE_DONE;
         return AWS_OP_SUCCESS;
     }
 
@@ -346,6 +334,15 @@ static int s_state_done(
     return AWS_OP_SUCCESS;
 }
 
+/* Dispatch table indexed by enum aws_chunked_decoder_state */
+static aws_chunked_decoder_state_fn *s_state_functions[] = {
+    [AWS_CHUNKED_DECODER_STATE_CHUNK_SIZE_LINE] = s_state_chunk_size_line,
+    [AWS_CHUNKED_DECODER_STATE_CHUNK_DATA] = s_state_chunk_data,
+    [AWS_CHUNKED_DECODER_STATE_CHUNK_DATA_CRLF] = s_state_chunk_data_crlf,
+    [AWS_CHUNKED_DECODER_STATE_TRAILER_LINE] = s_state_trailer_line,
+    [AWS_CHUNKED_DECODER_STATE_DONE] = s_state_done,
+};
+
 struct aws_chunked_decoder *aws_chunked_decoder_new(const struct aws_chunked_decoder_options *options) {
 
     AWS_PRECONDITION(options);
@@ -354,7 +351,7 @@ struct aws_chunked_decoder *aws_chunked_decoder_new(const struct aws_chunked_dec
     struct aws_chunked_decoder *decoder = aws_mem_calloc(options->allocator, 1, sizeof(struct aws_chunked_decoder));
 
     decoder->alloc = options->allocator;
-    decoder->state = s_state_chunk_size_line;
+    decoder->state = AWS_CHUNKED_DECODER_STATE_CHUNK_SIZE_LINE;
     decoder->on_trailer = options->on_trailer;
     decoder->user_data = options->user_data;
     if (options->expected_content_length != NULL) {
@@ -386,7 +383,7 @@ int aws_chunked_decoder_process(
     }
 
     while (input.len > 0 && !decoder->is_done) {
-        if (decoder->state(decoder, &input, output_buf)) {
+        if (s_state_functions[decoder->state](decoder, &input, output_buf)) {
             decoder->has_error = true;
             return AWS_OP_ERR;
         }
