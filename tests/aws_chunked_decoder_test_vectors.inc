@@ -111,7 +111,7 @@ static struct error_vector s_error_vectors[] = {
     {
         .description = "data after terminal chunk and trailer (extra bytes after DONE)",
         .input = "3;chunk-signature=UNSIGNED-PAYLOAD\r\nfoo\r\n0;chunk-signature=UNSIGNED-PAYLOAD\r\ntrailer-key:abc==\r\n\r\nextra garbage",
-        .expected_decoded_length = 0,
+        .expected_decoded_length = 3,
     },
     {
         .description = "decoded content length mismatch (expected 100, actual 5)",

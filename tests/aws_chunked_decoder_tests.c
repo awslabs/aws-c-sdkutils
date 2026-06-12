@@ -118,6 +118,42 @@ static int s_test_callback_error(struct aws_allocator *allocator, void *ctx) {
     return AWS_OP_SUCCESS;
 }
 
+/* Tests the expected-content-length and decoded-length getters */
+AWS_TEST_CASE(aws_chunked_decoder_getters, s_test_getters)
+static int s_test_getters(struct aws_allocator *allocator, void *ctx) {
+    (void)ctx;
+
+    struct aws_chunked_decoder_options options = {
+        .allocator = allocator,
+        .expected_content_length = 5,
+    };
+    struct aws_chunked_decoder *decoder = aws_chunked_decoder_new(&options);
+
+    /* Expected length echoes the configured value; nothing decoded yet. */
+    ASSERT_UINT_EQUALS(5, aws_chunked_decoder_get_expected_content_length(decoder));
+    ASSERT_UINT_EQUALS(0, aws_chunked_decoder_get_decoded_length(decoder));
+
+    struct aws_byte_buf output;
+    aws_byte_buf_init(&output, allocator, 64);
+
+    /* Chunk-size line + partial data ("hel") -> 3 decoded bytes so far, not done. */
+    struct aws_byte_cursor part1 = aws_byte_cursor_from_c_str("5;chunk-signature=UNSIGNED-PAYLOAD\r\nhel");
+    ASSERT_SUCCESS(aws_chunked_decoder_process(decoder, part1, &output));
+    ASSERT_UINT_EQUALS(3, aws_chunked_decoder_get_decoded_length(decoder));
+    ASSERT_FALSE(aws_chunked_decoder_is_done(decoder));
+
+    /* Remaining data + terminal chunk -> 5 decoded bytes total, done. */
+    struct aws_byte_cursor part2 = aws_byte_cursor_from_c_str("lo\r\n0;chunk-signature=UNSIGNED-PAYLOAD\r\n\r\n");
+    ASSERT_SUCCESS(aws_chunked_decoder_process(decoder, part2, &output));
+    ASSERT_TRUE(aws_chunked_decoder_is_done(decoder));
+    ASSERT_UINT_EQUALS(5, aws_chunked_decoder_get_decoded_length(decoder));
+    ASSERT_UINT_EQUALS(5, aws_chunked_decoder_get_expected_content_length(decoder));
+
+    aws_byte_buf_clean_up(&output);
+    aws_chunked_decoder_destroy(decoder);
+    return AWS_OP_SUCCESS;
+}
+
 /* === Data-driven test harness === */
 
 struct trailer_capture {
@@ -170,7 +206,7 @@ static int s_run_vector_with_split(struct aws_allocator *allocator, struct test_
         .allocator = allocator,
         .on_trailer = s_capture_trailer,
         .user_data = &cap,
-        .expected_content_length = &vector->expected_decoded_length,
+        .expected_content_length = vector->expected_decoded_length,
     };
     struct aws_chunked_decoder *decoder = aws_chunked_decoder_new(&options);
 
@@ -256,15 +292,9 @@ AWS_TEST_CASE(aws_chunked_decoder_error_vectors, s_test_error_vectors)
 static int s_test_error_vectors(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
     for (size_t i = 0; i < NUM_ERROR_VECTORS; ++i) {
-        /* Only set expected_content_length if the vector has a non-zero value
-         * (0 means "not specified" for error vectors that don't test length mismatch) */
-        const uint64_t *expected_len = NULL;
-        if (s_error_vectors[i].expected_decoded_length > 0) {
-            expected_len = &s_error_vectors[i].expected_decoded_length;
-        }
         struct aws_chunked_decoder_options options = {
             .allocator = allocator,
-            .expected_content_length = expected_len,
+            .expected_content_length = s_error_vectors[i].expected_decoded_length,
         };
         struct aws_chunked_decoder *decoder = aws_chunked_decoder_new(&options);
 

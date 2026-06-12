@@ -47,7 +47,6 @@ struct aws_chunked_decoder {
     /* Total decoded bytes tracking */
     uint64_t total_decoded;
     uint64_t expected_content_length;
-    bool expected_content_length_set;
 
     /* Trailer callback */
     aws_chunked_decoder_on_trailer_fn *on_trailer;
@@ -146,7 +145,7 @@ static int s_parse_chunk_size_line(struct aws_chunked_decoder *decoder, struct a
     }
 
     if (size == 0) {
-        if (decoder->expected_content_length_set && decoder->total_decoded != decoder->expected_content_length) {
+        if (decoder->total_decoded != decoder->expected_content_length) {
             AWS_LOGF_ERROR(
                 AWS_LS_SDKUTILS_GENERAL,
                 "id=%p: decoded length %" PRIu64 " does not match expected %" PRIu64,
@@ -352,10 +351,7 @@ struct aws_chunked_decoder *aws_chunked_decoder_new(const struct aws_chunked_dec
     decoder->state = AWS_CHUNKED_DECODER_STATE_CHUNK_SIZE_LINE;
     decoder->on_trailer = options->on_trailer;
     decoder->user_data = options->user_data;
-    if (options->expected_content_length != NULL) {
-        decoder->expected_content_length = *options->expected_content_length;
-        decoder->expected_content_length_set = true;
-    }
+    decoder->expected_content_length = options->expected_content_length;
 
     return decoder;
 }
@@ -399,4 +395,14 @@ int aws_chunked_decoder_process(
 bool aws_chunked_decoder_is_done(const struct aws_chunked_decoder *decoder) {
     AWS_PRECONDITION(decoder);
     return decoder->is_done;
+}
+
+uint64_t aws_chunked_decoder_get_expected_content_length(const struct aws_chunked_decoder *decoder) {
+    AWS_PRECONDITION(decoder);
+    return decoder->expected_content_length;
+}
+
+uint64_t aws_chunked_decoder_get_decoded_length(const struct aws_chunked_decoder *decoder) {
+    AWS_PRECONDITION(decoder);
+    return decoder->total_decoded;
 }

@@ -25,8 +25,9 @@ struct aws_chunked_decoder_options {
     struct aws_allocator *allocator;
     aws_chunked_decoder_on_trailer_fn *on_trailer;
     void *user_data;
-    /* If non-NULL, decoder verifies total decoded bytes match this value. */
-    const uint64_t *expected_content_length;
+    /* Required. The decoder verifies that the total decoded byte count matches this value when the
+     * terminal chunk is reached, raising AWS_ERROR_SDKUTILS_PARSE_FATAL on mismatch (truncation). */
+    uint64_t expected_content_length;
 };
 
 AWS_EXTERN_C_BEGIN
@@ -60,6 +61,19 @@ int aws_chunked_decoder_process(
  */
 AWS_SDKUTILS_API
 bool aws_chunked_decoder_is_done(const struct aws_chunked_decoder *decoder);
+
+/**
+ * Returns the expected (decoded) content length the decoder was configured with.
+ */
+AWS_SDKUTILS_API
+uint64_t aws_chunked_decoder_get_expected_content_length(const struct aws_chunked_decoder *decoder);
+
+/**
+ * Returns the number of decoded payload bytes produced so far (across all process() calls).
+ * At successful completion this equals the expected content length.
+ */
+AWS_SDKUTILS_API
+uint64_t aws_chunked_decoder_get_decoded_length(const struct aws_chunked_decoder *decoder);
 
 AWS_EXTERN_C_END
 AWS_POP_SANE_WARNING_LEVEL
