@@ -271,6 +271,7 @@ int aws_endpoints_bdd_engine_resolve(
                 &endpoint->r.endpoint.url, engine->allocator, val.v.owning_cursor_string.cur)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated url.");
             result = AWS_OP_ERR;
+            aws_endpoints_resolved_endpoint_release(endpoint);
             goto on_done;
         }
 
@@ -288,6 +289,7 @@ int aws_endpoints_bdd_engine_resolve(
                 true)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated properties.");
             result = AWS_OP_ERR;
+            aws_endpoints_resolved_endpoint_release(endpoint);
             goto on_done;
         }
 
@@ -295,6 +297,7 @@ int aws_endpoints_bdd_engine_resolve(
                 engine->allocator, &state.scope, &eval_result.data.endpoint.headers, &endpoint->r.endpoint.headers)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated headers.");
             result = AWS_OP_ERR;
+            aws_endpoints_resolved_endpoint_release(endpoint);
             goto on_done;
         }
 
@@ -311,6 +314,7 @@ int aws_endpoints_bdd_engine_resolve(
             aws_endpoints_value_clean_up(&val);
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve templated url.");
             result = AWS_OP_ERR;
+            aws_endpoints_resolved_endpoint_release(error);
             goto on_done;
         }
 
