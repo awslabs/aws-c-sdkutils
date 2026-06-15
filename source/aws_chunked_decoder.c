@@ -192,6 +192,13 @@ static int s_state_chunk_size_line(
 }
 
 /*
+ * Small helper to either do a static or dynamic append.
+ */
+static int s_output_append(struct aws_byte_buf *buf, const struct aws_byte_cursor *data) {
+    return buf->allocator != NULL ? aws_byte_buf_append_dynamic(buf, data) : aws_byte_buf_append(buf, data);
+}
+
+/*
  * State: CHUNK_DATA — writes decoded data bytes into the caller's output buffer.
  * Consumes up to (chunk_size - chunk_processed) bytes from input, then transitions to CHUNK_DATA_CRLF.
  */
@@ -207,7 +214,7 @@ static int s_state_chunk_data(
     }
 
     struct aws_byte_cursor data = aws_byte_cursor_advance(input, to_copy);
-    if (aws_byte_buf_append_dynamic(output_buf, &data)) {
+    if (s_output_append(output_buf, &data)) {
         return AWS_OP_ERR;
     }
 
