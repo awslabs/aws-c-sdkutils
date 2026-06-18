@@ -59,7 +59,9 @@ static bool s_is_identifier(uint8_t value) {
 
     if ((value_as_char >= 'A' && value_as_char <= 'Z') || (value_as_char >= 'a' && value_as_char <= 'z') ||
         (value_as_char >= '0' && value_as_char <= '9') || value_as_char == '\\' || value_as_char == '_' ||
-        value_as_char == '-') {
+        value_as_char == '-' || value_as_char == '/' || value_as_char == '.' || value_as_char == '%' ||
+        value_as_char == '@' || value_as_char == ':' || value_as_char == '+') {
+        /* [A-Za-z0-9_\-/.%@:\+]+, keep '\\' for backward compatibility */
         return true;
     }
 
