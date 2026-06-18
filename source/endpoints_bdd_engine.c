@@ -38,7 +38,6 @@ static int s_copy_context_to_state(
         if (element != NULL) {
             idx = (size_t)element->value;
         } else {
-            AWS_LOGF_DEBUG(0, "foo context " PRInSTR " not found", AWS_BYTE_CURSOR_PRI(context_value->name.cur));
             idx = aws_hash_table_get_entry_count(&state->engine->register_map) + 1;
         }
 
@@ -47,17 +46,13 @@ static int s_copy_context_to_state(
         scope_value->name = aws_endpoints_non_owning_cursor_create(context_value->name.cur);
         scope_value->value = context_value->value;
         scope_value->value.is_ref = true;
-
-        AWS_LOGF_DEBUG(0, "foo context " PRInSTR " at %d", AWS_BYTE_CURSOR_PRI(context_value->name.cur), idx);
     }
 
     return AWS_OP_SUCCESS;
 }
 
-struct aws_endpoints_scope_value *bdd_scope_find_fn(void *scope_impl, struct aws_endpoints_reference ref) {
+struct aws_endpoints_scope_value *s_bdd_scope_find_fn(void *scope_impl, struct aws_endpoints_reference ref) {
     struct aws_bdd_scope *bdd_scope = scope_impl;
-
-    AWS_LOGF_DEBUG(0, "Foo try find " PRInSTR " at %d", AWS_BYTE_CURSOR_PRI(ref.name), ref.bdd_ref_idx);
 
     struct aws_endpoints_scope_value *ret = NULL;
 
@@ -65,12 +60,10 @@ struct aws_endpoints_scope_value *bdd_scope_find_fn(void *scope_impl, struct aws
         struct aws_hash_element *element = NULL;
         aws_hash_table_find(&bdd_scope->engine->register_map, &ref.name, &element);
         if (element == NULL) {
-            AWS_LOGF_DEBUG(0, "foo cant find " PRInSTR, AWS_BYTE_CURSOR_PRI(ref.name));
             return NULL;
         }
 
         size_t reg_idx = (size_t)element->value;
-        AWS_LOGF_DEBUG(0, "Foo try find " PRInSTR " long search %d", AWS_BYTE_CURSOR_PRI(ref.name), reg_idx);
         ret = &((struct aws_bdd_scope *)scope_impl)->values[reg_idx];
     } else {
         ret = &bdd_scope->values[ref.bdd_ref_idx - 1];
@@ -78,7 +71,6 @@ struct aws_endpoints_scope_value *bdd_scope_find_fn(void *scope_impl, struct aws
 
     AWS_LOGF_DEBUG(
         0,
-        "Foo found " PRInSTR " value name " PRInSTR " value type %d",
         AWS_BYTE_CURSOR_PRI(ref.name),
         AWS_BYTE_CURSOR_PRI(ret->name.cur),
         ret->value.type);
@@ -102,7 +94,7 @@ static int s_init_state(
 
     state->scope.partitions = engine->partitions_config;
     state->scope.scope_impl = &state->scope_impl;
-    state->scope.find = bdd_scope_find_fn;
+    state->scope.find = s_bdd_scope_find_fn;
     state->engine = engine;
     state->scope_impl.engine = engine;
 
@@ -173,8 +165,6 @@ static int s_resolve_one_condition(
     *out_is_truthy = aws_endpoints_is_value_truthy(&val);
 
     if (condition->assign.len > 0) {
-        AWS_LOGF_DEBUG(
-            0, "Foo assign " PRInSTR " at %d", AWS_BYTE_CURSOR_PRI(condition->assign), condition->assign_idx);
         struct aws_bdd_scope *scope_impl = &state->scope_impl;
         struct aws_endpoints_scope_value *scope_value = &scope_impl->values[condition->assign_idx];
 
@@ -215,8 +205,6 @@ int aws_endpoints_bdd_engine_resolve(
         result = AWS_OP_ERR;
         goto on_done;
     }
-
-    AWS_LOGF_DEBUG(0, "foo init done");
 
     int32_t current_ref = engine->root_ref;
 
@@ -270,8 +258,6 @@ int aws_endpoints_bdd_engine_resolve(
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
     }
-
-    AWS_LOGF_DEBUG(0, "foo resolved type %d", eval_result.type);
 
     if (eval_result.type == AWS_ENDPOINTS_RESOLVED_ENDPOINT) {
         struct aws_endpoints_resolved_endpoint *endpoint = aws_endpoints_resolved_endpoint_new(engine->allocator);

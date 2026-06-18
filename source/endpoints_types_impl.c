@@ -409,7 +409,6 @@ int aws_endpoints_resolve_expr(
             break;
         }
         case AWS_ENDPOINTS_EXPR_REFERENCE: {
-            AWS_LOGF_DEBUG(0, "foo scope find %p %p", scope->find, scope->scope_impl);
             struct aws_endpoints_scope_value *scope_value = scope->find(scope->scope_impl, expr->e.reference);
 
             if (scope_value == NULL) {

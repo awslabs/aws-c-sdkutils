@@ -97,6 +97,21 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
 }
 
+struct aws_endpoints_scope_value *s_scope_find_fn(void *scope_impl, struct aws_endpoints_reference ref) {
+    struct aws_hash_table *values = scope_impl;
+
+    struct aws_endpoints_scope_value *ret = NULL;
+
+    struct aws_hash_element *existing = NULL;
+    if (aws_hash_table_find(values, &ref.name, &existing)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to init request context values.");
+        return NULL;
+    }
+
+
+    return (struct aws_endpoints_scope_value *)existing->value;
+}
+
 static int s_init_top_level_state(
     struct aws_allocator *allocator,
     const struct aws_endpoints_request_context *context,
@@ -112,6 +127,9 @@ static int s_init_top_level_state(
     state->rules = &ruleset->rules;
     state->scope.partitions = partitions;
     state->scope.expr_index = ruleset->exprs;
+
+    state->scope.scope_impl = &state->values;
+    state->scope.find = s_scope_find_fn;
 
     if (aws_hash_table_init(
             &state->values,

@@ -293,14 +293,10 @@ static int s_decode_value(
             if (element != NULL) {
                 uint16_t reg_index = (size_t)element->value;
                 ref.bdd_ref_idx = reg_index + 1;
-                AWS_LOGF_DEBUG(0, "foo ref load 1");
             } else {
                 ref.bdd_ref_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
                 aws_hash_table_put(&engine->register_map, &ref_cur, (void *)ref.bdd_ref_idx, NULL);
-                AWS_LOGF_DEBUG(0, "foo ref load 2");
             }
-
-            AWS_LOGF_DEBUG(0, "Foo ref load " PRInSTR " %d", AWS_BYTE_CURSOR_PRI(ref.name), ref.bdd_ref_idx);
 
             out_expr->e.reference = ref;
             break;
@@ -726,7 +722,6 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
 
         if (element == NULL) {
             aws_hash_table_put(&engine->register_map, &value->name, (void *)param_count, NULL);
-            AWS_LOGF_DEBUG(0, "foo param name " PRInSTR " at %d", AWS_BYTE_CURSOR_PRI(value->name), param_count);
             param_count++;
         }
     }
