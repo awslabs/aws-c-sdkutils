@@ -286,7 +286,23 @@ static int s_decode_value(
                 return AWS_OP_ERR;
             }
             out_expr->type = AWS_ENDPOINTS_EXPR_REFERENCE;
-            out_expr->e.reference = ref_cur;
+            struct aws_endpoints_reference ref = {.name = ref_cur};
+
+            struct aws_hash_element *element = NULL;
+            aws_hash_table_find(&engine->register_map, &ref_cur, &element);
+            if (element != NULL) {
+                uint16_t reg_index = (size_t)element->value;
+                ref.bdd_ref_idx = reg_index + 1;
+                AWS_LOGF_DEBUG(0, "foo ref load 1");
+            } else {
+                ref.bdd_ref_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
+                aws_hash_table_put(&engine->register_map, &ref_cur, (void *)ref.bdd_ref_idx, NULL);
+                AWS_LOGF_DEBUG(0, "foo ref load 2");
+            }
+
+            AWS_LOGF_DEBUG(0, "Foo ref load " PRInSTR " %d", AWS_BYTE_CURSOR_PRI(ref.name), ref.bdd_ref_idx);
+
+            out_expr->e.reference = ref;
             break;
         }
 
@@ -405,6 +421,16 @@ static int s_parse_one_condition(
     if (has_assign) {
         if (s_read_string_ref(cursor, blob, &cond->assign)) {
             goto on_error;
+        }
+
+        struct aws_hash_element *element = NULL;
+        aws_hash_table_find(&engine->register_map, &cond->assign, &element);
+        if (element != NULL) {
+            size_t reg_index = (size_t)element->value + 1;
+            cond->assign_idx = reg_index;
+        } else {
+            cond->assign_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
+            aws_hash_table_put(&engine->register_map, &cond->assign, (void *)cond->assign_idx, NULL);
         }
     }
 
@@ -661,6 +687,18 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
         goto error;
     }
 
+    if (aws_hash_table_init(
+            &engine->register_map,
+            allocator,
+            s_max_regs,
+            aws_hash_byte_cursor_ptr,
+            aws_endpoints_byte_cursor_eq,
+            NULL,
+            NULL)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to create reg map");
+        goto error;
+    }
+
     if (s_load_string_table(&bytecode, &engine->string_blob)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load string table");
         goto error;
@@ -675,6 +713,22 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     if (s_load_parameters(allocator, &bytecode, engine->string_blob, &engine->parameters)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load parameters");
         goto error;
+    }
+
+    size_t param_count = 0;
+    for (struct aws_hash_iter iter = aws_hash_iter_begin(&engine->parameters); !aws_hash_iter_done(&iter);
+         aws_hash_iter_next(&iter)) {
+
+        struct aws_endpoints_parameter *value = (struct aws_endpoints_parameter *)iter.element.value;
+
+        struct aws_hash_element *element = NULL;
+        aws_hash_table_find(&engine->register_map, &value->name, &element);
+
+        if (element == NULL) {
+            aws_hash_table_put(&engine->register_map, &value->name, (void *)param_count, NULL);
+            AWS_LOGF_DEBUG(0, "foo param name " PRInSTR " at %d", AWS_BYTE_CURSOR_PRI(value->name), param_count);
+            param_count++;
+        }
     }
 
     if (s_load_conditions(engine, &bytecode, engine->string_blob, &engine->conditions, &engine->conditions_ptr)) {
@@ -719,6 +773,7 @@ static void s_endpoints_bdd_engine_destroy(void *data) {
     }
 
     aws_hash_table_clean_up(&engine->parameters);
+    aws_hash_table_clean_up(&engine->register_map);
     aws_array_list_deep_clean_up(&engine->conditions, s_on_condition_array_element_clean_up);
     aws_mem_release(engine->allocator, engine->conditions_ptr);
     aws_array_list_deep_clean_up(&engine->results, s_on_resutls_array_element_clean_up);

@@ -269,14 +269,16 @@ static int s_resolve_templated_value_with_pathing(
         goto on_error;
     }
 
-    struct aws_hash_element *elem = NULL;
-    if (aws_hash_table_find(&scope->values, &split, &elem) || elem == NULL) {
+    struct aws_endpoints_reference ref = {.name = split};
+
+    struct aws_endpoints_scope_value *scope_value = scope->find(scope->scope_impl, ref);
+
+    if (scope_value == NULL) {
         AWS_LOGF_ERROR(
             AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Templated value does not exist: " PRInSTR, AWS_BYTE_CURSOR_PRI(split));
         goto on_error;
     }
 
-    struct aws_endpoints_scope_value *scope_value = elem->value;
     if (!aws_byte_cursor_next_split(&template_cur, '#', &split)) {
         if (scope_value->value.type != AWS_ENDPOINTS_VALUE_STRING) {
             AWS_LOGF_ERROR(
@@ -407,18 +409,13 @@ int aws_endpoints_resolve_expr(
             break;
         }
         case AWS_ENDPOINTS_EXPR_REFERENCE: {
-            struct aws_hash_element *element;
-            if (aws_hash_table_find(&scope->values, &expr->e.reference, &element)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to deref.");
-                goto on_error;
-            }
+            AWS_LOGF_DEBUG(0, "foo scope find %p %p", scope->find, scope->scope_impl);
+            struct aws_endpoints_scope_value *scope_value = scope->find(scope->scope_impl, expr->e.reference);
 
-            if (element == NULL) {
+            if (scope_value == NULL) {
                 out_value->type = AWS_ENDPOINTS_VALUE_NONE;
             } else {
-                struct aws_endpoints_scope_value *aws_endpoints_scope_value = element->value;
-
-                *out_value = aws_endpoints_scope_value->value;
+                *out_value = scope_value->value;
                 out_value->is_ref = true;
             }
             break;

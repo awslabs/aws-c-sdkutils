@@ -10,9 +10,10 @@
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/testing/aws_test_harness.h>
 
-static int s_run_endoint_resolve(struct aws_allocator *allocator, 
-        struct aws_endpoints_request_context *context,
-        struct aws_endpoints_resolved_endpoint **out_resolved) {
+static int s_run_endoint_resolve(
+    struct aws_allocator *allocator,
+    struct aws_endpoints_request_context *context,
+    struct aws_endpoints_resolved_endpoint **out_resolved) {
     struct aws_byte_buf bytecode;
     ASSERT_SUCCESS(aws_byte_buf_init_from_file(&bytecode, allocator, "bdd/endpoint-bdd-encoded.bin"));
 
@@ -107,7 +108,10 @@ static int s_test_bdd_dataplane_zone(struct aws_allocator *allocator, void *ctx)
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
         allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-east-1")));
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
-        allocator, context, aws_byte_cursor_from_c_str("Bucket"), aws_byte_cursor_from_c_str("mybucket--abcd-ab1--x-s3")));
+        allocator,
+        context,
+        aws_byte_cursor_from_c_str("Bucket"),
+        aws_byte_cursor_from_c_str("mybucket--abcd-ab1--x-s3")));
 
     struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
     ASSERT_SUCCESS(s_run_endoint_resolve(allocator, context, &resolved_endpoint));
@@ -117,7 +121,8 @@ static int s_test_bdd_dataplane_zone(struct aws_allocator *allocator, void *ctx)
     struct aws_byte_cursor url_cur;
     ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
 
-    ASSERT_CURSOR_VALUE_CSTRING_EQUALS(url_cur, "https://mybucket--abcd-ab1--x-s3.s3express-abcd-ab1.us-east-1.amazonaws.com");
+    ASSERT_CURSOR_VALUE_CSTRING_EQUALS(
+        url_cur, "https://mybucket--abcd-ab1--x-s3.s3express-abcd-ab1.us-east-1.amazonaws.com");
 
     aws_endpoints_resolved_endpoint_release(resolved_endpoint);
     aws_endpoints_request_context_release(context);
@@ -135,7 +140,10 @@ static int s_test_access_point(struct aws_allocator *allocator, void *ctx) {
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
         allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-west-2")));
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
-        allocator, context, aws_byte_cursor_from_c_str("Bucket"), aws_byte_cursor_from_c_str("arn:aws:s3:us-west-2:123456789012:accesspoint:myendpoint")));
+        allocator,
+        context,
+        aws_byte_cursor_from_c_str("Bucket"),
+        aws_byte_cursor_from_c_str("arn:aws:s3:us-west-2:123456789012:accesspoint:myendpoint")));
 
     struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
     ASSERT_SUCCESS(s_run_endoint_resolve(allocator, context, &resolved_endpoint));
@@ -145,7 +153,8 @@ static int s_test_access_point(struct aws_allocator *allocator, void *ctx) {
     struct aws_byte_cursor url_cur;
     ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
 
-    ASSERT_CURSOR_VALUE_CSTRING_EQUALS(url_cur, "https://myendpoint-123456789012.s3-accesspoint.us-west-2.amazonaws.com");
+    ASSERT_CURSOR_VALUE_CSTRING_EQUALS(
+        url_cur, "https://myendpoint-123456789012.s3-accesspoint.us-west-2.amazonaws.com");
 
     aws_endpoints_resolved_endpoint_release(resolved_endpoint);
     aws_endpoints_request_context_release(context);
@@ -163,7 +172,11 @@ static int s_test_outpost(struct aws_allocator *allocator, void *ctx) {
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
         allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-west-2")));
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
-        allocator, context, aws_byte_cursor_from_c_str("Bucket"), aws_byte_cursor_from_c_str("arn:aws:s3-outposts:us-west-2:123456789012:outpost/op-01234567890123456/accesspoint/reports")));
+        allocator,
+        context,
+        aws_byte_cursor_from_c_str("Bucket"),
+        aws_byte_cursor_from_c_str(
+            "arn:aws:s3-outposts:us-west-2:123456789012:outpost/op-01234567890123456/accesspoint/reports")));
 
     struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
     ASSERT_SUCCESS(s_run_endoint_resolve(allocator, context, &resolved_endpoint));
@@ -173,7 +186,8 @@ static int s_test_outpost(struct aws_allocator *allocator, void *ctx) {
     struct aws_byte_cursor url_cur;
     ASSERT_SUCCESS(aws_endpoints_resolved_endpoint_get_url(resolved_endpoint, &url_cur));
 
-    ASSERT_CURSOR_VALUE_CSTRING_EQUALS(url_cur, "https://reports-123456789012.op-01234567890123456.s3-outposts.us-west-2.amazonaws.com");
+    ASSERT_CURSOR_VALUE_CSTRING_EQUALS(
+        url_cur, "https://reports-123456789012.op-01234567890123456.s3-outposts.us-west-2.amazonaws.com");
 
     aws_endpoints_resolved_endpoint_release(resolved_endpoint);
     aws_endpoints_request_context_release(context);

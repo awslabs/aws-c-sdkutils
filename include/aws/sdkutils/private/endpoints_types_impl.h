@@ -172,6 +172,12 @@ struct aws_endpoints_kv_pair {
     uint16_t expr_ref;
 };
 
+struct aws_endpoints_reference {
+    struct aws_byte_cursor name;
+    /* bdd supports lookup by index. if 0 look up by name, non-zero lookup by index. */
+    size_t bdd_ref_idx;
+};
+
 struct aws_endpoints_expr {
     enum aws_endpoints_expr_type type;
     union {
@@ -182,7 +188,7 @@ struct aws_endpoints_expr {
             uint16_t ptr[AWS_ENDPOINTS_MAX_ELEMENTS_EXPR_ARRAY];
             uint16_t len;
         } array;
-        struct aws_byte_cursor reference;
+        struct aws_endpoints_reference reference;
         struct aws_endpoints_function function;
         struct aws_array_list object; /* List of (aws_endpoints_kv_pair) */
     } e;
@@ -220,6 +226,7 @@ struct aws_endpoints_rule_data_tree {
 struct aws_endpoints_condition {
     uint16_t expr_ref;
     struct aws_byte_cursor assign;
+    size_t assign_idx;
 };
 
 struct aws_endpoints_rule {
@@ -286,7 +293,7 @@ struct aws_endpoints_request_context {
     struct aws_hash_table values;
 };
 
-/* wrapper around aws_endpoints_value to store it more easily in hash table*/
+/* wrapper around aws_endpoints_value to store it more easily in hash table */
 struct aws_endpoints_scope_value {
     struct aws_allocator *allocator;
 
@@ -295,17 +302,24 @@ struct aws_endpoints_scope_value {
     struct aws_endpoints_value value;
 };
 
+typedef struct aws_endpoints_scope_value *(aws_endpoints_scope_find_fn)(void *scope_impl,
+                                                                        struct aws_endpoints_reference ref);
+
 struct aws_endpoints_resolution_scope {
-    /* current values in scope. byte_cur -> aws_endpoints_scope_value */
-    struct aws_hash_table values;
+    void *scope_impl;
 
     const struct aws_partitions_config *partitions;
 
     struct aws_array_list expr_index;
+
+    aws_endpoints_scope_find_fn *find;
 };
 
 struct aws_endpoints_resolution_state {
     struct aws_endpoints_resolution_scope scope;
+
+    /* current values in scope. byte_cur -> aws_endpoints_scope_value */
+    struct aws_hash_table values;
 
     /* list of value keys added since last cleanup */
     struct aws_array_list added_keys;
@@ -442,6 +456,10 @@ struct aws_endpoints_bdd_result {
     } data;
 };
 
+enum {
+    s_max_regs = 128, /* max regs during eval */
+};
+
 struct aws_endpoints_bdd_engine {
     struct aws_allocator *allocator;
     struct aws_ref_count ref_count;
@@ -457,6 +475,8 @@ struct aws_endpoints_bdd_engine {
 
     struct aws_array_list conditions;
     struct aws_endpoints_condition *conditions_ptr;
+
+    struct aws_hash_table register_map;
 
     /* array of all exprs in the program. everything else indexes into this. */
     struct aws_endpoints_expr expr_ptr[AWS_BDD_MAX_EXPRS];
