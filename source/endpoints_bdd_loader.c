@@ -291,7 +291,7 @@ static int s_decode_value(
             struct aws_hash_element *element = NULL;
             aws_hash_table_find(&engine->register_map, &ref_cur, &element);
             if (element != NULL) {
-                uint16_t reg_index = (size_t)element->value;
+                size_t reg_index = (size_t)element->value;
                 ref.bdd_ref_idx = reg_index + 1;
             } else {
                 ref.bdd_ref_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;

@@ -76,11 +76,9 @@ struct aws_endpoints_scope_value *s_bdd_scope_find_fn(void *scope_impl, struct a
 }
 
 static int s_init_state(
-    struct aws_allocator *allocator,
     const struct aws_endpoints_request_context *context,
     struct aws_endpoints_bdd_engine *engine,
     struct aws_endpoints_bdd_engine_state *state) {
-    AWS_PRECONDITION(allocator);
     AWS_PRECONDITION(context);
     AWS_PRECONDITION(engine);
     AWS_PRECONDITION(state);
@@ -194,7 +192,7 @@ int aws_endpoints_bdd_engine_resolve(
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_bdd_engine_state state;
     AWS_ZERO_STRUCT(state);
-    if (s_init_state(engine->allocator, context, engine, &state)) {
+    if (s_init_state(context, engine, &state)) {
         result = AWS_OP_ERR;
         goto on_done;
     }
