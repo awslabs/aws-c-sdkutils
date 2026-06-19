@@ -69,12 +69,6 @@ struct aws_endpoints_scope_value *s_bdd_scope_find_fn(void *scope_impl, struct a
         ret = &bdd_scope->values[ref.bdd_ref_idx - 1];
     }
 
-    AWS_LOGF_DEBUG(
-        0,
-        AWS_BYTE_CURSOR_PRI(ref.name),
-        AWS_BYTE_CURSOR_PRI(ret->name.cur),
-        ret->value.type);
-
     if (ret->value.type == AWS_ENDPOINTS_VALUE_ANY) {
         return NULL;
     }

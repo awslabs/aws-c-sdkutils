@@ -100,16 +100,13 @@ on_error:
 struct aws_endpoints_scope_value *s_scope_find_fn(void *scope_impl, struct aws_endpoints_reference ref) {
     struct aws_hash_table *values = scope_impl;
 
-    struct aws_endpoints_scope_value *ret = NULL;
-
     struct aws_hash_element *existing = NULL;
     if (aws_hash_table_find(values, &ref.name, &existing)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to init request context values.");
         return NULL;
     }
 
-
-    return (struct aws_endpoints_scope_value *)existing->value;
+    return existing != NULL ? (struct aws_endpoints_scope_value *)existing->value : NULL;
 }
 
 static int s_init_top_level_state(
