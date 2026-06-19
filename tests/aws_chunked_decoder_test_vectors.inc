@@ -90,6 +90,26 @@ static struct test_vector s_success_vectors[] = {
         .num_trailers = 0,
         .expected_trailers = {{0}},
     },
+    {
+        .description = "no chunk extension (bare hex size, no semicolon)",
+        .input = "5\r\nhello\r\n0\r\ntrailer-key:abc==\r\n\r\n",
+        .expected_output = "hello",
+        .expected_decoded_length = 5,
+        .num_trailers = 1,
+        .expected_trailers = {
+            {"trailer-key", "abc=="},
+        },
+    },
+    {
+        .description = "bare semicolon with no extension value",
+        .input = "5;\r\nhello\r\n0;\r\ntrailer-key:abc==\r\n\r\n",
+        .expected_output = "hello",
+        .expected_decoded_length = 5,
+        .num_trailers = 1,
+        .expected_trailers = {
+            {"trailer-key", "abc=="},
+        },
+    },
 };
 
 static struct error_vector s_error_vectors[] = {

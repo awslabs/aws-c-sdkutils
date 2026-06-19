@@ -98,6 +98,28 @@
         "output": "hello",
         "trailers": []
       }
+    },
+    {
+      "description": "no chunk extension (bare hex size, no semicolon)",
+      "input": "5\r\nhello\r\n0\r\ntrailer-key:abc==\r\n\r\n",
+      "expected_decoded_length": 5,
+      "expect": {
+        "output": "hello",
+        "trailers": [
+          {"name": "trailer-key", "value": "abc=="}
+        ]
+      }
+    },
+    {
+      "description": "bare semicolon with no extension value",
+      "input": "5;\r\nhello\r\n0;\r\ntrailer-key:abc==\r\n\r\n",
+      "expected_decoded_length": 5,
+      "expect": {
+        "output": "hello",
+        "trailers": [
+          {"name": "trailer-key", "value": "abc=="}
+        ]
+      }
     }
   ],
   "error_tests": [

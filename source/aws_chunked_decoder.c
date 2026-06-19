@@ -61,7 +61,7 @@ struct aws_chunked_decoder {
 static int s_scratch_append(struct aws_chunked_decoder *decoder, struct aws_byte_cursor data) {
     size_t new_len = decoder->scratch.len + data.len;
     if (new_len > AWS_CHUNKED_DECODER_MAX_LINE_LENGTH) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_GENERAL, "id=%p: parsing line exceed the max", (void *)decoder);
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_CHUNKED_DECODER, "id=%p: parsing line exceed the max", (void *)decoder);
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
     }
     if (decoder->scratch.capacity == 0) {
@@ -119,6 +119,8 @@ static int s_getline(
         *line_complete = true;
         return AWS_OP_SUCCESS;
     }
+    /* aws_byte_cursor_find_exact raises error for non-exist str, reset the error to avoid leaking it. */
+    aws_reset_error();
 
     /* No CRLF — buffer and wait */
     struct aws_byte_cursor remaining = aws_byte_cursor_advance(input, input->len);
@@ -140,24 +142,25 @@ static int s_parse_chunk_size_line(struct aws_chunked_decoder *decoder, struct a
 
     uint64_t size = 0;
     if (aws_byte_cursor_utf8_parse_u64_hex(hex_part, &size)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_GENERAL, "id=%p: invalid hex in chunk size line", (void *)decoder);
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_CHUNKED_DECODER, "id=%p: invalid hex in chunk size line", (void *)decoder);
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
     }
 
     if (size == 0) {
         if (decoder->total_decoded != decoder->expected_content_length) {
             AWS_LOGF_ERROR(
-                AWS_LS_SDKUTILS_GENERAL,
+                AWS_LS_SDKUTILS_CHUNKED_DECODER,
                 "id=%p: decoded length %" PRIu64 " does not match expected %" PRIu64,
                 (void *)decoder,
                 decoder->total_decoded,
                 decoder->expected_content_length);
             return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
         }
-        AWS_LOGF_TRACE(AWS_LS_SDKUTILS_GENERAL, "id=%p: terminal chunk, transitioning to trailers", (void *)decoder);
+        AWS_LOGF_TRACE(
+            AWS_LS_SDKUTILS_CHUNKED_DECODER, "id=%p: terminal chunk, transitioning to trailers", (void *)decoder);
         decoder->state = AWS_CHUNKED_DECODER_STATE_TRAILER_LINE;
     } else {
-        AWS_LOGF_TRACE(AWS_LS_SDKUTILS_GENERAL, "id=%p: chunk size=%" PRIu64, (void *)decoder, size);
+        AWS_LOGF_TRACE(AWS_LS_SDKUTILS_CHUNKED_DECODER, "id=%p: chunk size=%" PRIu64, (void *)decoder, size);
         decoder->chunk_size = size;
         decoder->chunk_processed = 0;
         decoder->state = AWS_CHUNKED_DECODER_STATE_CHUNK_DATA;
@@ -243,7 +246,7 @@ static int s_state_chunk_data_crlf(
         uint8_t expected = (decoder->chunk_processed == 0) ? s_cr : s_lf;
         if (input->ptr[0] != expected) {
             AWS_LOGF_ERROR(
-                AWS_LS_SDKUTILS_GENERAL,
+                AWS_LS_SDKUTILS_CHUNKED_DECODER,
                 "id=%p: expected CRLF after chunk data, but got unexpected byte",
                 (void *)decoder);
             return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
@@ -266,8 +269,8 @@ static int s_state_chunk_data_crlf(
 static int s_parse_trailer_line(struct aws_chunked_decoder *decoder, struct aws_byte_cursor line) {
     if (line.len == 0) {
         AWS_LOGF_TRACE(
-            AWS_LS_SDKUTILS_GENERAL,
-            "id=%p: decode complete, total bytes=%" PRIu64,
+            AWS_LS_SDKUTILS_CHUNKED_DECODER,
+            "id=%p: aws-chunked decode complete, total bytes=%" PRIu64,
             (void *)decoder,
             decoder->total_decoded);
         decoder->is_done = true;
@@ -280,7 +283,8 @@ static int s_parse_trailer_line(struct aws_chunked_decoder *decoder, struct aws_
      * Trim optional whitespace from value only; field-name must not contain whitespace. */
     struct aws_byte_cursor name = {0};
     if (!aws_byte_cursor_next_split(&line, ':', &name) || name.len == line.len) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_GENERAL, "id=%p: malformed trailer line, no colon separator", (void *)decoder);
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_CHUNKED_DECODER, "id=%p: malformed trailer line, no colon separator", (void *)decoder);
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
     }
     /* Advance past "name:" to get value */
@@ -332,7 +336,8 @@ static int s_state_done(
     (void)output_buf;
     (void)decoder;
     if (input->len > 0) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_GENERAL, "id=%p: unexpected data after decode complete", (void *)decoder);
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_CHUNKED_DECODER, "id=%p: unexpected data after decode complete", (void *)decoder);
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
     }
     return AWS_OP_SUCCESS;
@@ -391,7 +396,8 @@ int aws_chunked_decoder_process(
     }
 
     if (decoder->is_done && input.len > 0) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_GENERAL, "id=%p: unexpected data after decode complete", (void *)decoder);
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_CHUNKED_DECODER, "id=%p: unexpected data after decode complete", (void *)decoder);
         decoder->has_error = true;
         return aws_raise_error(AWS_ERROR_SDKUTILS_PARSE_FATAL);
     }
