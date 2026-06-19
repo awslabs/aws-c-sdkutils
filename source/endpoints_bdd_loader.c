@@ -596,7 +596,7 @@ static int s_load_results(
     return AWS_OP_SUCCESS;
 
 error:
-    aws_array_list_clean_up(out_results);
+    aws_array_list_deep_clean_up(out_results, s_on_resutls_array_element_clean_up);
     return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
@@ -655,8 +655,6 @@ static int s_load_nodes(
     } else {
         aws_array_list_init_static_from_initialized(
             out_nodes, data.ptr, node_count, sizeof(struct aws_endpoints_bdd_node));
-
-        aws_byte_cursor_advance(cursor, expected_size);
     }
 
     return AWS_OP_SUCCESS;

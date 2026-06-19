@@ -333,7 +333,7 @@ int aws_endpoints_path_through_array(
     }
 
     if (index < 0) {
-        index = aws_array_list_length(&value->v.array) - index;
+        index = aws_array_list_length(&value->v.array) + index;
     }
 
     if (index < 0) {

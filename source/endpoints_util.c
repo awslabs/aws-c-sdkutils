@@ -370,7 +370,7 @@ int aws_path_through_json(
             }
 
             if (index < 0) {
-                index = aws_json_get_array_size(*out_value) - index;
+                index = aws_json_get_array_size(*out_value) + index;
             }
 
             if (index < 0) {
