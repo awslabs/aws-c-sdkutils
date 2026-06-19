@@ -21,7 +21,6 @@ struct aws_endpoints_bdd_engine_state {
 };
 
 static int s_copy_context_to_state(
-    struct aws_allocator *allocator,
     const struct aws_endpoints_request_context *context,
     struct aws_endpoints_bdd_engine_state *state) {
 
@@ -95,7 +94,7 @@ static int s_init_state(
     aws_array_list_init_static_from_initialized(
         &state->scope.expr_index, engine->expr_ptr, engine->expr_len, sizeof(struct aws_endpoints_expr));
 
-    if (s_copy_context_to_state(allocator, context, state)) {
+    if (s_copy_context_to_state(context, state)) {
         return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
     }
 
