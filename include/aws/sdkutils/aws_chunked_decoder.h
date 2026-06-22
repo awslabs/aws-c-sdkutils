@@ -34,6 +34,9 @@ AWS_EXTERN_C_BEGIN
 
 /**
  * Create a new aws-chunked decoder.
+ *
+ * Parses chunk-size lines, data chunks, and trailers. Chunk extensions (the optional
+ * ";key=value" portion after the hex size, per RFC 9112 §7.1.1) are silently ignored.
  */
 AWS_SDKUTILS_API
 struct aws_chunked_decoder *aws_chunked_decoder_new(const struct aws_chunked_decoder_options *options);

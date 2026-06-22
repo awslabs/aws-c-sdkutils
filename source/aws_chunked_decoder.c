@@ -131,12 +131,14 @@ static int s_getline(
 }
 
 /*
- * Parse a complete chunk-size line. Format: "<HEX-SIZE>;chunk-signature=<value>"
- * Example: "5;chunk-signature=UNSIGNED-PAYLOAD"
+ * Parse a complete chunk-size line. Format: "<HEX-SIZE>[;chunk-extension]"
+ * Example: "5;chunk-signature=UNSIGNED-PAYLOAD" or just "5"
+ * Chunk extensions (everything after ';') are silently ignored.
  * On size > 0: transition to CHUNK_DATA. On size == 0: terminal chunk, transition to TRAILER_LINE.
  */
 static int s_parse_chunk_size_line(struct aws_chunked_decoder *decoder, struct aws_byte_cursor line) {
-    /* Split on ';' to get hex size (first segment before ';') */
+    /* Split on ';' to extract hex size. Everything after ';' is a chunk extension
+     * which we silently ignore (RFC 9112 §7.1.1: recipients MUST ignore extensions they do not understand). */
     struct aws_byte_cursor hex_part = {0};
     aws_byte_cursor_next_split(&line, ';', &hex_part);
 
@@ -170,7 +172,8 @@ static int s_parse_chunk_size_line(struct aws_chunked_decoder *decoder, struct a
 
 /*
  * State: CHUNK_SIZE_LINE — accumulate bytes until CRLF, then parse the chunk size.
- * Example line: "5;chunk-signature=UNSIGNED-PAYLOAD\r\n"
+ * The line may include optional chunk extensions after ';', which are ignored.
+ * Example: "5;chunk-signature=UNSIGNED-PAYLOAD\r\n" or "5\r\n"
  */
 static int s_state_chunk_size_line(
     struct aws_chunked_decoder *decoder,
