@@ -349,7 +349,8 @@ void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr);
 
 struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor name_cur);
+    struct aws_byte_cursor name_cur,
+    bool should_own);
 void aws_endpoints_scope_value_destroy(struct aws_endpoints_scope_value *scope_value);
 
 int aws_endpoints_deep_copy_parameter_value(
