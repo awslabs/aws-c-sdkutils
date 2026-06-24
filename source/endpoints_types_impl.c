@@ -167,12 +167,14 @@ void aws_endpoints_expr_clean_up(struct aws_endpoints_expr *expr) {
 
 struct aws_endpoints_scope_value *aws_endpoints_scope_value_new(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor name_cur) {
+    struct aws_byte_cursor name_cur,
+    bool should_own) {
     AWS_PRECONDITION(allocator);
     struct aws_endpoints_scope_value *value = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_scope_value));
 
     value->allocator = allocator;
-    value->name = aws_endpoints_non_owning_cursor_create(name_cur);
+    value->name = should_own ? aws_endpoints_owning_cursor_from_cursor(allocator, name_cur)
+                             : aws_endpoints_non_owning_cursor_create(name_cur);
 
     return value;
 }
