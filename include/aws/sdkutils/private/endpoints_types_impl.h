@@ -456,8 +456,13 @@ struct aws_endpoints_bdd_result {
     } data;
 };
 
+/* Max distinct named variables (parameters + condition assigns) per ruleset.
+ * Scope values are stored in a fixed array of this size to avoid heap allocation
+ * on the resolve hot path. The loader errors with AWS_ERROR_INVALID_ARGUMENT if
+ * exceeded. Increase this constant if a larger ruleset is needed.
+ * Current rulesets use ~20-30 slots. */
 enum {
-    s_max_regs = 128, /* max regs during eval */
+    s_max_regs = 128,
 };
 
 struct aws_endpoints_bdd_engine {

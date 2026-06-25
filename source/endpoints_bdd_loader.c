@@ -10,6 +10,7 @@
 #include <aws/sdkutils/partitions.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/private/endpoints_util.h>
+#include <stdint.h>
 
 #define BDD_MAGIC_NUMBER 0x45504452 /* "EPDR" */
 
@@ -159,9 +160,11 @@ static int s_parse_one_parameter(
 
 static int s_load_parameters(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor *cursor,
-    struct aws_byte_cursor blob,
-    struct aws_hash_table *out_parameters) {
+    struct aws_endpoints_bdd_engine *engine,
+    struct aws_byte_cursor *cursor) {
+
+    struct aws_byte_cursor blob = engine->string_blob;
+    struct aws_hash_table *out_parameters = &engine->parameters;
 
     uint16_t count;
     if (!aws_byte_cursor_read_le16(cursor, &count)) {
@@ -190,6 +193,20 @@ static int s_load_parameters(
             aws_hash_table_put(out_parameters, &param->name, param, NULL)) {
             aws_mem_release(allocator, param);
             goto error;
+        }
+
+        struct aws_hash_element *element = NULL;
+        aws_hash_table_find(&engine->register_map, &param->name, &element);
+        if (element == NULL) {
+            if (aws_hash_table_get_entry_count(&engine->register_map) >= s_max_regs) {
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                    "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
+                    s_max_regs);
+                return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+            }
+            size_t param_idx = aws_hash_table_get_entry_count(&engine->register_map);
+            aws_hash_table_put(&engine->register_map, &param->name, (void *)(param_idx + 1), NULL);
         }
     }
 
@@ -294,6 +311,13 @@ static int s_decode_value(
                 size_t reg_index = (size_t)element->value;
                 ref.bdd_ref_idx = reg_index + 1;
             } else {
+                if (aws_hash_table_get_entry_count(&engine->register_map) >= s_max_regs) {
+                    AWS_LOGF_ERROR(
+                        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                        "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
+                        s_max_regs);
+                    return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+                }
                 ref.bdd_ref_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
                 aws_hash_table_put(&engine->register_map, &ref_cur, (void *)ref.bdd_ref_idx, NULL);
             }
@@ -425,6 +449,13 @@ static int s_parse_one_condition(
             size_t reg_index = (size_t)element->value + 1;
             cond->assign_idx = reg_index;
         } else {
+            if (aws_hash_table_get_entry_count(&engine->register_map) >= s_max_regs) {
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                    "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
+                    s_max_regs);
+                return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+            }
             cond->assign_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
             aws_hash_table_put(&engine->register_map, &cond->assign, (void *)cond->assign_idx, NULL);
         }
@@ -704,24 +735,9 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     }
     engine->version = version_cur;
 
-    if (s_load_parameters(allocator, &bytecode, engine->string_blob, &engine->parameters)) {
+    if (s_load_parameters(allocator, engine, &bytecode)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load parameters");
         goto error;
-    }
-
-    size_t param_count = 0;
-    for (struct aws_hash_iter iter = aws_hash_iter_begin(&engine->parameters); !aws_hash_iter_done(&iter);
-         aws_hash_iter_next(&iter)) {
-
-        struct aws_endpoints_parameter *value = (struct aws_endpoints_parameter *)iter.element.value;
-
-        struct aws_hash_element *element = NULL;
-        aws_hash_table_find(&engine->register_map, &value->name, &element);
-
-        if (element == NULL) {
-            aws_hash_table_put(&engine->register_map, &value->name, (void *)param_count, NULL);
-            param_count++;
-        }
     }
 
     if (s_load_conditions(engine, &bytecode, engine->string_blob, &engine->conditions, &engine->conditions_ptr)) {
