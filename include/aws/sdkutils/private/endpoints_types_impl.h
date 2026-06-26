@@ -129,6 +129,7 @@ struct aws_endpoints_parameter {
     bool is_deprecated;
     struct aws_byte_cursor deprecated_message;
     struct aws_byte_cursor deprecated_since;
+    size_t param_idx;
 };
 
 struct aws_endpoints_ruleset {
@@ -476,10 +477,11 @@ struct aws_endpoints_bdd_engine {
     /* string segment. basically blob of all strings in ruleset that everything else indexes to. */
     struct aws_byte_cursor string_blob;
 
-    struct aws_hash_table parameters;
+    struct aws_array_list parameters;
+    struct aws_endpoints_parameter *parameters_array_ptr;
 
     struct aws_array_list conditions;
-    struct aws_endpoints_condition *conditions_ptr;
+    struct aws_endpoints_condition *conditions_array_ptr;
 
     struct aws_hash_table register_map;
 

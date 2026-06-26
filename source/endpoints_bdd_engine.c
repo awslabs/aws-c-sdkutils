@@ -37,7 +37,18 @@ static int s_copy_context_to_state(
         if (element != NULL) {
             idx = (size_t)element->value;
         } else {
+            if (aws_hash_table_get_entry_count(&state->engine->register_map) >= s_max_regs) {
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                    "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
+                    s_max_regs);
+                return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+            }
             idx = aws_hash_table_get_entry_count(&state->engine->register_map) + 1;
+            aws_hash_table_put(&state->engine->register_map, &context_value->name, (void *)idx, NULL);
+            AWS_LOGF_WARN(
+                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                "Received a context value not present in ruleset bytecode. Registering at runtime.");
         }
 
         struct aws_endpoints_scope_value *scope_value = &scope_impl->values[idx];
@@ -97,23 +108,16 @@ static int s_init_state(
     }
 
     /* Add defaults to the top level scope. */
-    for (struct aws_hash_iter iter = aws_hash_iter_begin(&engine->parameters); !aws_hash_iter_done(&iter);
-         aws_hash_iter_next(&iter)) {
-        const struct aws_byte_cursor key = *(const struct aws_byte_cursor *)iter.element.key;
-        struct aws_endpoints_parameter *value = (struct aws_endpoints_parameter *)iter.element.value;
+    for (size_t i = 0; i < aws_array_list_length(&engine->parameters); ++i) {
+        struct aws_endpoints_parameter *value = NULL;
+        aws_array_list_get_at_ptr(&engine->parameters, (void **)&value, i);
 
         /* Skip non-required values, since they cannot have default values. */
         if (!value->is_required) {
             continue;
         }
 
-        struct aws_hash_element *element = NULL;
-        aws_hash_table_find(&state->engine->register_map, &key, &element);
-
-        uint16_t idx = 0;
-        if (element != NULL) {
-            idx = (uint16_t)(uintptr_t)element->value;
-        }
+        size_t idx = value->param_idx;
 
         if (state->scope_impl.values[idx].value.type == AWS_ENDPOINTS_VALUE_ANY) {
             if (!value->has_default_value) {
@@ -129,7 +133,7 @@ static int s_init_state(
                 case AWS_ENDPOINTS_PARAMETER_STRING_ARRAY:
                     scope_value->value = value->default_value;
                     scope_value->value.is_ref = true;
-                    scope_value->name = aws_endpoints_non_owning_cursor_create(key);
+                    scope_value->name = aws_endpoints_non_owning_cursor_create(value->name);
                     break;
                 default:
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected parameter type.");
@@ -219,13 +223,13 @@ int aws_endpoints_bdd_engine_resolve(
             goto on_done;
         }
 
-        bool is_thruthy = false;
-        if (s_resolve_one_condition(engine->allocator, current_condition, &state, &is_thruthy)) {
+        bool is_truthy = false;
+        if (s_resolve_one_condition(engine->allocator, current_condition, &state, &is_truthy)) {
             result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
             goto on_done;
         }
 
-        if (is_complement ^ is_thruthy) {
+        if (is_complement ^ is_truthy) {
             current_ref = node->high_ref;
         } else {
             current_ref = node->low_ref;
