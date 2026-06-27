@@ -108,8 +108,10 @@ static int s_init_state(
 
         /* value should always be present in the register map since we load parameters into the map */
         if (value->param_idx == 0) {
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Value not present in register map: " PRInSTR,
-                            AWS_BYTE_CURSOR_PRI(value->name));
+            AWS_LOGF_ERROR(
+                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                "Value not present in register map: " PRInSTR,
+                AWS_BYTE_CURSOR_PRI(value->name));
             return AWS_OP_ERR;
         }
 
