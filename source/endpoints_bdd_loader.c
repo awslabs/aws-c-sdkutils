@@ -81,18 +81,6 @@ static int s_read_string_ref(struct aws_byte_cursor *cursor, struct aws_byte_cur
     return AWS_OP_SUCCESS;
 }
 
-static void s_on_value_element_clean_up(void *data) {
-    struct aws_endpoints_value *value = data;
-    aws_endpoints_value_clean_up(value);
-}
-
-static void s_callback_endpoints_parameter_clean_up(void *data) {
-    struct aws_endpoints_parameter *parameter = data;
-    if (parameter->has_default_value && parameter->type == AWS_ENDPOINTS_PARAMETER_STRING_ARRAY) {
-        aws_array_list_deep_clean_up(&parameter->default_value.v.array, s_on_value_element_clean_up);
-    }
-}
-
 static int s_parse_one_parameter(
     struct aws_endpoints_bdd_engine *engine,
     struct aws_byte_cursor *cursor,
@@ -152,12 +140,6 @@ static int s_parse_one_parameter(
         return AWS_OP_ERR;
     }
     param->is_required = (is_required != 0);
-
-    if (param->is_required && !param->has_default_value) {
-        AWS_LOGF_ERROR(
-            AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Required parameter has no default value. Bytecode is malformed.");
-        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
-    }
 
     uint8_t has_builtin;
     if (!aws_byte_cursor_read_u8(cursor, &has_builtin)) {
@@ -316,7 +298,7 @@ static int s_decode_value(
             aws_hash_table_find(&engine->register_map, &ref_cur, &element);
             if (element != NULL) {
                 size_t reg_index = (size_t)element->value;
-                ref.bdd_ref_idx = reg_index + 1;
+                ref.bdd_ref_idx = reg_index;
             } else {
                 /* We have already parsed (and loaded) all parameters and condition assigns
                  * to the register map so we are guaranteed to have encountered any reference
@@ -452,7 +434,7 @@ static int s_parse_one_condition(
         struct aws_hash_element *element = NULL;
         aws_hash_table_find(&engine->register_map, &cond->assign, &element);
         if (element != NULL) {
-            size_t reg_index = (size_t)element->value + 1;
+            size_t reg_index = (size_t)element->value;
             cond->assign_idx = reg_index;
         } else {
             if (aws_hash_table_get_entry_count(&engine->register_map) >= s_max_regs) {

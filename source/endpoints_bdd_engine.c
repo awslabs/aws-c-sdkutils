@@ -31,18 +31,17 @@ static int s_copy_context_to_state(
 
         struct aws_endpoints_scope_value *context_value = (struct aws_endpoints_scope_value *)iter.element.value;
         struct aws_hash_element *element = NULL;
-        aws_hash_table_find(&state->engine->register_map, &context_value->name, &element);
+        aws_hash_table_find(&state->engine->register_map, &context_value->name.cur, &element);
 
-        size_t idx = 0;
         if (element == NULL) {
-            /* We have already populated the register map with all possible parameters at load time.
-             * We should not be seeing a new element while we copy context to current resolution state.
-             */
-            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Received a context variable not present in parameters.");
+            AWS_LOGF_ERROR(
+                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                "Received a context variable not present in parameters: " PRInSTR,
+                AWS_BYTE_CURSOR_PRI(context_value->name.cur));
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
         }
 
-        size_t idx = (size_t)element->value;
+        size_t idx = (size_t)element->value - 1;
 
         struct aws_endpoints_scope_value *scope_value = &scope_impl->values[idx];
         scope_value->allocator = NULL;
@@ -64,7 +63,8 @@ struct aws_endpoints_scope_value *s_bdd_scope_find_fn(void *scope_impl, struct a
         aws_hash_table_find(&bdd_scope->engine->register_map, &ref.name, &element);
         if (element == NULL) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Could not find reference in implementation");
-            return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+            aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+            return NULL;
         }
 
         size_t reg_idx = (size_t)element->value;
@@ -111,9 +111,14 @@ static int s_init_state(
             continue;
         }
 
-        size_t idx = value->param_idx;
+        size_t idx = value->param_idx - 1;
 
         if (state->scope_impl.values[idx].value.type == AWS_ENDPOINTS_VALUE_ANY) {
+            if (!value->has_default_value) {
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "No value or default for required parameter.");
+                return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+            }
+
             struct aws_endpoints_scope_value *scope_value = &state->scope_impl.values[idx];
 
             switch (value->type) {
@@ -150,7 +155,7 @@ static int s_resolve_one_condition(
 
     if (condition->assign.len > 0) {
         struct aws_bdd_scope *scope_impl = &state->scope_impl;
-        struct aws_endpoints_scope_value *scope_value = &scope_impl->values[condition->assign_idx];
+        struct aws_endpoints_scope_value *scope_value = &scope_impl->values[condition->assign_idx - 1];
 
         scope_value->allocator = NULL;
         scope_value->name = aws_endpoints_non_owning_cursor_create(condition->assign);
