@@ -34,22 +34,15 @@ static int s_copy_context_to_state(
         aws_hash_table_find(&state->engine->register_map, &context_value->name, &element);
 
         size_t idx = 0;
-        if (element != NULL) {
-            idx = (size_t)element->value;
-        } else {
-            if (aws_hash_table_get_entry_count(&state->engine->register_map) >= s_max_regs) {
-                AWS_LOGF_ERROR(
-                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-                    "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
-                    s_max_regs);
-                return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
-            }
-            idx = aws_hash_table_get_entry_count(&state->engine->register_map) + 1;
-            aws_hash_table_put(&state->engine->register_map, &context_value->name, (void *)idx, NULL);
-            AWS_LOGF_WARN(
-                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-                "Received a context value not present in ruleset bytecode. Registering at runtime.");
+        if (element == NULL) {
+            /* We have already populated the register map with all possible parameters at load time.
+             * We should not be seeing a new element while we copy context to current resolution state.
+             */
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Received a context variable not present in parameters.");
+            return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
         }
+
+        size_t idx = (size_t)element->value;
 
         struct aws_endpoints_scope_value *scope_value = &scope_impl->values[idx];
         scope_value->allocator = NULL;
@@ -70,14 +63,15 @@ struct aws_endpoints_scope_value *s_bdd_scope_find_fn(void *scope_impl, struct a
         struct aws_hash_element *element = NULL;
         aws_hash_table_find(&bdd_scope->engine->register_map, &ref.name, &element);
         if (element == NULL) {
-            return NULL;
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Could not find reference in implementation");
+            return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
         }
 
         size_t reg_idx = (size_t)element->value;
-        ret = &((struct aws_bdd_scope *)scope_impl)->values[reg_idx];
-    } else {
-        ret = &bdd_scope->values[ref.bdd_ref_idx - 1];
+        ref.bdd_ref_idx = reg_idx;
     }
+
+    ret = &bdd_scope->values[ref.bdd_ref_idx - 1];
 
     if (ret->value.type == AWS_ENDPOINTS_VALUE_ANY) {
         return NULL;
@@ -186,7 +180,7 @@ static void s_state_clean_up(struct aws_endpoints_bdd_engine_state *state) {
     }
 }
 
-static int32_t s_result_bound = 100000000;
+static const int32_t s_result_bound = 100000000;
 
 int aws_endpoints_bdd_engine_resolve(
     struct aws_endpoints_bdd_engine *engine,

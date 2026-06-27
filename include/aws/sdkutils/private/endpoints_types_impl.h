@@ -483,6 +483,16 @@ struct aws_endpoints_bdd_engine {
     struct aws_array_list conditions;
     struct aws_endpoints_condition *conditions_array_ptr;
 
+    /* This register map is a hash table to store indices of scope values array. In the previous engine,
+     * each scope had its own hash table of scope values which meant, every time we needed to
+     * update a value for a scope variable, we did a hash_table_find. Expensive. The new
+     * state stores it as a stack allocated scope array which would mean faster finding and
+     * replacing values. This works by storing register_map which would store a particular index
+     * at which that particular scope variable resides in the scope_values array and each assign
+     * scope variable and parameter get its index. if the index is 0 we can look up the correct
+     * index from the register map if not use the index we stored. Ideally we should have all the
+     * indices stored and ready at load time.
+     */
     struct aws_hash_table register_map;
 
     /* array of all exprs in the program. everything else indexes into this. */

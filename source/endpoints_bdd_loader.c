@@ -208,7 +208,8 @@ static int s_load_parameters(
         }
     }
 
-    aws_array_list_init_static_from_initialized(out_parameters, parameters, count, sizeof(struct aws_endpoints_parameter));
+    aws_array_list_init_static_from_initialized(
+        out_parameters, parameters, count, sizeof(struct aws_endpoints_parameter));
     engine->parameters_array_ptr = parameters;
 
     return AWS_OP_SUCCESS;
@@ -311,15 +312,14 @@ static int s_decode_value(
                 size_t reg_index = (size_t)element->value;
                 ref.bdd_ref_idx = reg_index + 1;
             } else {
-                if (aws_hash_table_get_entry_count(&engine->register_map) >= s_max_regs) {
-                    AWS_LOGF_ERROR(
-                        AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-                        "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
-                        s_max_regs);
-                    return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
-                }
-                ref.bdd_ref_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
-                aws_hash_table_put(&engine->register_map, &ref_cur, (void *)ref.bdd_ref_idx, NULL);
+                /* We have already parsed (and loaded) all parameters and condition assigns
+                 * to the register map so we are guaranteed to have encountered any reference
+                 * from results. If not, the model/bytecode is malformed.
+                 */
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                    "Reference to unknown variable in bytecode. Bytecode is malformed.");
+                return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
             }
 
             out_expr->e.reference = ref;
@@ -781,7 +781,6 @@ static void s_endpoints_bdd_engine_destroy(void *data) {
         aws_partitions_config_release(engine->partitions_config);
     }
 
-    aws_array_list_deep_clean_up(&engine->parameters, s_callback_endpoints_parameter_clean_up);
     aws_mem_release(engine->allocator, engine->parameters_array_ptr);
     aws_hash_table_clean_up(&engine->register_map);
     aws_mem_release(engine->allocator, engine->conditions_array_ptr);
