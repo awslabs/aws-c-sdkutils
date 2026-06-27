@@ -106,6 +106,13 @@ static int s_init_state(
         struct aws_endpoints_parameter *value = NULL;
         aws_array_list_get_at_ptr(&engine->parameters, (void **)&value, i);
 
+        /* value should always be present in the register map since we load parameters into the map */
+        if (value->param_idx == 0) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Value not present in register map: " PRInSTR,
+                            AWS_BYTE_CURSOR_PRI(value->name));
+            return AWS_OP_ERR;
+        }
+
         /* Skip non-required values, since they cannot have default values. */
         if (!value->is_required) {
             continue;
