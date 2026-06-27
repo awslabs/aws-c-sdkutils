@@ -114,11 +114,6 @@ static int s_init_state(
         size_t idx = value->param_idx;
 
         if (state->scope_impl.values[idx].value.type == AWS_ENDPOINTS_VALUE_ANY) {
-            if (!value->has_default_value) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "No value or default for required parameter.");
-                return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
-            }
-
             struct aws_endpoints_scope_value *scope_value = &state->scope_impl.values[idx];
 
             switch (value->type) {

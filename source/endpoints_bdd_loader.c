@@ -153,6 +153,12 @@ static int s_parse_one_parameter(
     }
     param->is_required = (is_required != 0);
 
+    if (param->is_required && !param->has_default_value) {
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Required parameter has no default value. Bytecode is malformed.");
+        return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+    }
+
     uint8_t has_builtin;
     if (!aws_byte_cursor_read_u8(cursor, &has_builtin)) {
         return AWS_OP_ERR;
