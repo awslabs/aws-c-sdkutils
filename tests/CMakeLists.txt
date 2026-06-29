@@ -102,8 +102,23 @@ add_test_case(endpoints_regex_misc_validation)
 add_test_case(endpoints_bdd_loader_basic)
 add_test_case(endpoints_bdd_compiler_loader_roundtrip)
 
+add_test_case(aws_chunked_decoder_new_destroy)
+add_test_case(aws_chunked_decoder_process_empty_input)
+add_test_case(aws_chunked_decoder_permanent_error)
+add_test_case(aws_chunked_decoder_line_too_long)
+add_test_case(aws_chunked_decoder_callback_error)
+add_test_case(aws_chunked_decoder_getters)
+add_test_case(aws_chunked_decoder_split_all_at_once)
+add_test_case(aws_chunked_decoder_split_one_byte)
+add_test_case(aws_chunked_decoder_split_two_bytes)
+add_test_case(aws_chunked_decoder_error_vectors)
+
 set(TEST_BINARY_NAME ${PROJECT_NAME}-tests)
 generate_test_driver(${TEST_BINARY_NAME})
+
+file(GLOB FUZZ_TESTS "fuzz/*.c")
+include(AwsLibFuzzer)
+aws_add_fuzz_tests("${FUZZ_TESTS}" "" "")
 
 add_custom_command(TARGET ${PROJECT_NAME}-tests PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory

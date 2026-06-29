@@ -49,6 +49,10 @@ static struct aws_log_subject_info s_log_subject_infos[] = {
         "Subject for AWS Endpoints Engine general messages"),
     DEFINE_LOG_SUBJECT_INFO(AWS_LS_SDKUTILS_PARTITIONS_PARSING, "AWSEndpoints", "Subject for AWS Partitions parsing"),
     DEFINE_LOG_SUBJECT_INFO(AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "AWSEndpoints", "Subject for AWS Endpoints Regex engine"),
+    DEFINE_LOG_SUBJECT_INFO(
+        AWS_LS_SDKUTILS_CHUNKED_DECODER,
+        "AwsChunkedDecoder",
+        "Subject for aws-chunked content encoding decoder"),
 };
 
 static struct aws_log_subject_info_list s_sdkutils_log_subjects = {
