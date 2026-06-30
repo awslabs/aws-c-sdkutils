@@ -27,9 +27,13 @@ static int s_copy_context_to_state(
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
         }
 
-        size_t idx = (size_t)element->value - 1;
+        size_t idx = (size_t)element->value;
+        AWS_ERROR_PRECONDITION3(
+            idx > 0 && idx <= AWS_BDD_MAX_REGS,
+            AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED,
+            "Variable index out of bounds.");
 
-        struct aws_endpoints_scope_value *scope_value = &scope_impl->values[idx];
+        struct aws_endpoints_scope_value *scope_value = &scope_impl->values[idx - 1];
         scope_value->allocator = NULL;
         scope_value->name = aws_endpoints_non_owning_cursor_create(context_value->name.cur);
         scope_value->value = context_value->value;
@@ -57,6 +61,11 @@ struct aws_endpoints_scope_value *s_bdd_scope_find_fn(void *scope_impl, struct a
         ref.bdd_ref_idx = reg_idx;
     }
 
+    if (ref.bdd_ref_idx == 0 || ref.bdd_ref_idx > AWS_BDD_MAX_REGS) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Variable index out of bounds.");
+        aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        return NULL;
+    }
     ret = &bdd_scope->values[ref.bdd_ref_idx - 1];
 
     if (ret->value.type == AWS_ENDPOINTS_VALUE_UNSET) {
@@ -106,15 +115,19 @@ static int s_init_state(
             continue;
         }
 
-        size_t idx = value->param_idx - 1;
+        size_t idx = value->param_idx;
+        AWS_ERROR_PRECONDITION3(
+            idx > 0 && idx <= AWS_BDD_MAX_REGS,
+            AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED,
+            "Variable index out of bounds.");
 
-        if (state->scope_impl.values[idx].value.type == AWS_ENDPOINTS_VALUE_UNSET) {
+        if (state->scope_impl.values[idx - 1].value.type == AWS_ENDPOINTS_VALUE_UNSET) {
             if (!value->has_default_value) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "No value or default for required parameter.");
                 return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
             }
 
-            struct aws_endpoints_scope_value *scope_value = &state->scope_impl.values[idx];
+            struct aws_endpoints_scope_value *scope_value = &state->scope_impl.values[idx - 1];
 
             switch (value->type) {
                 case AWS_ENDPOINTS_PARAMETER_STRING:
@@ -150,6 +163,10 @@ static int s_resolve_one_condition(
 
     if (condition->assign.len > 0) {
         struct aws_bdd_scope *scope_impl = &state->scope_impl;
+        AWS_ERROR_PRECONDITION3(
+            condition->assign_idx > 0 && condition->assign_idx <= AWS_BDD_MAX_REGS,
+            AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED,
+            "Variable index out of bounds.");
         struct aws_endpoints_scope_value *scope_value = &scope_impl->values[condition->assign_idx - 1];
 
         scope_value->allocator = NULL;
@@ -170,7 +187,7 @@ on_error:
 static void s_state_clean_up(struct aws_endpoints_bdd_engine_state *state) {
     AWS_PRECONDITION(state);
 
-    for (size_t i = 0; i < s_max_regs; ++i) {
+    for (size_t i = 0; i < AWS_BDD_MAX_REGS; ++i) {
         aws_endpoints_value_clean_up(&state->scope_impl.values[i].value);
     }
 }

@@ -158,13 +158,10 @@ static int s_parse_one_parameter(
      * guaranteed to be unique amongst themselves.
      */
     size_t param_idx = offset + 1;
-    if (param_idx > s_max_regs) {
-        AWS_LOGF_ERROR(
-            AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-            "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
-            s_max_regs);
-        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);
-    }
+    AWS_ERROR_PRECONDITION3(
+        param_idx <= AWS_BDD_MAX_REGS,
+        AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET,
+        "Too many unique variables in ruleset. Increase AWS_BDD_MAX_REGS.");
     aws_hash_table_put(&engine->register_map, &param->name, (void *)param_idx, NULL);
     param->param_idx = param_idx;
 
@@ -437,13 +434,10 @@ static int s_parse_one_condition(
             cond->assign_idx = reg_index;
         } else {
             cond->assign_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
-            if (cond->assign_idx > s_max_regs) {
-                AWS_LOGF_ERROR(
-                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-                    "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
-                    s_max_regs);
-                return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);
-            }
+            AWS_ERROR_PRECONDITION3(
+                cond->assign_idx <= AWS_BDD_MAX_REGS,
+                AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET,
+                "Too many unique variables in ruleset. Increase AWS_BDD_MAX_REGS.");
             aws_hash_table_put(&engine->register_map, &cond->assign, (void *)cond->assign_idx, NULL);
         }
     }
@@ -702,7 +696,7 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     if (aws_hash_table_init(
             &engine->register_map,
             allocator,
-            s_max_regs,
+            AWS_BDD_MAX_REGS,
             aws_hash_byte_cursor_ptr,
             aws_endpoints_byte_cursor_eq,
             NULL,
