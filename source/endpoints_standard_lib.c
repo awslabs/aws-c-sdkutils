@@ -24,7 +24,8 @@ static int s_resolve_fn_is_set(
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
-    if (args.argc != 1 || aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value)) {
+    if (args.argc != 1 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_UNSET, &argv_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for isSet.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;
@@ -70,7 +71,8 @@ static int s_resolve_fn_get_attr(
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_value argv_value = {0};
     struct aws_endpoints_value argv_path = {0};
-    if (args.argc != 2 || aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_ANY, &argv_value) ||
+    if (args.argc != 2 ||
+        aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_UNSET, &argv_value) ||
         aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_STRING, &argv_path)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for get attr.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
@@ -241,7 +243,7 @@ static int s_resolve_fn_coalesce(
 
     for (size_t i = 0; i < args.argc; ++i) {
         struct aws_endpoints_value argv_value = {0};
-        if (aws_endpoints_argv_expect(allocator, scope, args, i, AWS_ENDPOINTS_VALUE_ANY, &argv_value)) {
+        if (aws_endpoints_argv_expect(allocator, scope, args, i, AWS_ENDPOINTS_VALUE_UNSET, &argv_value)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve coalesce.");
             result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
             goto on_done;
@@ -349,8 +351,8 @@ static int s_resolve_fn_ite(
     struct aws_endpoints_value false_value = {0};
     if (args.argc != 3 ||
         aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_BOOLEAN, &cond_value) ||
-        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_ANY, &true_value) ||
-        aws_endpoints_argv_expect(allocator, scope, args, 2, AWS_ENDPOINTS_VALUE_ANY, &false_value)) {
+        aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_UNSET, &true_value) ||
+        aws_endpoints_argv_expect(allocator, scope, args, 2, AWS_ENDPOINTS_VALUE_UNSET, &false_value)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve ite.");
         result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         goto on_done;

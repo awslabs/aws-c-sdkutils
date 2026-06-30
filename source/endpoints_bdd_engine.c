@@ -6,19 +6,6 @@
 #include <aws/sdkutils/endpoints_bdd_engine.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 
-struct aws_bdd_scope {
-    struct aws_endpoints_bdd_engine *engine;
-
-    struct aws_endpoints_scope_value values[s_max_regs];
-};
-
-struct aws_endpoints_bdd_engine_state {
-    struct aws_endpoints_resolution_scope scope;
-
-    struct aws_bdd_scope scope_impl;
-
-    struct aws_endpoints_bdd_engine *engine;
-};
 
 static int s_copy_context_to_state(
     const struct aws_endpoints_request_context *context,
@@ -73,7 +60,7 @@ struct aws_endpoints_scope_value *s_bdd_scope_find_fn(void *scope_impl, struct a
 
     ret = &bdd_scope->values[ref.bdd_ref_idx - 1];
 
-    if (ret->value.type == AWS_ENDPOINTS_VALUE_ANY) {
+    if (ret->value.type == AWS_ENDPOINTS_VALUE_UNSET) {
         return NULL;
     }
 
@@ -122,7 +109,7 @@ static int s_init_state(
 
         size_t idx = value->param_idx - 1;
 
-        if (state->scope_impl.values[idx].value.type == AWS_ENDPOINTS_VALUE_ANY) {
+        if (state->scope_impl.values[idx].value.type == AWS_ENDPOINTS_VALUE_UNSET) {
             if (!value->has_default_value) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "No value or default for required parameter.");
                 return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);

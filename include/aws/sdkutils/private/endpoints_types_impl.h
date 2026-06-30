@@ -87,7 +87,7 @@ enum aws_endpoints_fn_type {
 enum aws_endpoints_value_type {
     /* Special value to represent that any value type is expected from resolving an expresion.
         Not a valid value for a value type. */
-    AWS_ENDPOINTS_VALUE_ANY,
+    AWS_ENDPOINTS_VALUE_UNSET,
 
     AWS_ENDPOINTS_VALUE_NONE,
     AWS_ENDPOINTS_VALUE_STRING,
@@ -466,6 +466,17 @@ enum {
     s_max_regs = 128,
 };
 
+struct aws_bdd_scope {
+    struct aws_endpoints_bdd_engine *engine;
+    struct aws_endpoints_scope_value values[s_max_regs];
+};
+
+struct aws_endpoints_bdd_engine_state {
+    struct aws_endpoints_resolution_scope scope;
+    struct aws_bdd_scope scope_impl;
+    struct aws_endpoints_bdd_engine *engine;
+};
+
 struct aws_endpoints_bdd_engine {
     struct aws_allocator *allocator;
     struct aws_ref_count ref_count;
@@ -483,15 +494,10 @@ struct aws_endpoints_bdd_engine {
     struct aws_array_list conditions;
     struct aws_endpoints_condition *conditions_array_ptr;
 
-    /* This register map is a hash table to store indices of scope values array. In the previous engine,
-     * each scope had its own hash table of scope values which meant, every time we needed to
-     * update a value for a scope variable, we did a hash_table_find. Expensive. The new
-     * state stores it as a stack allocated scope array which would mean faster finding and
-     * replacing values. This works by storing register_map which would store a particular index
-     * at which that particular scope variable resides in the scope_values array and each assign
-     * scope variable and parameter get its index. if the index is 0 we can look up the correct
-     * index from the register map if not use the index we stored. Ideally we should have all the
-     * indices stored and ready at load time.
+    /* Maps variable name (aws_byte_cursor*) to a 1-based slot index (size_t) in
+     * aws_bdd_scope.values[]. Populated once at load time with all parameters and
+     * condition assigns. At resolve time, variable lookups use this index for direct
+     * array access instead of a hash table lookup on every condition evaluation.
      */
     struct aws_hash_table register_map;
 

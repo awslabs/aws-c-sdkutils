@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0.
  */
 
+#include "aws/sdkutils/sdkutils.h"
 #include <aws/common/byte_buf.h>
 #include <aws/common/encoding.h>
 #include <aws/common/hash_table.h>
@@ -85,7 +86,8 @@ static int s_parse_one_parameter(
     struct aws_endpoints_bdd_engine *engine,
     struct aws_byte_cursor *cursor,
     struct aws_byte_cursor blob,
-    struct aws_endpoints_parameter *param) {
+    struct aws_endpoints_parameter *param,
+    size_t offset) {
 
     uint8_t opcode;
     if (!aws_byte_cursor_read_u8(cursor, &opcode)) {
@@ -151,20 +153,20 @@ static int s_parse_one_parameter(
         }
     }
 
-    struct aws_hash_element *element = NULL;
-    aws_hash_table_find(&engine->register_map, &param->name, &element);
-    if (element == NULL) {
-        if (aws_hash_table_get_entry_count(&engine->register_map) >= s_max_regs) {
-            AWS_LOGF_ERROR(
-                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-                "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
-                s_max_regs);
-            return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
-        }
-        size_t param_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
-        aws_hash_table_put(&engine->register_map, &param->name, (void *)param_idx, NULL);
-        param->param_idx = param_idx;
+    /* We are confident about not checking the register_map to see if the value
+     * already exists since parameters are the first variables to be loaded and
+     * guaranteed to be unique amongst themselves.
+     */
+    size_t param_idx = offset + 1;
+    if (param_idx > s_max_regs) {
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+            "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
+            s_max_regs);
+        return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);
     }
+    aws_hash_table_put(&engine->register_map, &param->name, (void *)param_idx, NULL);
+    param->param_idx = param_idx;
 
     return AWS_OP_SUCCESS;
 }
@@ -184,13 +186,10 @@ static int s_load_parameters(
 
     struct aws_endpoints_parameter *parameters =
         aws_mem_calloc(allocator, count, sizeof(struct aws_endpoints_parameter));
-    if (!parameters) {
-        return AWS_OP_ERR;
-    }
 
     for (uint16_t i = 0; i < count; ++i) {
         parameters[i].allocator = allocator;
-        if (s_parse_one_parameter(engine, cursor, blob, &parameters[i])) {
+        if (s_parse_one_parameter(engine, cursor, blob, &parameters[i], i)) {
             aws_mem_release(allocator, parameters);
             goto error;
         }
@@ -437,14 +436,14 @@ static int s_parse_one_condition(
             size_t reg_index = (size_t)element->value;
             cond->assign_idx = reg_index;
         } else {
-            if (aws_hash_table_get_entry_count(&engine->register_map) >= s_max_regs) {
+            cond->assign_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
+            if (cond->assign_idx > s_max_regs) {
                 AWS_LOGF_ERROR(
                     AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
                     "Too many unique variables in ruleset. Increase s_max_regs (currently %d).",
                     s_max_regs);
-                return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
+                return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);
             }
-            cond->assign_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
             aws_hash_table_put(&engine->register_map, &cond->assign, (void *)cond->assign_idx, NULL);
         }
     }
