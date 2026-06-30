@@ -6,7 +6,6 @@
 #include <aws/sdkutils/endpoints_bdd_engine.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 
-
 static int s_copy_context_to_state(
     const struct aws_endpoints_request_context *context,
     struct aws_endpoints_bdd_engine_state *state) {
