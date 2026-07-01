@@ -129,6 +129,11 @@ struct aws_endpoints_parameter {
     bool is_deprecated;
     struct aws_byte_cursor deprecated_message;
     struct aws_byte_cursor deprecated_since;
+    /* 1-based index of its location in scope-value array.
+     * Although param_idx is 1-based, array has 0-based indexing
+     * index = 0 indicates the value has not yet been added to
+     * the register_map.
+     */
     size_t param_idx;
 };
 
@@ -227,6 +232,11 @@ struct aws_endpoints_rule_data_tree {
 struct aws_endpoints_condition {
     uint16_t expr_ref;
     struct aws_byte_cursor assign;
+    /* 1-based index of its location in scope-value array.
+     * Although assign_idx is 1-based, array has 0-based indexing
+     * index = 0 indicates the value has not yet been added to
+     * the register_map.
+     */
     size_t assign_idx;
 };
 
@@ -460,7 +470,7 @@ struct aws_endpoints_bdd_result {
 /* Max distinct named variables (parameters + condition assigns) per ruleset.
  * Scope values are stored in a fixed array of this size to avoid heap allocation
  * on the resolve hot path. Increase this constant if a larger ruleset is needed.
- * Current rulesets use ~20-30 slots. */
+ * 2026 July rulesets use ~40 slots. */
 enum { AWS_BDD_MAX_REGS = 128 };
 
 struct aws_bdd_scope {

@@ -110,7 +110,7 @@ static int s_init_state(
             return AWS_OP_ERR;
         }
 
-        /* Skip non-required values, since they cannot have default values. */
+        /* Ignore non-required values from this check. They cannot have default values. */
         if (!value->is_required) {
             continue;
         }

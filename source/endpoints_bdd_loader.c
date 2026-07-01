@@ -158,10 +158,6 @@ static int s_parse_one_parameter(
      * guaranteed to be unique amongst themselves.
      */
     size_t param_idx = offset + 1;
-    AWS_ERROR_PRECONDITION3(
-        param_idx <= AWS_BDD_MAX_REGS,
-        AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET,
-        "Too many unique variables in ruleset. Increase AWS_BDD_MAX_REGS.");
     aws_hash_table_put(&engine->register_map, &param->name, (void *)param_idx, NULL);
     param->param_idx = param_idx;
 
@@ -434,10 +430,6 @@ static int s_parse_one_condition(
             cond->assign_idx = reg_index;
         } else {
             cond->assign_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
-            AWS_ERROR_PRECONDITION3(
-                cond->assign_idx <= AWS_BDD_MAX_REGS,
-                AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET,
-                "Too many unique variables in ruleset. Increase AWS_BDD_MAX_REGS.");
             aws_hash_table_put(&engine->register_map, &cond->assign, (void *)cond->assign_idx, NULL);
         }
     }
@@ -725,6 +717,11 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load conditions");
         goto error;
     }
+
+    AWS_ERROR_PRECONDITION3(
+        aws_hash_table_get_entry_count(&engine->register_map) <= AWS_BDD_MAX_REGS,
+        AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET,
+        "Too many unique variables in ruleset. Increase AWS_BDD_MAX_REGS.");
 
     if (s_load_results(engine, &bytecode, engine->string_blob, &engine->results)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load results");
