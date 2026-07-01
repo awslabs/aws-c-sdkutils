@@ -591,7 +591,7 @@ int aws_endpoints_argv_expect(
         goto on_error;
     }
 
-    if (expected_type != AWS_ENDPOINTS_VALUE_ANY && argv_value.type != expected_type) {
+    if (expected_type != AWS_ENDPOINTS_VALUE_UNSET && argv_value.type != expected_type) {
         AWS_LOGF_ERROR(
             AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
             "Unexpected arg type actual: %u expected %u.",

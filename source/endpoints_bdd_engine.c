@@ -6,20 +6,6 @@
 #include <aws/sdkutils/endpoints_bdd_engine.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 
-struct aws_bdd_scope {
-    struct aws_endpoints_bdd_engine *engine;
-
-    struct aws_endpoints_scope_value values[s_max_regs];
-};
-
-struct aws_endpoints_bdd_engine_state {
-    struct aws_endpoints_resolution_scope scope;
-
-    struct aws_bdd_scope scope_impl;
-
-    struct aws_endpoints_bdd_engine *engine;
-};
-
 static int s_copy_context_to_state(
     const struct aws_endpoints_request_context *context,
     struct aws_endpoints_bdd_engine_state *state) {
@@ -31,16 +17,23 @@ static int s_copy_context_to_state(
 
         struct aws_endpoints_scope_value *context_value = (struct aws_endpoints_scope_value *)iter.element.value;
         struct aws_hash_element *element = NULL;
-        aws_hash_table_find(&state->engine->register_map, &context_value->name, &element);
+        aws_hash_table_find(&state->engine->register_map, &context_value->name.cur, &element);
 
-        size_t idx = 0;
-        if (element != NULL) {
-            idx = (size_t)element->value;
-        } else {
-            idx = aws_hash_table_get_entry_count(&state->engine->register_map) + 1;
+        if (element == NULL) {
+            AWS_LOGF_ERROR(
+                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                "Received a context variable not present in parameters: " PRInSTR,
+                AWS_BYTE_CURSOR_PRI(context_value->name.cur));
+            return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
         }
 
-        struct aws_endpoints_scope_value *scope_value = &scope_impl->values[idx];
+        size_t idx = (size_t)element->value;
+        AWS_ERROR_PRECONDITION3(
+            idx > 0 && idx <= AWS_BDD_MAX_REGS,
+            AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED,
+            "Variable index out of bounds.");
+
+        struct aws_endpoints_scope_value *scope_value = &scope_impl->values[idx - 1];
         scope_value->allocator = NULL;
         scope_value->name = aws_endpoints_non_owning_cursor_create(context_value->name.cur);
         scope_value->value = context_value->value;
@@ -59,16 +52,23 @@ struct aws_endpoints_scope_value *s_bdd_scope_find_fn(void *scope_impl, struct a
         struct aws_hash_element *element = NULL;
         aws_hash_table_find(&bdd_scope->engine->register_map, &ref.name, &element);
         if (element == NULL) {
+            AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Could not find reference in implementation");
+            aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
             return NULL;
         }
 
         size_t reg_idx = (size_t)element->value;
-        ret = &((struct aws_bdd_scope *)scope_impl)->values[reg_idx];
-    } else {
-        ret = &bdd_scope->values[ref.bdd_ref_idx - 1];
+        ref.bdd_ref_idx = reg_idx;
     }
 
-    if (ret->value.type == AWS_ENDPOINTS_VALUE_ANY) {
+    if (ref.bdd_ref_idx == 0 || ref.bdd_ref_idx > AWS_BDD_MAX_REGS) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Variable index out of bounds.");
+        aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
+        return NULL;
+    }
+    ret = &bdd_scope->values[ref.bdd_ref_idx - 1];
+
+    if (ret->value.type == AWS_ENDPOINTS_VALUE_UNSET) {
         return NULL;
     }
 
@@ -97,31 +97,37 @@ static int s_init_state(
     }
 
     /* Add defaults to the top level scope. */
-    for (struct aws_hash_iter iter = aws_hash_iter_begin(&engine->parameters); !aws_hash_iter_done(&iter);
-         aws_hash_iter_next(&iter)) {
-        const struct aws_byte_cursor key = *(const struct aws_byte_cursor *)iter.element.key;
-        struct aws_endpoints_parameter *value = (struct aws_endpoints_parameter *)iter.element.value;
+    for (size_t i = 0; i < aws_array_list_length(&engine->parameters); ++i) {
+        struct aws_endpoints_parameter *value = NULL;
+        aws_array_list_get_at_ptr(&engine->parameters, (void **)&value, i);
 
-        /* Skip non-required values, since they cannot have default values. */
+        /* value should always be present in the register map since we load parameters into the map */
+        if (value->param_idx == 0) {
+            AWS_LOGF_ERROR(
+                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                "Value not present in register map: " PRInSTR,
+                AWS_BYTE_CURSOR_PRI(value->name));
+            return AWS_OP_ERR;
+        }
+
+        /* Ignore non-required values from this check. They cannot have default values. */
         if (!value->is_required) {
             continue;
         }
 
-        struct aws_hash_element *element = NULL;
-        aws_hash_table_find(&state->engine->register_map, &key, &element);
+        size_t idx = value->param_idx;
+        AWS_ERROR_PRECONDITION3(
+            idx > 0 && idx <= AWS_BDD_MAX_REGS,
+            AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED,
+            "Variable index out of bounds.");
 
-        uint16_t idx = 0;
-        if (element != NULL) {
-            idx = (uint16_t)(uintptr_t)element->value;
-        }
-
-        if (state->scope_impl.values[idx].value.type == AWS_ENDPOINTS_VALUE_ANY) {
+        if (state->scope_impl.values[idx - 1].value.type == AWS_ENDPOINTS_VALUE_UNSET) {
             if (!value->has_default_value) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "No value or default for required parameter.");
                 return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
             }
 
-            struct aws_endpoints_scope_value *scope_value = &state->scope_impl.values[idx];
+            struct aws_endpoints_scope_value *scope_value = &state->scope_impl.values[idx - 1];
 
             switch (value->type) {
                 case AWS_ENDPOINTS_PARAMETER_STRING:
@@ -129,7 +135,7 @@ static int s_init_state(
                 case AWS_ENDPOINTS_PARAMETER_STRING_ARRAY:
                     scope_value->value = value->default_value;
                     scope_value->value.is_ref = true;
-                    scope_value->name = aws_endpoints_non_owning_cursor_create(key);
+                    scope_value->name = aws_endpoints_non_owning_cursor_create(value->name);
                     break;
                 default:
                     AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected parameter type.");
@@ -157,7 +163,11 @@ static int s_resolve_one_condition(
 
     if (condition->assign.len > 0) {
         struct aws_bdd_scope *scope_impl = &state->scope_impl;
-        struct aws_endpoints_scope_value *scope_value = &scope_impl->values[condition->assign_idx];
+        AWS_ERROR_PRECONDITION3(
+            condition->assign_idx > 0 && condition->assign_idx <= AWS_BDD_MAX_REGS,
+            AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED,
+            "Variable index out of bounds.");
+        struct aws_endpoints_scope_value *scope_value = &scope_impl->values[condition->assign_idx - 1];
 
         scope_value->allocator = NULL;
         scope_value->name = aws_endpoints_non_owning_cursor_create(condition->assign);
@@ -177,12 +187,12 @@ on_error:
 static void s_state_clean_up(struct aws_endpoints_bdd_engine_state *state) {
     AWS_PRECONDITION(state);
 
-    for (size_t i = 0; i < s_max_regs; ++i) {
+    for (size_t i = 0; i < AWS_BDD_MAX_REGS; ++i) {
         aws_endpoints_value_clean_up(&state->scope_impl.values[i].value);
     }
 }
 
-static int32_t s_result_bound = 100000000;
+static const int32_t s_result_bound = 100000000;
 
 int aws_endpoints_bdd_engine_resolve(
     struct aws_endpoints_bdd_engine *engine,
@@ -219,13 +229,13 @@ int aws_endpoints_bdd_engine_resolve(
             goto on_done;
         }
 
-        bool is_thruthy = false;
-        if (s_resolve_one_condition(engine->allocator, current_condition, &state, &is_thruthy)) {
+        bool is_truthy = false;
+        if (s_resolve_one_condition(engine->allocator, current_condition, &state, &is_truthy)) {
             result = aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
             goto on_done;
         }
 
-        if (is_complement ^ is_thruthy) {
+        if (is_complement ^ is_truthy) {
             current_ref = node->high_ref;
         } else {
             current_ref = node->low_ref;

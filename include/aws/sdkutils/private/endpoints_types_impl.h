@@ -87,7 +87,7 @@ enum aws_endpoints_fn_type {
 enum aws_endpoints_value_type {
     /* Special value to represent that any value type is expected from resolving an expresion.
         Not a valid value for a value type. */
-    AWS_ENDPOINTS_VALUE_ANY,
+    AWS_ENDPOINTS_VALUE_UNSET,
 
     AWS_ENDPOINTS_VALUE_NONE,
     AWS_ENDPOINTS_VALUE_STRING,
@@ -129,6 +129,12 @@ struct aws_endpoints_parameter {
     bool is_deprecated;
     struct aws_byte_cursor deprecated_message;
     struct aws_byte_cursor deprecated_since;
+    /* 1-based index of its location in scope-value array.
+     * Although param_idx is 1-based, array has 0-based indexing
+     * index = 0 indicates the value has not yet been added to
+     * the register_map.
+     */
+    size_t param_idx;
 };
 
 struct aws_endpoints_ruleset {
@@ -226,6 +232,11 @@ struct aws_endpoints_rule_data_tree {
 struct aws_endpoints_condition {
     uint16_t expr_ref;
     struct aws_byte_cursor assign;
+    /* 1-based index of its location in scope-value array.
+     * Although assign_idx is 1-based, array has 0-based indexing
+     * index = 0 indicates the value has not yet been added to
+     * the register_map.
+     */
     size_t assign_idx;
 };
 
@@ -456,8 +467,21 @@ struct aws_endpoints_bdd_result {
     } data;
 };
 
-enum {
-    s_max_regs = 128, /* max regs during eval */
+/* Max distinct named variables (parameters + condition assigns) per ruleset.
+ * Scope values are stored in a fixed array of this size to avoid heap allocation
+ * on the resolve hot path. Increase this constant if a larger ruleset is needed.
+ * 2026 July rulesets use ~40 slots. */
+enum { AWS_BDD_MAX_REGS = 128 };
+
+struct aws_bdd_scope {
+    struct aws_endpoints_bdd_engine *engine;
+    struct aws_endpoints_scope_value values[AWS_BDD_MAX_REGS];
+};
+
+struct aws_endpoints_bdd_engine_state {
+    struct aws_endpoints_resolution_scope scope;
+    struct aws_bdd_scope scope_impl;
+    struct aws_endpoints_bdd_engine *engine;
 };
 
 struct aws_endpoints_bdd_engine {
@@ -471,11 +495,17 @@ struct aws_endpoints_bdd_engine {
     /* string segment. basically blob of all strings in ruleset that everything else indexes to. */
     struct aws_byte_cursor string_blob;
 
-    struct aws_hash_table parameters;
+    struct aws_array_list parameters;
+    struct aws_endpoints_parameter *parameters_array_ptr;
 
     struct aws_array_list conditions;
-    struct aws_endpoints_condition *conditions_ptr;
+    struct aws_endpoints_condition *conditions_array_ptr;
 
+    /* Maps variable name (aws_byte_cursor*) to a 1-based slot index (size_t) in
+     * aws_bdd_scope.values[]. Populated once at load time with all parameters and
+     * condition assigns. At resolve time, variable lookups use this index for direct
+     * array access instead of a hash table lookup on every condition evaluation.
+     */
     struct aws_hash_table register_map;
 
     /* array of all exprs in the program. everything else indexes into this. */

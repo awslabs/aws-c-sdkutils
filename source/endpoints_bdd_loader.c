@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0.
  */
 
+#include "aws/sdkutils/sdkutils.h"
 #include <aws/common/byte_buf.h>
 #include <aws/common/encoding.h>
 #include <aws/common/hash_table.h>
@@ -10,6 +11,7 @@
 #include <aws/sdkutils/partitions.h>
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/private/endpoints_util.h>
+#include <stdint.h>
 
 #define BDD_MAGIC_NUMBER 0x45504452 /* "EPDR" */
 
@@ -30,7 +32,7 @@ static void s_on_condition_array_element_clean_up(void *element) {
     aws_endpoints_condition_clean_up(condition);
 }
 
-static void s_on_resutls_array_element_clean_up(void *element) {
+static void s_on_results_array_element_clean_up(void *element) {
     struct aws_endpoints_bdd_result *result = element;
     switch (result->type) {
         case AWS_ENDPOINTS_RESOLVED_ENDPOINT:
@@ -80,15 +82,12 @@ static int s_read_string_ref(struct aws_byte_cursor *cursor, struct aws_byte_cur
     return AWS_OP_SUCCESS;
 }
 
-static void s_callback_endpoints_parameter_destroy(void *data) {
-    struct aws_endpoints_parameter *parameter = data;
-    aws_endpoints_parameter_destroy(parameter);
-}
-
 static int s_parse_one_parameter(
+    struct aws_endpoints_bdd_engine *engine,
     struct aws_byte_cursor *cursor,
     struct aws_byte_cursor blob,
-    struct aws_endpoints_parameter *param) {
+    struct aws_endpoints_parameter *param,
+    size_t offset) {
 
     uint8_t opcode;
     if (!aws_byte_cursor_read_u8(cursor, &opcode)) {
@@ -154,49 +153,48 @@ static int s_parse_one_parameter(
         }
     }
 
+    /* We are confident about not checking the register_map to see if the value
+     * already exists since parameters are the first variables to be loaded and
+     * guaranteed to be unique amongst themselves.
+     */
+    size_t param_idx = offset + 1;
+    aws_hash_table_put(&engine->register_map, &param->name, (void *)param_idx, NULL);
+    param->param_idx = param_idx;
+
     return AWS_OP_SUCCESS;
 }
 
 static int s_load_parameters(
     struct aws_allocator *allocator,
-    struct aws_byte_cursor *cursor,
-    struct aws_byte_cursor blob,
-    struct aws_hash_table *out_parameters) {
+    struct aws_endpoints_bdd_engine *engine,
+    struct aws_byte_cursor *cursor) {
+
+    struct aws_byte_cursor blob = engine->string_blob;
+    struct aws_array_list *out_parameters = &engine->parameters;
 
     uint16_t count;
     if (!aws_byte_cursor_read_le16(cursor, &count)) {
         return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
     }
 
-    if (aws_hash_table_init(
-            out_parameters,
-            allocator,
-            count,
-            aws_hash_byte_cursor_ptr,
-            aws_endpoints_byte_cursor_eq,
-            NULL,
-            s_callback_endpoints_parameter_destroy)) {
-        return AWS_OP_ERR;
-    }
+    struct aws_endpoints_parameter *parameters =
+        aws_mem_calloc(allocator, count, sizeof(struct aws_endpoints_parameter));
 
     for (uint16_t i = 0; i < count; ++i) {
-        struct aws_endpoints_parameter *param = aws_mem_calloc(allocator, 1, sizeof(struct aws_endpoints_parameter));
-        if (!param) {
-            goto error;
-        }
-        param->allocator = allocator;
-
-        if (s_parse_one_parameter(cursor, blob, param) ||
-            aws_hash_table_put(out_parameters, &param->name, param, NULL)) {
-            aws_mem_release(allocator, param);
+        parameters[i].allocator = allocator;
+        if (s_parse_one_parameter(engine, cursor, blob, &parameters[i], i)) {
+            aws_mem_release(allocator, parameters);
             goto error;
         }
     }
+
+    aws_array_list_init_static_from_initialized(
+        out_parameters, parameters, count, sizeof(struct aws_endpoints_parameter));
+    engine->parameters_array_ptr = parameters;
 
     return AWS_OP_SUCCESS;
 
 error:
-    aws_hash_table_clean_up(out_parameters);
     return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
@@ -292,10 +290,16 @@ static int s_decode_value(
             aws_hash_table_find(&engine->register_map, &ref_cur, &element);
             if (element != NULL) {
                 size_t reg_index = (size_t)element->value;
-                ref.bdd_ref_idx = reg_index + 1;
+                ref.bdd_ref_idx = reg_index;
             } else {
-                ref.bdd_ref_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
-                aws_hash_table_put(&engine->register_map, &ref_cur, (void *)ref.bdd_ref_idx, NULL);
+                /* We have already parsed (and loaded) all parameters and condition assigns
+                 * to the register map so we are guaranteed to have encountered any reference
+                 * from results. If not, the model/bytecode is malformed.
+                 */
+                AWS_LOGF_ERROR(
+                    AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
+                    "Reference to unknown variable in bytecode. Bytecode is malformed.");
+                return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
             }
 
             out_expr->e.reference = ref;
@@ -422,7 +426,7 @@ static int s_parse_one_condition(
         struct aws_hash_element *element = NULL;
         aws_hash_table_find(&engine->register_map, &cond->assign, &element);
         if (element != NULL) {
-            size_t reg_index = (size_t)element->value + 1;
+            size_t reg_index = (size_t)element->value;
             cond->assign_idx = reg_index;
         } else {
             cond->assign_idx = aws_hash_table_get_entry_count(&engine->register_map) + 1;
@@ -442,7 +446,7 @@ static int s_load_conditions(
     struct aws_byte_cursor *cursor,
     struct aws_byte_cursor blob,
     struct aws_array_list *out_conditions,
-    struct aws_endpoints_condition **out_conditions_ptr) {
+    struct aws_endpoints_condition **out_conditions_array_ptr) {
 
     uint16_t count;
     if (!aws_byte_cursor_read_le16(cursor, &count)) {
@@ -461,7 +465,7 @@ static int s_load_conditions(
     aws_array_list_init_static_from_initialized(
         out_conditions, conditions, count, sizeof(struct aws_endpoints_condition));
 
-    *out_conditions_ptr = conditions;
+    *out_conditions_array_ptr = conditions;
 
     return AWS_OP_SUCCESS;
 
@@ -596,7 +600,7 @@ static int s_load_results(
     return AWS_OP_SUCCESS;
 
 error:
-    aws_array_list_deep_clean_up(out_results, s_on_resutls_array_element_clean_up);
+    aws_array_list_deep_clean_up(out_results, s_on_results_array_element_clean_up);
     return aws_raise_error(AWS_ERROR_INVALID_ARGUMENT);
 }
 
@@ -684,7 +688,7 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     if (aws_hash_table_init(
             &engine->register_map,
             allocator,
-            s_max_regs,
+            AWS_BDD_MAX_REGS,
             aws_hash_byte_cursor_ptr,
             aws_endpoints_byte_cursor_eq,
             NULL,
@@ -704,28 +708,20 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     }
     engine->version = version_cur;
 
-    if (s_load_parameters(allocator, &bytecode, engine->string_blob, &engine->parameters)) {
+    if (s_load_parameters(allocator, engine, &bytecode)) {
         AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load parameters");
         goto error;
     }
 
-    size_t param_count = 0;
-    for (struct aws_hash_iter iter = aws_hash_iter_begin(&engine->parameters); !aws_hash_iter_done(&iter);
-         aws_hash_iter_next(&iter)) {
-
-        struct aws_endpoints_parameter *value = (struct aws_endpoints_parameter *)iter.element.value;
-
-        struct aws_hash_element *element = NULL;
-        aws_hash_table_find(&engine->register_map, &value->name, &element);
-
-        if (element == NULL) {
-            aws_hash_table_put(&engine->register_map, &value->name, (void *)param_count, NULL);
-            param_count++;
-        }
+    if (s_load_conditions(engine, &bytecode, engine->string_blob, &engine->conditions, &engine->conditions_array_ptr)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load conditions");
+        goto error;
     }
 
-    if (s_load_conditions(engine, &bytecode, engine->string_blob, &engine->conditions, &engine->conditions_ptr)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to load conditions");
+    if (aws_hash_table_get_entry_count(&engine->register_map) > AWS_BDD_MAX_REGS) {
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Too many unique variables in ruleset. Increase AWS_BDD_MAX_REGS.");
+        aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);
         goto error;
     }
 
@@ -742,7 +738,7 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
     AWS_LOGF_DEBUG(
         AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
         "BDD engine loaded: %d params, %d conditions, %d results, %d nodes",
-        (int)aws_hash_table_get_entry_count(&engine->parameters),
+        (int)aws_array_list_length(&engine->parameters),
         (int)aws_array_list_length(&engine->conditions),
         (int)aws_array_list_length(&engine->results),
         (int)aws_array_list_length(&engine->nodes));
@@ -765,11 +761,10 @@ static void s_endpoints_bdd_engine_destroy(void *data) {
         aws_partitions_config_release(engine->partitions_config);
     }
 
-    aws_hash_table_clean_up(&engine->parameters);
+    aws_mem_release(engine->allocator, engine->parameters_array_ptr);
     aws_hash_table_clean_up(&engine->register_map);
-    aws_array_list_deep_clean_up(&engine->conditions, s_on_condition_array_element_clean_up);
-    aws_mem_release(engine->allocator, engine->conditions_ptr);
-    aws_array_list_deep_clean_up(&engine->results, s_on_resutls_array_element_clean_up);
+    aws_mem_release(engine->allocator, engine->conditions_array_ptr);
+    aws_array_list_deep_clean_up(&engine->results, s_on_results_array_element_clean_up);
     aws_array_list_clean_up(&engine->results);
     aws_array_list_clean_up(&engine->nodes);
 
