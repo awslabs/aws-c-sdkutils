@@ -23,6 +23,8 @@ AWS_EXTERN_C_BEGIN
  *
  * @param allocator Memory allocator
  * @param bytecode Bytecode buffer
+ * The Bytecode buffer is supposed to be from heap allocated memory
+ * and guaranteed to exist for the lifetime of the engine.
  * @param partitions_config Partition configuration (acquired by engine)
  * @return New BDD engine or NULL on error
  */

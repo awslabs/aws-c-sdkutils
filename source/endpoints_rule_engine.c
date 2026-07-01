@@ -69,7 +69,7 @@ static void s_scope_value_destroy_cb(void *data) {
 static int s_deep_copy_context_to_scope(
     struct aws_allocator *allocator,
     const struct aws_endpoints_request_context *context,
-    struct aws_endpoints_resolution_scope *scope) {
+    struct aws_endpoints_resolution_state *state) {
 
     struct aws_endpoints_scope_value *new_value = NULL;
 
@@ -85,7 +85,7 @@ static int s_deep_copy_context_to_scope(
             goto on_error;
         }
 
-        if (aws_hash_table_put(&scope->values, &new_value->name.cur, new_value, NULL)) {
+        if (aws_hash_table_put(&state->values, &new_value->name.cur, new_value, NULL)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to add deep copy to scope.");
             goto on_error;
         }
@@ -98,7 +98,19 @@ on_error:
     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
 }
 
-static int s_init_top_level_scope(
+struct aws_endpoints_scope_value *s_scope_find_fn(void *scope_impl, struct aws_endpoints_reference ref) {
+    struct aws_hash_table *values = scope_impl;
+
+    struct aws_hash_element *existing = NULL;
+    if (aws_hash_table_find(values, &ref.name, &existing)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to init request context values.");
+        return NULL;
+    }
+
+    return existing != NULL ? (struct aws_endpoints_scope_value *)existing->value : NULL;
+}
+
+static int s_init_top_level_state(
     struct aws_allocator *allocator,
     const struct aws_endpoints_request_context *context,
     const struct aws_endpoints_ruleset *ruleset,
@@ -114,8 +126,11 @@ static int s_init_top_level_scope(
     state->scope.partitions = partitions;
     state->scope.expr_index = ruleset->exprs;
 
+    state->scope.scope_impl = &state->values;
+    state->scope.find = s_scope_find_fn;
+
     if (aws_hash_table_init(
-            &state->scope.values,
+            &state->values,
             allocator,
             0,
             aws_hash_byte_cursor_ptr,
@@ -126,7 +141,7 @@ static int s_init_top_level_scope(
         goto on_error;
     }
 
-    if (s_deep_copy_context_to_scope(allocator, context, &state->scope)) {
+    if (s_deep_copy_context_to_scope(allocator, context, state)) {
         goto on_error;
     }
 
@@ -147,7 +162,7 @@ static int s_init_top_level_scope(
         }
 
         struct aws_hash_element *existing = NULL;
-        if (aws_hash_table_find(&state->scope.values, &key, &existing)) {
+        if (aws_hash_table_find(&state->values, &key, &existing)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to init request context values.");
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
         }
@@ -175,7 +190,7 @@ static int s_init_top_level_scope(
                     goto on_error;
             }
 
-            if (aws_hash_table_put(&state->scope.values, &val->name.cur, val, NULL)) {
+            if (aws_hash_table_put(&state->values, &val->name.cur, val, NULL)) {
                 AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to add value to top level scope.");
                 aws_endpoints_scope_value_destroy(val);
                 goto on_error;
@@ -192,7 +207,7 @@ on_error:
 static void s_state_clean_up(struct aws_endpoints_resolution_state *state) {
     AWS_PRECONDITION(state);
 
-    aws_hash_table_clean_up(&state->scope.values);
+    aws_hash_table_clean_up(&state->values);
     aws_array_list_clean_up(&state->added_keys);
 }
 
@@ -233,7 +248,7 @@ static int s_resolve_one_condition(
         }
 
         int was_created = 1;
-        if (aws_hash_table_put(&state->scope.values, &scope_value->name.cur, scope_value, &was_created)) {
+        if (aws_hash_table_put(&state->values, &scope_value->name.cur, scope_value, &was_created)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to set assigned variable.");
             goto on_error;
         }
@@ -321,7 +336,7 @@ int aws_endpoints_path_through_array(
     }
 
     if (index < 0) {
-        index = aws_array_list_length(&value->v.array) - index;
+        index = aws_array_list_length(&value->v.array) + index;
     }
 
     if (index < 0) {
@@ -335,8 +350,10 @@ int aws_endpoints_path_through_array(
         goto on_error;
     }
 
-    *out_value = *val;
-    out_value->is_ref = true;
+    if (aws_endpoints_deep_copy_parameter_value(allocator, val, out_value)) {
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to copy resolved value");
+        goto on_error;
+    }
 
     return AWS_OP_SUCCESS;
 
@@ -683,7 +700,7 @@ int s_revert_scope(struct aws_endpoints_resolution_state *state) {
             return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_FAILED);
         }
 
-        aws_hash_table_remove(&state->scope.values, cur, NULL, NULL);
+        aws_hash_table_remove(&state->values, cur, NULL, NULL);
     }
 
     aws_array_list_clear(&state->added_keys);
@@ -702,7 +719,7 @@ int aws_endpoints_rule_engine_resolve(
 
     int result = AWS_OP_SUCCESS;
     struct aws_endpoints_resolution_state state;
-    if (s_init_top_level_scope(engine->allocator, context, engine->ruleset, engine->partitions_config, &state)) {
+    if (s_init_top_level_state(engine->allocator, context, engine->ruleset, engine->partitions_config, &state)) {
         result = AWS_OP_ERR;
         goto on_done;
     }

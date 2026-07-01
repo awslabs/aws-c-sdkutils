@@ -81,6 +81,8 @@ NODES SECTION:
     [4 bytes]  root_ref (int32) - root node reference
     [4 bytes]  node_count (uint32)
     [2 bytes]  base64_length (uint16)
+    [1 byte]   padding
+    [n bytes]  0 padding bytes specified by padding
     [base64_length bytes]  Base64-encoded node array
 
     Each node (after decoding) is 12 bytes:
@@ -281,6 +283,14 @@ def encode_nodes(buf, data):
     le_bytes = struct.pack(f'<{n}i', *be_values)
 
     buf += struct.pack("<H", len(le_bytes))
+
+    # Note: on little endian arches we want to be able to index into this array directly
+    # but on some platforms with strict alignment (i.e. older arm) the array might be at wrong offset
+    # so pad the buffer, so array can start at 4 byte alignment
+    padding = (4 - ((len(buf) + 1) % 4)) % 4
+    buf += struct.pack("<B", padding)
+    buf += b'\x00' * padding
+
     buf += le_bytes
 
 
