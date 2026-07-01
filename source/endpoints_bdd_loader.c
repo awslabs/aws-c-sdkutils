@@ -718,8 +718,9 @@ struct aws_endpoints_bdd_engine *aws_endpoints_bdd_engine_new_from_bytecode(
         goto error;
     }
 
-    if(aws_hash_table_get_entry_count(&engine->register_map) > AWS_BDD_MAX_REGS){
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Too many unique variables in ruleset. Increase AWS_BDD_MAX_REGS.");
+    if (aws_hash_table_get_entry_count(&engine->register_map) > AWS_BDD_MAX_REGS) {
+        AWS_LOGF_ERROR(
+            AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Too many unique variables in ruleset. Increase AWS_BDD_MAX_REGS.");
         aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_RULESET);
         goto error;
     }
