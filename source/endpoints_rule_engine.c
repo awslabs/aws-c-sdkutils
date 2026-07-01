@@ -78,7 +78,8 @@ static int s_deep_copy_context_to_scope(
 
         struct aws_endpoints_scope_value *context_value = (struct aws_endpoints_scope_value *)iter.element.value;
 
-        new_value = aws_endpoints_scope_value_new(allocator, context_value->name.cur);
+        /* Own the name: context_value may be freed after resolve returns */
+        new_value = aws_endpoints_scope_value_new(allocator, context_value->name.cur, true);
         if (aws_endpoints_deep_copy_parameter_value(allocator, &context_value->value, &new_value->value)) {
             AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to deep copy value.");
             goto on_error;
@@ -172,7 +173,8 @@ static int s_init_top_level_state(
                 goto on_error;
             }
 
-            struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, key);
+            /* Non-owning: key points into ruleset which outlives the scope */
+            struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, key, false);
             AWS_ASSERT(val);
 
             switch (value->type) {
@@ -236,7 +238,8 @@ static int s_resolve_one_condition(
     if (*out_is_truthy && condition->assign.len > 0) {
         /* If condition assigns a value, push it to scope and let scope
         handle value memory. */
-        scope_value = aws_endpoints_scope_value_new(allocator, condition->assign);
+        /* Non-owning: condition->assign points into ruleset which outlives the scope */
+        scope_value = aws_endpoints_scope_value_new(allocator, condition->assign, false);
         scope_value->value = val;
 
         if (aws_array_list_push_back(&state->added_keys, &scope_value->name.cur)) {
@@ -495,7 +498,8 @@ int aws_endpoints_request_context_add_string(
     struct aws_byte_cursor value) {
     AWS_PRECONDITION(allocator);
 
-    struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name);
+    /* Own the name: caller-provided cursor may not outlive this call */
+    struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name, true);
     val->value.type = AWS_ENDPOINTS_VALUE_STRING;
     val->value.v.owning_cursor_string = aws_endpoints_owning_cursor_from_cursor(allocator, value);
 
@@ -514,7 +518,8 @@ int aws_endpoints_request_context_add_boolean(
     bool value) {
     AWS_PRECONDITION(allocator);
 
-    struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name);
+    /* Own the name: caller-provided cursor may not outlive this call */
+    struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name, true);
     val->value.type = AWS_ENDPOINTS_VALUE_BOOLEAN;
     val->value.v.boolean = value;
 
@@ -533,7 +538,8 @@ int aws_endpoints_request_context_add_string_array(
     const struct aws_byte_cursor *values,
     size_t len) {
 
-    struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name);
+    /* Own the name: caller-provided cursor may not outlive this call */
+    struct aws_endpoints_scope_value *val = aws_endpoints_scope_value_new(allocator, name, true);
     val->value.type = AWS_ENDPOINTS_VALUE_ARRAY;
     aws_array_list_init_dynamic(&val->value.v.array, allocator, len, sizeof(struct aws_endpoints_value));
 

@@ -42,6 +42,15 @@ static int read_file_contents(
     return AWS_OP_SUCCESS;
 }
 
+static int s_add_context(struct aws_endpoints_request_context *context, struct aws_allocator *alloc) {
+    struct aws_string *region = aws_string_new_from_c_str(alloc, "Region");
+
+    ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
+        alloc, context, aws_byte_cursor_from_string(region), aws_byte_cursor_from_c_str("us-west-2")));
+    aws_string_destroy(region);
+    return AWS_OP_SUCCESS;
+}
+
 AWS_TEST_CASE(parse_ruleset_from_string, s_test_parse_ruleset_from_string)
 static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, void *ctx) {
     (void)ctx;
@@ -81,8 +90,7 @@ static int s_test_parse_ruleset_from_string(struct aws_allocator *allocator, voi
     struct aws_endpoints_rule_engine *engine = aws_endpoints_rule_engine_new(allocator, ruleset, partitions);
 
     struct aws_endpoints_request_context *context = aws_endpoints_request_context_new(allocator);
-    ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
-        allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-west-2")));
+    ASSERT_SUCCESS(s_add_context(context, allocator));
 
     struct aws_endpoints_resolved_endpoint *resolved_endpoint = NULL;
     clock_t begin_resolve = clock();
