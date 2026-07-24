@@ -35,8 +35,39 @@ AWS_EXTERN_C_BEGIN
 /**
  * Create a new aws-chunked decoder.
  *
- * Parses chunk-size lines, data chunks, and trailers. Chunk extensions (the optional
- * ";key=value" portion after the hex size, per RFC 9112 §7.1.1) are silently ignored.
+ * "aws-chunked" is an AWS-specific Content-Encoding used by Amazon S3 (SigV4 streaming uploads
+ * and streaming checksum responses). Its framing reuses the HTTP/1.1 chunked transfer coding
+ * syntax (RFC 9112 Section 7.1) applied as a content coding (the pattern described in RFC 7694):
+ * the payload is split into chunks, each preceded by a hexadecimal size line and optional chunk
+ * extensions, and terminated by a zero-size chunk that may be followed by trailer fields carrying
+ * metadata about the stream, such as checksums and length. The decoded payload length travels
+ * out-of-band in the x-amz-decoded-content-length header.
+ *
+ * Wire format:
+ *
+ *     <hex-chunk-size>[;extension...]\r\n
+ *     <chunk-data bytes>\r\n
+ *     ... more chunks ...
+ *     0\r\n
+ *     [<trailer-name>:<trailer-value>\r\n ...]
+ *     \r\n
+ *
+ * Example (25-byte payload, 10-byte chunks, CRC32 trailer):
+ *
+ *     A\r\n
+ *     1234567890\r\n
+ *     A\r\n
+ *     1234567890\r\n
+ *     5\r\n
+ *     12345\r\n
+ *     0\r\n
+ *     x-amz-checksum-crc32:78DeVw==\r\n
+ *     \r\n
+ *
+ * Public specification: https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming.html
+ *
+ * This decoder parses chunk-size lines, data chunks, and trailers. Chunk extensions (the optional
+ * ";key=value" portion after the hex size, per RFC 9112 Section 7.1.1) are silently ignored.
  */
 AWS_SDKUTILS_API
 struct aws_chunked_decoder *aws_chunked_decoder_new(const struct aws_chunked_decoder_options *options);
