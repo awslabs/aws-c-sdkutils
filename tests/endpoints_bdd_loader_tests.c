@@ -16,7 +16,7 @@ static int s_test_bdd_loader_basic(struct aws_allocator *allocator, void *ctx) {
     aws_sdkutils_library_init(allocator);
 
     struct aws_byte_buf bytecode;
-    ASSERT_SUCCESS(aws_byte_buf_init_from_file(&bytecode, allocator, "bdd_test.bin"));
+    ASSERT_SUCCESS(aws_byte_buf_init_from_file(&bytecode, allocator, "bdd/endpoint-bdd-encoded.bin"));
 
     struct aws_byte_buf partitions_buf;
     ASSERT_SUCCESS(aws_byte_buf_init_from_file(&partitions_buf, allocator, "sample_partitions.json"));
@@ -30,7 +30,7 @@ static int s_test_bdd_loader_basic(struct aws_allocator *allocator, void *ctx) {
     ASSERT_NOT_NULL(engine);
 
     ASSERT_TRUE(aws_byte_cursor_eq_c_str(&engine->version, "1.1"));
-    ASSERT_UINT_EQUALS(17, aws_hash_table_get_entry_count(&engine->parameters));
+    ASSERT_UINT_EQUALS(17, aws_array_list_length(&engine->parameters));
     ASSERT_UINT_EQUALS(76, aws_array_list_length(&engine->conditions));
     ASSERT_UINT_EQUALS(97, aws_array_list_length(&engine->results));
 
@@ -63,7 +63,7 @@ static int s_test_bdd_compiler_loader_roundtrip(struct aws_allocator *allocator,
     ASSERT_NOT_NULL(engine);
 
     ASSERT_TRUE(aws_byte_cursor_eq_c_str(&engine->version, "1.1"));
-    ASSERT_UINT_EQUALS(2, aws_hash_table_get_entry_count(&engine->parameters));
+    ASSERT_UINT_EQUALS(2, aws_array_list_length(&engine->parameters));
     ASSERT_UINT_EQUALS(2, aws_array_list_length(&engine->conditions));
     ASSERT_UINT_EQUALS(3, aws_array_list_length(&engine->results));
     ASSERT_UINT_EQUALS(3, aws_array_list_length(&engine->nodes));

@@ -361,7 +361,7 @@ static int s_parse_expr(
 
     if (reference.len > 0) {
         expr->type = AWS_ENDPOINTS_EXPR_REFERENCE;
-        expr->e.reference = reference;
+        expr->e.reference.name = reference;
         return AWS_OP_SUCCESS;
     }
 
@@ -696,7 +696,7 @@ static int s_parse_endpoints_rule_data_endpoint(
 
         if (reference.len > 0) {
             expr.type = AWS_ENDPOINTS_EXPR_REFERENCE;
-            expr.e.reference = reference;
+            expr.e.reference.name = reference;
         } else {
             expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
             if (s_parse_function(ruleset, url_node, &expr.e.function)) {
@@ -777,7 +777,7 @@ static int s_parse_endpoints_rule_data_error(
 
     if (reference.len > 0) {
         expr.type = AWS_ENDPOINTS_EXPR_REFERENCE;
-        expr.e.reference = reference;
+        expr.e.reference.name = reference;
         aws_array_list_push_back(&ruleset->exprs, &expr);
         data_rule->error_expr_ref = (uint16_t)aws_array_list_length(&ruleset->exprs) - 1;
         return AWS_OP_SUCCESS;
