@@ -245,7 +245,7 @@ def encode_results(buf, data, strings):
             props = ep.get("properties", {})
             props_json = json.dumps(props, separators=(",", ":")) if props else ""
             write_string_ref(buf, *strings.add(props_json))
-            headers = data.get("headers", {})
+            headers = ep.get("headers", {})
             buf += struct.pack("<H", len(headers))
             for name, vs in headers.items():
                 write_string_ref(buf, *strings.add(name))
