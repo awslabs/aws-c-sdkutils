@@ -51,7 +51,9 @@ static int s_test_bdd_virtual(struct aws_allocator *allocator, void *ctx) {
         allocator, context, aws_byte_cursor_from_c_str("Region"), aws_byte_cursor_from_c_str("us-west-2")));
     /* add undefined param to make sure it still passes. */
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
-        allocator, context, aws_byte_cursor_from_c_str("AnotherRegion"), 
+        allocator,
+        context,
+        aws_byte_cursor_from_c_str("AnotherRegion"),
         aws_byte_cursor_from_c_str("old-snake-is-back")));
     ASSERT_SUCCESS(aws_endpoints_request_context_add_string(
         allocator, context, aws_byte_cursor_from_c_str("Bucket"), aws_byte_cursor_from_c_str("bucket-name")));
