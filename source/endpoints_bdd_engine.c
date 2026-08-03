@@ -21,10 +21,10 @@ static int s_copy_context_to_state(
 
         if (element == NULL) {
             /**
-             * Technically all context params need to be defined in the model, i.e. 
-             * we should have already mapped a register for them. But some SDKs populate 
-             * context with undefined context params (giving you a side look cpp). 
-             * In general, we can just ignore those params, since they will not be derefed 
+             * Technically all context params need to be defined in the model, i.e.
+             * we should have already mapped a register for them. But some SDKs populate
+             * context with undefined context params (giving you a side look cpp).
+             * In general, we can just ignore those params, since they will not be derefed
              * by the rules anyways.
              */
             continue;
