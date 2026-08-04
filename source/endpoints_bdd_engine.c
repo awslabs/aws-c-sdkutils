@@ -20,11 +20,14 @@ static int s_copy_context_to_state(
         aws_hash_table_find(&state->engine->register_map, &context_value->name.cur, &element);
 
         if (element == NULL) {
-            AWS_LOGF_ERROR(
-                AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE,
-                "Received a context variable not present in parameters: " PRInSTR,
-                AWS_BYTE_CURSOR_PRI(context_value->name.cur));
-            return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_RESOLVE_INIT_FAILED);
+            /**
+             * Technically all context params need to be defined in the model, i.e.
+             * we should have already mapped a register for them. But some SDKs populate
+             * context with undefined context params (giving you a side look cpp).
+             * In general, we can just ignore those params, since they will not be derefed
+             * by the rules anyways.
+             */
+            continue;
         }
 
         size_t idx = (size_t)element->value;
