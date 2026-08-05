@@ -38,10 +38,10 @@ time assert on enum size or members would make it a lot simpler. */
  * Conditions can add values to scope. Those values are valid for the duration of
  * rule resolution. Note: for tree rules, any values added in tree conditions are
  * valid for all rules within the tree.
- * Scope can be though of as a 'leveled' structure. Top level or 0 level
+ * Scope can be thought of as a 'leveled' structure. Top level or 0 level
  * represents all values from context and defaults. Levels 1 and up represent
  * values added by rules. Ex. if we start at level 0, all values added by rule
- * can be though of as level 1.
+ * can be thought of as level 1.
  * Since tree rule cannot be exited from, engine is simplified by making all
  * values in scope top level whenever tree is jumped into. So in practice engine
  * goes back between top level and first level as resolving rules. If that
@@ -691,7 +691,7 @@ struct aws_endpoints_rule_engine *aws_endpoints_rule_engine_release(struct aws_e
     return NULL;
 }
 
-int s_revert_scope(struct aws_endpoints_resolution_state *state) {
+static int s_revert_scope(struct aws_endpoints_resolution_state *state) {
 
     for (size_t idx = 0; idx < aws_array_list_length(&state->added_keys); ++idx) {
         struct aws_byte_cursor *cur = NULL;

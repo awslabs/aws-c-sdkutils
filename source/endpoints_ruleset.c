@@ -700,7 +700,7 @@ static int s_parse_endpoints_rule_data_endpoint(
         } else {
             expr.type = AWS_ENDPOINTS_EXPR_FUNCTION;
             if (s_parse_function(ruleset, url_node, &expr.e.function)) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to function.");
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_PARSING, "Failed to parse function.");
                 goto on_error;
             }
         }

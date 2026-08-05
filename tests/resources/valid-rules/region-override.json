@@ -8,7 +8,7 @@
     },
     "rules": [
       {
-        "documentation": "override rule for the local pseduo region",
+        "documentation": "override rule for the local pseudo region",
         "conditions": [
           {
             "fn": "stringEquals",

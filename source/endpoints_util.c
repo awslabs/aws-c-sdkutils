@@ -11,7 +11,7 @@
 
 #include <inttypes.h>
 
-/* arbitrary max length of a region. curent longest region name is 16 chars */
+/* arbitrary max length of a region. current longest region name is 16 chars */
 #define AWS_REGION_LEN 50
 
 bool aws_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains) {
@@ -50,7 +50,7 @@ bool aws_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains
     return aws_isalnum(label.ptr[label.len - 1]);
 }
 
-struct aws_byte_cursor s_path_slash = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("/");
+static struct aws_byte_cursor s_path_slash = AWS_BYTE_CUR_INIT_FROM_STRING_LITERAL("/");
 
 int aws_byte_buf_init_from_normalized_uri_path(
     struct aws_allocator *allocator,
@@ -167,10 +167,10 @@ static int s_buf_append_and_update_quote_count(
     size_t *quote_count,
     bool is_json) {
 
-    /* Dont count quotes if its not json. escaped quotes will be replaced with
+    /* Don't count quotes if it's not json. escaped quotes will be replaced with
     regular quotes when ruleset json is parsed, which will lead to incorrect
     results for when templates should be resolved in regular strings.
-    Note: in json blobs escaped quotes are preserved and bellow approach works. */
+    Note: in json blobs escaped quotes are preserved and below approach works. */
     if (is_json) {
         for (size_t idx = 0; idx < to_append.len; ++idx) {
             if (to_append.ptr[idx] == '"' && !(idx > 0 && to_append.ptr[idx - 1] == '\\')) {
@@ -188,9 +188,9 @@ static struct aws_byte_cursor escaped_opening_curly = AWS_BYTE_CUR_INIT_FROM_STR
  * Small helper to deal with escapes correctly in strings that occur before
  * template opening curly. General flow for resolving is to look for opening and
  * then closing curly. This function correctly appends any escaped closing
- * curlies and errors out if closing is not escaped (i.e. its unmatched).
+ * curlies and errors out if closing is not escaped (i.e. it's unmatched).
  */
-int s_append_template_prefix_to_buffer(
+static int s_append_template_prefix_to_buffer(
     struct aws_byte_buf *out_buf,
     struct aws_byte_cursor prefix,
     size_t *quote_count,
@@ -262,7 +262,7 @@ int aws_byte_buf_init_from_resolved_templated_string(
     while (s_split_on_first_delim(string, '{', &split, &rest)) {
         if (s_append_template_prefix_to_buffer(out_buf, split, &quote_count, is_json)) {
             AWS_LOGF_ERROR(
-                AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to append to buffer while evaluating templated sting.");
+                AWS_LS_SDKUTILS_ENDPOINTS_GENERAL, "Failed to append to buffer while evaluating templated string.");
             goto on_error;
         }
 
@@ -374,7 +374,7 @@ int aws_path_through_json(
             }
 
             if (index < 0) {
-                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected negaive index");
+                AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Unexpected negative index");
                 goto on_error;
             }
 

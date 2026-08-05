@@ -11,7 +11,7 @@
 #include <aws/sdkutils/private/endpoints_types_impl.h>
 #include <aws/sdkutils/private/endpoints_util.h>
 
-void s_endpoints_value_clean_up_cb(void *value);
+static void s_endpoints_value_clean_up_cb(void *value);
 
 uint64_t aws_endpoints_fn_name_hash[AWS_ENDPOINTS_FN_LAST];
 
@@ -214,7 +214,7 @@ on_done:
     AWS_ZERO_STRUCT(*aws_endpoints_value);
 }
 
-void s_endpoints_value_clean_up_cb(void *value) {
+static void s_endpoints_value_clean_up_cb(void *value) {
     struct aws_endpoints_value *aws_endpoints_value = value;
     aws_endpoints_value_clean_up(aws_endpoints_value);
 }
@@ -320,7 +320,7 @@ static int s_resolve_templated_value_with_pathing(
         *out_owning_cursor = aws_endpoints_owning_cursor_from_string(resolved_value.v.owning_cursor_string.string);
         resolved_value.v.owning_cursor_string.string = NULL;
     } else {
-        /* Unlikely to get here since current pathing always return new string. */
+        /* Unlikely to get here since current pathing always returns a new string. */
         *out_owning_cursor = aws_endpoints_non_owning_cursor_create(resolved_value.v.owning_cursor_string.cur);
     }
 

@@ -24,7 +24,7 @@ AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_create(
     const struct aws_string *str);
 /* Creates new cursor that takes ownership of created string. */
 AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str);
-/* Clones memory pointer to by cursor and wraps in owning cursor */
+/* Clones memory pointed to by cursor and wraps in owning cursor */
 AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
     struct aws_allocator *allocator,
     const struct aws_byte_cursor cur);

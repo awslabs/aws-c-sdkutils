@@ -31,7 +31,7 @@
  * - alternation groups
  *
  * Limitations?
- * - star and plus are greedy (match as much as they can), but do not backtrace.
+ * - star and plus are greedy (match as much as they can), but do not backtrack.
  *   This is major deviation from how regex matching should work.
  *   Note: regions in aws have a predefined pattern where sections are separated
  *   by '-', so current implementation just matches until it hits separator.
@@ -95,7 +95,7 @@ static void s_clean_up_symbols(struct aws_array_list *symbols) {
     }
 }
 
-int s_validate_regex(const struct aws_endpoints_regex *regex) {
+static int s_validate_regex(const struct aws_endpoints_regex *regex) {
     AWS_FATAL_PRECONDITION(regex != NULL);
 
     for (size_t sym_idx = 0; sym_idx < aws_array_list_length(&regex->symbols); ++sym_idx) {
@@ -164,7 +164,7 @@ int s_validate_regex(const struct aws_endpoints_regex *regex) {
             while (aws_byte_cursor_next_split(&alternation, '|', &split)) {
                 if (num_elements == s_max_elements_per_alteration) {
                     AWS_LOGF_ERROR(
-                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Unsupported regex pattern. Too many element in alternation");
+                        AWS_LS_SDKUTILS_ENDPOINTS_REGEX, "Unsupported regex pattern. Too many elements in alternation");
                     return aws_raise_error(AWS_ERROR_SDKUTILS_ENDPOINTS_UNSUPPORTED_REGEX);
                 }
 
