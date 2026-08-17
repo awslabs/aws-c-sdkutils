@@ -52,6 +52,7 @@ aws_use_package(aws-c-common)
 target_link_libraries(${PROJECT_NAME} PUBLIC ${DEP_AWS_LIBS})
 
 # Our ABI is not yet stable
+# TODO: switch to VERSION derived from the VERSION file (via aws_get_version) once SOVERSION is set explicitly, to avoid changing the SONAME.
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION 1.0.0)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
