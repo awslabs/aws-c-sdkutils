@@ -43,7 +43,7 @@ struct aws_json_value;
 ******************************
 */
 
-/* Note: following are rather arbitraty limits on different arrays, so that we can do a statically sized
+/* Note: following are rather arbitrary limits on different arrays, so that we can do a statically sized
     array instead of dynamic arrays for perf reasons. */
 enum {
     AWS_ENDPOINTS_MAX_ELEMENTS_EXPR_ARRAY =
@@ -85,7 +85,7 @@ enum aws_endpoints_fn_type {
 };
 
 enum aws_endpoints_value_type {
-    /* Special value to represent that any value type is expected from resolving an expresion.
+    /* Special value to represent that any value type is expected from resolving an expression.
         Not a valid value for a value type. */
     AWS_ENDPOINTS_VALUE_UNSET,
 
