@@ -24,7 +24,7 @@ AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_create(
     const struct aws_string *str);
 /* Creates new cursor that takes ownership of created string. */
 AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_from_string(struct aws_string *str);
-/* Clones memory pointer to by cursor and wraps in owning cursor */
+/* Clones memory pointed to by cursor and wraps in owning cursor */
 AWS_SDKUTILS_API struct aws_owning_cursor aws_endpoints_owning_cursor_from_cursor(
     struct aws_allocator *allocator,
     const struct aws_byte_cursor cur);
@@ -77,6 +77,7 @@ typedef int(aws_endpoints_template_resolve_fn)(
     struct aws_byte_cursor template_cursor,
     void *user_data,
     struct aws_owning_cursor *out_resolved);
+
 /*
  * Resolve templated string and write it out to buf.
  * Will parse templated values (i.e. values enclosed in {}) and replace them with
