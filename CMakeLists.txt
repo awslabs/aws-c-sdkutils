@@ -2,8 +2,23 @@
 # SPDX-License-Identifier: Apache-2.0.
 
 cmake_minimum_required(VERSION 3.9...3.31)
-project(aws-c-sdkutils LANGUAGES C VERSION 0.1.0)
+# In-source builds inherit aws-c-common's module path from the parent. Standalone
+# builds must locate the installed modules here: find_package needs an enabled
+# language, so it cannot run until after project().
+if (NOT IN_SOURCE_BUILD)
+    find_file(AWS_GET_VERSION_MODULE AwsGetVersion.cmake
+            PATH_SUFFIXES lib/cmake/aws-c-common/modules lib64/cmake/aws-c-common/modules)
+    if (NOT AWS_GET_VERSION_MODULE)
+        message(FATAL_ERROR "Could not find AwsGetVersion.cmake from an installed aws-c-common. Set CMAKE_PREFIX_PATH to the aws-c-common install prefix.")
+    endif()
+    get_filename_component(AWS_COMMON_MODULE_DIR "${AWS_GET_VERSION_MODULE}" DIRECTORY)
+    list(APPEND CMAKE_MODULE_PATH "${AWS_COMMON_MODULE_DIR}")
+endif()
 
+include(AwsGetVersion)
+aws_get_version(AWS_C_SDKUTILS_VERSION AWS_C_SDKUTILS_SOVERSION)
+
+project(aws-c-sdkutils LANGUAGES C VERSION ${AWS_C_SDKUTILS_VERSION})
 if (NOT IN_SOURCE_BUILD)
     # this is required so we can use aws-c-common's CMake modules
     find_package(aws-c-common REQUIRED)
@@ -51,9 +66,8 @@ aws_add_sanitizers(${PROJECT_NAME})
 aws_use_package(aws-c-common)
 target_link_libraries(${PROJECT_NAME} PUBLIC ${DEP_AWS_LIBS})
 
-# Our ABI is not yet stable
-# TODO: switch to VERSION derived from the VERSION file (via aws_get_version) once SOVERSION is set explicitly, to avoid changing the SONAME.
-set_target_properties(${PROJECT_NAME} PROPERTIES VERSION 1.0.0)
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${AWS_C_SDKUTILS_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${AWS_C_SDKUTILS_SOVERSION})
 
 target_include_directories(${PROJECT_NAME} PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
