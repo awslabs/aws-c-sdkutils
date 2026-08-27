@@ -661,16 +661,16 @@ static int s_profile_collection_add_profile(
     if (section_type == AWS_PROFILE_SECTION_TYPE_PROFILE && profile_collection->profile_source == AWS_PST_CONFIG &&
         s_is_default_profile_name(profile_name)) {
         /*
-         *  In a config file, "profile default" always supercedes "default"
+         *  In a config file, "profile default" always supersedes "default"
          */
         if (!has_profile_prefix && existing_profile && existing_profile->has_profile_prefix) {
             /*
-             * existing one supercedes: ignore this (and its properties) completely by failing the add
+             * existing one supersedes: ignore this (and its properties) completely by failing the add
              * which sets the current profile to NULL
              */
             AWS_LOGF_DEBUG(
                 AWS_LS_SDKUTILS_PROFILE,
-                "Existing prefixed default config profile supercedes unprefixed default profile");
+                "Existing prefixed default config profile supersedes unprefixed default profile");
             s_log_parse_context(AWS_LL_WARN, context);
 
             return AWS_OP_SUCCESS;
@@ -1563,7 +1563,7 @@ AWS_STATIC_STRING_FROM_LITERAL(s_default_profile_env_variable_name, "AWS_PROFILE
 struct aws_string *aws_get_profile_name(struct aws_allocator *allocator, const struct aws_byte_cursor *override_name) {
     /**
      * Profile name is resolved in the following order.
-     * 1. If the override_path variable is provided.
+     * 1. If the override_name variable is provided.
      * 2. Check `AWS_PROFILE` environment variable and use the value if it is not empty.
      * 3. Use "default". */
     struct aws_string *profile_name = NULL;

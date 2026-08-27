@@ -52,7 +52,7 @@ AWS_SDKUTILS_API enum aws_endpoints_parameter_type aws_endpoints_parameter_get_t
  * Specifies whether parameter maps to one of SDK built ins (ex. "AWS::Region").
  * Return is a cursor specifying the name of associated built in.
  * If there is no mapping, cursor will be empty.
- * Cursor is guaranteed to be valid for lifetime of paramater.
+ * Cursor is guaranteed to be valid for lifetime of parameter.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_built_in(
     const struct aws_endpoints_parameter *parameter);
@@ -61,7 +61,7 @@ AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_built_in(
  * Default string value.
  * out_cursor will point to default string value if one exist and will be empty
  * otherwise.
- * Cursor is guaranteed to be valid for lifetime of paramater.
+ * Cursor is guaranteed to be valid for lifetime of parameter.
  * Returns AWS_OP_ERR if parameter is not a string.
  */
 AWS_SDKUTILS_API int aws_endpoints_parameter_get_default_string(
@@ -85,7 +85,7 @@ AWS_SDKUTILS_API bool aws_endpoints_parameter_get_is_required(const struct aws_e
 
 /*
  * Returns cursor to parameter documentation.
- * Cursor is guaranteed to be valid for lifetime of paramater.
+ * Cursor is guaranteed to be valid for lifetime of parameter.
  * Will not be empty as doc is required.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_documentation(
@@ -98,14 +98,14 @@ AWS_SDKUTILS_API bool aws_endpoints_parameters_get_is_deprecated(const struct aw
 
 /*
  * Deprecation message. Cursor is empty if parameter is not deprecated.
- * Cursor is guaranteed to be valid for lifetime of paramater.
+ * Cursor is guaranteed to be valid for lifetime of parameter.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_message(
     const struct aws_endpoints_parameter *parameter);
 
 /*
  * Deprecated since. Cursor is empty if parameter is not deprecated.
- * Cursor is guaranteed to be valid for lifetime of paramater.
+ * Cursor is guaranteed to be valid for lifetime of parameter.
  */
 AWS_SDKUTILS_API struct aws_byte_cursor aws_endpoints_parameter_get_deprecated_since(
     const struct aws_endpoints_parameter *parameter);
@@ -136,8 +136,8 @@ AWS_SDKUTILS_API struct aws_endpoints_ruleset *aws_endpoints_ruleset_release(str
 
 /*
  * Get ruleset parameters.
- * Return is a hashtable with paramater name as a key (aws_byte_cursor *) and parameter
- * (aws_endpoints_parameter *) as a value. Ruleset owns the owns the hashtable and
+ * Return is a hashtable with parameter name as a key (aws_byte_cursor *) and parameter
+ * (aws_endpoints_parameter *) as a value. Ruleset owns the hashtable and
  * pointer is valid during ruleset lifetime. Will never return a NULL. In case
  * there are no parameters in the ruleset, hash table will contain 0 elements.
  *

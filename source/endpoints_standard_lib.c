@@ -555,7 +555,7 @@ static int s_resolve_is_valid_host_label(
     if (args.argc != 2 ||
         aws_endpoints_argv_expect(allocator, scope, args, 0, AWS_ENDPOINTS_VALUE_STRING, &argv_value) ||
         aws_endpoints_argv_expect(allocator, scope, args, 1, AWS_ENDPOINTS_VALUE_BOOLEAN, &argv_allow_subdomains)) {
-        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve not.");
+        AWS_LOGF_ERROR(AWS_LS_SDKUTILS_ENDPOINTS_RESOLVE, "Failed to resolve args for is_valid_host_label.");
         goto on_error;
     }
 
