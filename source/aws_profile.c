@@ -765,8 +765,7 @@ struct aws_profile_collection *aws_profile_collection_new_from_merge(
     }
 
     AWS_ZERO_STRUCT(*merged);
-    aws_ref_count_init(
-        &merged->ref_count, merged, (aws_simple_completion_callback *)s_aws_profile_collection_destroy_internal);
+    aws_ref_count_init(&merged->ref_count, merged, s_aws_profile_collection_destroy_internal);
     for (int i = 0; i < AWS_PROFILE_SECTION_TYPE_COUNT; i++) {
         size_t max_profiles = 0;
         if (config_profiles != NULL) {
@@ -1258,10 +1257,7 @@ static struct aws_profile_collection *s_aws_profile_collection_new_internal(
     profile_collection->profile_source = source;
     profile_collection->allocator = allocator;
 
-    aws_ref_count_init(
-        &profile_collection->ref_count,
-        profile_collection,
-        (aws_simple_completion_callback *)s_aws_profile_collection_destroy_internal);
+    aws_ref_count_init(&profile_collection->ref_count, profile_collection, s_aws_profile_collection_destroy_internal);
 
     for (int i = 0; i < AWS_PROFILE_SECTION_TYPE_COUNT; i++) {
         if (aws_hash_table_init(
