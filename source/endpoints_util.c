@@ -18,6 +18,9 @@ bool aws_is_valid_host_label(struct aws_byte_cursor label, bool allow_subdomains
     bool next_must_be_alnum = true;
     size_t subdomain_count = 0;
 
+    if (label.len == 0) {
+        return false;
+    }
     for (size_t i = 0; i < label.len; ++i) {
         if (label.ptr[i] == '.') {
             if (!allow_subdomains || subdomain_count == 0) {
