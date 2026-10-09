@@ -101,6 +101,7 @@ add_test_case(endpoints_regex_misc_validation)
 
 add_test_case(endpoints_bdd_loader_basic)
 add_test_case(endpoints_bdd_compiler_loader_roundtrip)
+add_test_case(endpoints_bdd_loader_misaligned)
 
 add_test_case(endpoints_bdd_virtual)
 add_test_case(endpoints_bdd_path)
