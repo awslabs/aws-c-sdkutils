@@ -641,7 +641,10 @@ static int s_load_nodes(
         return AWS_OP_ERR;
     }
 
-    if (aws_is_big_endian()) {
+    /* Nodes can be used in place (zero-copy) only for aligned data on a little-endian host.
+     * Alignment is not guaranteed since it depends on both the encoder's padding and the caller's buffer. */
+    bool is_aligned = ((uintptr_t)data.ptr % sizeof(int32_t)) == 0; /* node is 3x int32_t */
+    if (aws_is_big_endian() || !is_aligned) {
         if (aws_array_list_init_dynamic(out_nodes, allocator, node_count, sizeof(struct aws_endpoints_bdd_node))) {
             return AWS_OP_ERR;
         }
